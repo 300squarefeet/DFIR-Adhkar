@@ -1,0 +1,133 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.f.outputs.backend }}
+      frontend: ${{ steps.f.outputs.frontend }}
+      deploy: ${{ steps.f.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            backend: ['backend/**']
+            frontend: ['frontend/**']
+            deploy: ['deploy/**']
+
+  backend-quality:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.30"
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy adhkar
+      - run: uv run pytest tests/unit -v --cov=adhkar --cov-report=xml --cov-fail-under=70
+      - uses: actions/upload-artifact@v4
+        with: { name: backend-coverage, path: backend/coverage.xml }
+
+  frontend-quality:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test --run --coverage
+      - run: pnpm build
+
+  integration:
+    needs: [backend-quality, frontend-quality]
+    if: |
+      always() &&
+      (needs.backend-quality.result == 'success' || needs.backend-quality.result == 'skipped') &&
+      (needs.frontend-quality.result == 'success' || needs.frontend-quality.result == 'skipped')
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: adhkar
+          POSTGRES_PASSWORD: adhkar-dev
+          POSTGRES_DB: adhkar
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U adhkar"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minio-dev
+          MINIO_ROOT_PASSWORD: minio-dev-secret
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9000/minio/health/ready"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://adhkar:adhkar-dev@localhost:5432/adhkar
+      REDIS_URL: redis://localhost:6379/0
+      ADHKAR_S3_ENDPOINT: http://localhost:9000
+      ADHKAR_S3_ACCESS_KEY: minio-dev
+      ADHKAR_S3_SECRET_KEY: minio-dev-secret
+      ADHKAR_S3_BUCKET: adhkar-attachments
+      ADHKAR_SECRET_KEY: this-is-a-test-secret-32-chars-long
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with: { version: "0.4.30", enable-cache: true }
+      - run: uv sync --frozen
+      - name: create minio bucket
+        run: |
+          curl -sSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+          chmod +x /usr/local/bin/mc
+          mc alias set local http://localhost:9000 minio-dev minio-dev-secret
+          mc mb local/adhkar-attachments
+      - run: uv run alembic upgrade head
+      - run: uv run pytest tests/integration -v
+
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wagoid/commitlint-github-action@v6
+        continue-on-error: true
