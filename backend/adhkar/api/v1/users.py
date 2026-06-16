@@ -211,9 +211,7 @@ async def delete_user(
 ) -> None:
     if user_id == user.user_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "cannot_delete_self")
-    row = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    row = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
     from datetime import UTC
@@ -229,9 +227,7 @@ async def lock_user(
     _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserDTO:
-    row = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    row = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
     row.status = "locked"
@@ -245,9 +241,7 @@ async def unlock_user(
     _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserDTO:
-    row = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    row = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
     row.status = "active"
