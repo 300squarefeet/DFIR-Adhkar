@@ -76,12 +76,18 @@ export function KnowledgeBasePage() {
     }
   };
 
+  const [draftTags, setDraftTags] = useState("");
+
   const saveEdit = async () => {
     if (!active) return;
+    const tags = draftTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     try {
       const updated = await apiCall<KbPage>(`/v1/kb/pages/${active.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ content: draftContent }),
+        body: JSON.stringify({ content: draftContent, tags }),
       });
       setPages((prev) =>
         prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev,
@@ -116,7 +122,10 @@ export function KnowledgeBasePage() {
   };
 
   useEffect(() => {
-    if (active) setDraftContent(active.content);
+    if (active) {
+      setDraftContent(active.content);
+      setDraftTags(active.tags.join(", "));
+    }
   }, [active]);
 
   if (error)
@@ -260,15 +269,27 @@ export function KnowledgeBasePage() {
               ) : null}
             </header>
             {editing ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <textarea
-                  className="min-h-[24rem] rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 font-mono text-xs"
-                  value={draftContent}
-                  onChange={(e) => setDraftContent(e.target.value)}
-                />
-                <pre className="min-h-[24rem] whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
-                  {draftContent}
-                </pre>
+              <div className="space-y-2">
+                <label className="block">
+                  <span className="text-xs text-md-sys-color-on-surface-variant">
+                    Tags (comma-separated)
+                  </span>
+                  <input
+                    className="mt-1 w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+                    value={draftTags}
+                    onChange={(e) => setDraftTags(e.target.value)}
+                  />
+                </label>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <textarea
+                    className="min-h-[24rem] rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 font-mono text-xs"
+                    value={draftContent}
+                    onChange={(e) => setDraftContent(e.target.value)}
+                  />
+                  <pre className="min-h-[24rem] whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
+                    {draftContent}
+                  </pre>
+                </div>
               </div>
             ) : (
               <pre className="whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
