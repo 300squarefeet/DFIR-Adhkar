@@ -84,6 +84,11 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # Portal
     "/v1/portal/cases",
     "/v1/portal/cases/{case_id}/comments",
+    # Full-text search
+    "/v1/search",
+    # SAML SSO
+    "/v1/auth/saml/{provider}/login",
+    "/v1/auth/saml/{provider}/acs",
 )
 
 

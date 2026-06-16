@@ -85,7 +85,46 @@ export function LoginPage() {
         <Button type="submit" variant="filled" size="md" loading={busy} className="mt-4 w-full">
           Sign in
         </Button>
+        <SsoLinks />
       </form>
+    </div>
+  );
+}
+
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000";
+
+function SsoLinks() {
+  // Provider keys are env-driven in the backend; here we expose the conventional
+  // names the operator most likely configured. If a provider isn't configured
+  // the backend returns 404 — the link silently leads nowhere, no leak.
+  const providers = (
+    (import.meta.env.VITE_SSO_PROVIDERS as string | undefined) ?? ""
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (providers.length === 0) return null;
+  return (
+    <div className="mt-4 border-t border-outline-variant pt-3">
+      <p className="mb-2 text-xs text-on-surface-variant">Or sign in with:</p>
+      <div className="flex flex-wrap gap-2">
+        {providers.map((p) => {
+          const parts = p.includes(":") ? p.split(":") : ["oidc", p];
+          const kind = parts[0] ?? "oidc";
+          const name = parts[1] ?? parts[0] ?? "";
+          const url = `${API_BASE.replace(/\/$/, "")}/v1/auth/${kind}/${name}/login`;
+          return (
+            <a
+              key={p}
+              href={url}
+              className="rounded-full border border-outline-variant px-3 py-1 text-xs hover:bg-surface-container-high"
+            >
+              {kind.toUpperCase()} · {name}
+            </a>
+          );
+        })}
+      </div>
     </div>
   );
 }
