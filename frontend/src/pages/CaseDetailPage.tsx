@@ -69,6 +69,11 @@ interface CaseObservable {
   sighted: boolean;
 }
 
+interface AnalyzerInfo {
+  name: string;
+  supported_types: string[];
+}
+
 interface CaseReportResponse {
   markdown: string;
   number: number;
@@ -115,6 +120,8 @@ export function CaseDetailPage({ caseId }: Props) {
   const [attachIds, setAttachIds] = useState("");
   const [attachBusy, setAttachBusy] = useState(false);
   const [simCounts, setSimCounts] = useState<Record<string, number>>({});
+  const [analyzers, setAnalyzers] = useState<AnalyzerInfo[]>([]);
+  const [runningAnalyzer, setRunningAnalyzer] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +150,11 @@ export function CaseDetailPage({ caseId }: Props) {
         setPages(ps);
         setTimeline(tl.entries);
         setCaseObs(obs);
+        apiCall<AnalyzerInfo[]>(`/v1/analyzers`)
+          .then((a) => {
+            if (!cancelled) setAnalyzers(a);
+          })
+          .catch(() => undefined);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -190,6 +202,21 @@ export function CaseDetailPage({ caseId }: Props) {
       setError((e as Error).message);
     } finally {
       setAttachBusy(false);
+    }
+  };
+
+  const runAnalyzer = async (observableId: string, analyzerName: string) => {
+    setRunningAnalyzer(`${observableId}:${analyzerName}`);
+    try {
+      await apiCall(
+        `/v1/observables/${observableId}/analyzers/${encodeURIComponent(analyzerName)}`,
+        { method: "POST", body: "{}" },
+      );
+      toast.success(`Enqueued ${analyzerName}.`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setRunningAnalyzer(null);
     }
   };
 
@@ -553,10 +580,34 @@ export function CaseDetailPage({ caseId }: Props) {
                     seen {simCounts[o.id]}×
                   </span>
                 ) : null}
+                {permissions.has("manageObservable") ? (
+                  <select
+                    className="ml-auto rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-0.5 text-xs disabled:opacity-50"
+                    value=""
+                    disabled={runningAnalyzer?.startsWith(o.id + ":") ?? false}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      if (name) void runAnalyzer(o.id, name);
+                    }}
+                  >
+                    <option value="">
+                      {runningAnalyzer?.startsWith(o.id + ":")
+                        ? "Enqueuing…"
+                        : "Run analyzer…"}
+                    </option>
+                    {analyzers
+                      .filter((a) => a.supported_types.includes(o.data_type))
+                      .map((a) => (
+                        <option key={a.name} value={a.name}>
+                          {a.name}
+                        </option>
+                      ))}
+                  </select>
+                ) : null}
                 {permissions.has("manageCase") ? (
                   <button
                     type="button"
-                    className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                    className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
                     onClick={() => {
                       void detachObservable(o.id);
                     }}

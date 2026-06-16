@@ -9,6 +9,8 @@ import { Link } from "@tanstack/react-router";
 
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
+import { TaxonomyTagPicker } from "@/ui/TaxonomyTagPicker";
+import { useToast } from "@/ui/Toast";
 
 interface Observable {
   id: string;
@@ -41,10 +43,14 @@ interface Props {
 }
 
 export function ObservableDetailPage({ observableId }: Props) {
-  const { apiCall } = useAuth();
+  const { apiCall, permissions } = useAuth();
+  const toast = useToast();
   const [obs, setObs] = useState<Observable | null>(null);
   const [matches, setMatches] = useState<SimilarObservable[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [editingTags, setEditingTags] = useState(false);
+  const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [savingTags, setSavingTags] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +83,28 @@ export function ObservableDetailPage({ observableId }: Props) {
       </section>
     );
   if (!obs) return <section className="p-6">Loading…</section>;
+
+  const startEditTags = () => {
+    setDraftTags(obs.tags);
+    setEditingTags(true);
+  };
+
+  const saveTags = async () => {
+    setSavingTags(true);
+    try {
+      const updated = await apiCall<Observable>(`/v1/observables/${observableId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ tags: draftTags }),
+      });
+      setObs(updated);
+      toast.success("Tags saved.");
+      setEditingTags(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingTags(false);
+    }
+  };
 
   return (
     <section className="space-y-4 p-6">
@@ -112,7 +140,33 @@ export function ObservableDetailPage({ observableId }: Props) {
               #{t}
             </span>
           ))}
+          {permissions.has("manageObservable") ? (
+            <button
+              type="button"
+              className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              onClick={() => (editingTags ? setEditingTags(false) : startEditTags())}
+            >
+              {editingTags ? "Cancel" : "Edit tags"}
+            </button>
+          ) : null}
         </div>
+        {editingTags && permissions.has("manageObservable") ? (
+          <div className="rounded border border-md-sys-color-outline-variant p-3">
+            <TaxonomyTagPicker value={draftTags} onChange={setDraftTags} />
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                className="rounded-full bg-md-sys-color-primary px-4 py-1 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+                onClick={() => {
+                  void saveTags();
+                }}
+                disabled={savingTags}
+              >
+                {savingTags ? "Saving…" : "Save tags"}
+              </button>
+            </div>
+          </div>
+        ) : null}
         {obs.message ? (
           <p className="whitespace-pre-wrap text-sm">{obs.message}</p>
         ) : null}
