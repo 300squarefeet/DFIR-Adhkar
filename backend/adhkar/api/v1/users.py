@@ -135,6 +135,142 @@ async def invite_user(
     )
 
 
+class UserPatch(BaseModel):
+    display_name: str | None = None
+    profile_id: UUID | None = None  # in current org membership
+
+
+@router.get("/v1/users/{user_id}", response_model=UserDTO)
+async def get_user(
+    user_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserDTO:
+    row = (
+        await db.execute(
+            select(User)
+            .join(UserOrgMembership, UserOrgMembership.user_id == User.id)
+            .where(
+                User.id == user_id,
+                UserOrgMembership.organization_id == org_id,
+                User.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    return UserDTO(id=row.id, email=row.email, display_name=row.display_name, status=row.status)
+
+
+@router.patch("/v1/users/{user_id}", response_model=UserDTO)
+async def patch_user(
+    user_id: UUID,
+    body: UserPatch,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserDTO:
+    row = (
+        await db.execute(select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    if body.display_name is not None:
+        row.display_name = body.display_name
+    if body.profile_id is not None:
+        mem = (
+            await db.execute(
+                select(UserOrgMembership).where(
+                    UserOrgMembership.user_id == user_id,
+                    UserOrgMembership.organization_id == org_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not mem:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "membership_not_found")
+        profile = (
+            await db.execute(
+                select(Profile).where(
+                    Profile.id == body.profile_id, Profile.organization_id == org_id
+                )
+            )
+        ).scalar_one_or_none()
+        if not profile:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "profile_not_in_org")
+        mem.profile_id = profile.id
+    await db.flush()
+    return UserDTO(id=row.id, email=row.email, display_name=row.display_name, status=row.status)
+
+
+@router.delete("/v1/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    if user_id == user.user_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "cannot_delete_self")
+    row = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    row.deleted_at = _dt.now(tz=UTC)
+    await db.flush()
+
+
+@router.post("/v1/users/{user_id}/lock", response_model=UserDTO)
+async def lock_user(
+    user_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserDTO:
+    row = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    row.status = "locked"
+    await db.flush()
+    return UserDTO(id=row.id, email=row.email, display_name=row.display_name, status=row.status)
+
+
+@router.post("/v1/users/{user_id}/unlock", response_model=UserDTO)
+async def unlock_user(
+    user_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserDTO:
+    row = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    row.status = "active"
+    await db.flush()
+    return UserDTO(id=row.id, email=row.email, display_name=row.display_name, status=row.status)
+
+
+@router.post("/v1/users/{user_id}/reset-mfa", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_reset_mfa(
+    user_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    from adhkar.db.models import MfaSecret
+
+    row = (
+        await db.execute(select(MfaSecret).where(MfaSecret.user_id == user_id))
+    ).scalar_one_or_none()
+    if row:
+        await db.delete(row)
+        await db.flush()
+
+
 @router.get("/v1/auth/invite/{token}", response_model=InvitePeekResponse)
 async def peek_invite(
     token: str,
