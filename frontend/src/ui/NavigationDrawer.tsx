@@ -13,8 +13,8 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/alerts", label: "Alerts", icon: "warning" },
   { to: "/observables", label: "Observables", icon: "fingerprint" },
   { to: "/adhkar-mind", label: "Adhkar Mind", icon: "psychology" },
-  { label: "Dashboards", icon: "dashboard", phase: 6 },
-  { label: "Knowledge Base", icon: "menu_book", phase: 6 },
+  { to: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { to: "/knowledge-base", label: "Knowledge Base", icon: "menu_book" },
   { label: "Admin", icon: "settings", phase: 1 },
 ];
 
