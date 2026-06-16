@@ -17,7 +17,8 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/knowledge-base", label: "Knowledge Base", icon: "menu_book" },
   { to: "/notifications", label: "Notifications", icon: "notifications" },
   { to: "/ttps", label: "MITRE ATT&CK", icon: "shield" },
-  { label: "Admin", icon: "settings", phase: 1 },
+  { to: "/admin/users", label: "Admin · Users", icon: "group" },
+  { to: "/admin/profiles", label: "Admin · Profiles", icon: "verified_user" },
 ];
 
 export function NavigationDrawer() {

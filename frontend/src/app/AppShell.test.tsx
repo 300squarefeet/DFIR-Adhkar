@@ -39,9 +39,8 @@ describe("<AppShell>", () => {
     expect(screen.getByRole("link", { name: /adhkar mind/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /knowledge base/i })).toBeInTheDocument();
-    const admin = screen.getByRole("button", { name: /admin/i });
-    expect(admin).toBeDisabled();
-    expect(admin).toHaveAttribute("title", expect.stringContaining("Phase"));
+    expect(screen.getByRole("link", { name: /admin · users/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /admin · profiles/i })).toBeInTheDocument();
   });
 
   it("⌘K opens the command palette", async () => {

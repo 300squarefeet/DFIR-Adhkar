@@ -7,6 +7,8 @@ import {
 } from "@tanstack/react-router";
 
 import { AdhkarMindPage } from "@/pages/AdhkarMindPage";
+import { AdminProfilesPage } from "@/pages/AdminProfilesPage";
+import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { AlertsPage } from "@/pages/AlertsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CaseDetailPage } from "@/pages/CaseDetailPage";
@@ -113,6 +115,18 @@ const ttpsRoute = createRoute({
   component: TtpsPage,
 });
 
+const adminUsersRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/admin/users",
+  component: AdminUsersPage,
+});
+
+const adminProfilesRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/admin/profiles",
+  component: AdminProfilesPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -138,6 +152,8 @@ export const router = createRouter({
       dashboardRoute,
       notificationsRoute,
       ttpsRoute,
+      adminUsersRoute,
+      adminProfilesRoute,
     ]),
   ]),
 });
