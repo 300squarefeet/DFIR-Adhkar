@@ -15,6 +15,7 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/adhkar-mind", label: "Adhkar Mind", icon: "psychology" },
   { to: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { to: "/knowledge-base", label: "Knowledge Base", icon: "menu_book" },
+  { to: "/notifications", label: "Notifications", icon: "notifications" },
   { label: "Admin", icon: "settings", phase: 1 },
 ];
 

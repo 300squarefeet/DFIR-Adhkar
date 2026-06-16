@@ -15,6 +15,7 @@ import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
 import { KnowledgeBasePage } from "@/pages/KnowledgeBasePage";
 import { LoginPage } from "@/pages/LoginPage";
+import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ObservablesPage } from "@/pages/ObservablesPage";
 
 import { AppShell } from "./AppShell";
@@ -99,6 +100,12 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
+const notificationsRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/notifications",
+  component: NotificationsPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -122,6 +129,7 @@ export const router = createRouter({
       mindRoute,
       kbRoute,
       dashboardRoute,
+      notificationsRoute,
     ]),
   ]),
 });
