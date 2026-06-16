@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from adhkar import __version__
 from adhkar.api.errors import register_exception_handlers
+from adhkar.api.v1.auth import router as auth_router
 from adhkar.api.v1.meta import router as meta_router
 from adhkar.core.logging import configure_logging
 from adhkar.core.middleware import AccessLogMiddleware, RequestIdMiddleware
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.include_router(meta_router)
+    app.include_router(auth_router)
     register_exception_handlers(app)
     configure_otel(app, settings)
 
