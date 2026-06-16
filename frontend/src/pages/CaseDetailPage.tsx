@@ -258,6 +258,14 @@ export function CaseDetailPage({ caseId }: Props) {
           >
             {reportBusy ? "…" : "Download report (.md)"}
           </button>
+          <a
+            href={`${(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000"}/v1/cases/${caseId}/report.html`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+          >
+            Print preview
+          </a>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SeverityBadge level={c.severity} />
