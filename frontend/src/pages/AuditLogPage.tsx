@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { useUserNames } from "@/lib/useUserNames";
 
 interface AuditRow {
   id: string;
@@ -45,6 +46,8 @@ export function AuditLogPage() {
       cancelled = true;
     };
   }, [apiCall, entityType, actionFilter]);
+
+  const userNames = useUserNames(rows?.map((r) => r.actor_user_id) ?? []);
 
   const filtered = useMemo(() => {
     if (!rows) return [];
@@ -152,7 +155,12 @@ export function AuditLogPage() {
               <dt className="text-md-sys-color-on-surface-variant">When</dt>
               <dd>{new Date(active.created_at).toLocaleString()}</dd>
               <dt className="text-md-sys-color-on-surface-variant">Actor</dt>
-              <dd className="font-mono">{active.actor_user_id ?? "(system)"}</dd>
+              <dd>
+                {active.actor_user_id
+                  ? (userNames[active.actor_user_id] ??
+                    active.actor_user_id.slice(0, 8))
+                  : "(system)"}
+              </dd>
               <dt className="text-md-sys-color-on-surface-variant">Entity</dt>
               <dd className="font-mono">{active.entity_id ?? "—"}</dd>
               {active.ip ? (

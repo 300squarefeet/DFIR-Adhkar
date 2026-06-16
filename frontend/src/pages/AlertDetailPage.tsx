@@ -10,6 +10,7 @@ import { useRouter } from "@tanstack/react-router";
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
+import { useUserNames } from "@/lib/useUserNames";
 import { useToast } from "@/ui/Toast";
 
 interface AlertDetail {
@@ -53,6 +54,7 @@ export function AlertDetailPage({ alertId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const timelineUserNames = useUserNames(timeline.map((t) => t.actor_user_id));
 
   useEffect(() => {
     let cancelled = false;
@@ -205,6 +207,13 @@ export function AlertDetailPage({ alertId }: Props) {
               >
                 <span className="font-mono uppercase">{t.entity_type}</span>
                 <span className="font-medium">{t.action}</span>
+                {t.actor_user_id ? (
+                  <span className="text-md-sys-color-on-surface-variant">
+                    by{" "}
+                    {timelineUserNames[t.actor_user_id] ??
+                      t.actor_user_id.slice(0, 8)}
+                  </span>
+                ) : null}
                 <span className="ml-auto text-md-sys-color-on-surface-variant">
                   {new Date(t.created_at).toLocaleString()}
                 </span>
