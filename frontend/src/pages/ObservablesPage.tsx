@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Link } from "@tanstack/react-router";
+
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/ui/Toast";
@@ -132,8 +134,24 @@ export function ObservablesPage() {
                     />
                   ) : null}
                 </td>
-                <td className="py-2 pr-3 font-mono text-xs">{o.data_type}</td>
-                <td className="py-2 pr-3 break-all font-mono text-xs">{o.data}</td>
+                <td className="py-2 pr-3 font-mono text-xs">
+                  <Link
+                    to="/observables/$observableId"
+                    params={{ observableId: o.id }}
+                    className="hover:underline"
+                  >
+                    {o.data_type}
+                  </Link>
+                </td>
+                <td className="py-2 pr-3 break-all font-mono text-xs">
+                  <Link
+                    to="/observables/$observableId"
+                    params={{ observableId: o.id }}
+                    className="hover:underline"
+                  >
+                    {o.data}
+                  </Link>
+                </td>
                 <td className="py-2 pr-3">
                   <TLPBadge tlp={o.tlp} />
                 </td>
