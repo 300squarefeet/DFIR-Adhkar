@@ -1,0 +1,6 @@
+# Copy to docker-compose.override.yml for local-only overrides.
+# Auto-loaded by `docker compose` if named docker-compose.override.yml.
+services:
+  api:
+    environment:
+      ADHKAR_LOG_LEVEL: DEBUG
