@@ -141,6 +141,10 @@ export function CaseDetailPage({ caseId }: Props) {
   const [editingDesc, setEditingDesc] = useState(false);
   const [descDraft, setDescDraft] = useState("");
   const [showAssignee, setShowAssignee] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskMandatory, setNewTaskMandatory] = useState(false);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,6 +193,41 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId]);
+
+  const createTask = async () => {
+    if (!newTaskTitle.trim()) return;
+    setCreatingTask(true);
+    try {
+      const created = await apiCall<TaskRow>(`/v1/cases/${caseId}/tasks`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          mandatory: newTaskMandatory,
+        }),
+      });
+      setTasks((prev) => [...prev, created]);
+      setNewTaskTitle("");
+      setNewTaskMandatory(false);
+      setShowNewTask(false);
+      toast.success(`Task "${created.title}" added.`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
+  const setTaskStatus = async (taskId: string, status: string) => {
+    try {
+      const updated = await apiCall<TaskRow>(`/v1/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   const refreshObservables = async () => {
     try {
@@ -721,7 +760,46 @@ export function CaseDetailPage({ caseId }: Props) {
       ) : null}
 
       <article>
-        <h2 className="mb-2 text-lg font-medium">Tasks ({tasks.length})</h2>
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="text-lg font-medium">Tasks ({tasks.length})</h2>
+          {permissions.has("manageTask") ? (
+            <button
+              type="button"
+              className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              onClick={() => setShowNewTask((v) => !v)}
+            >
+              {showNewTask ? "Cancel" : "+ Task"}
+            </button>
+          ) : null}
+        </div>
+        {showNewTask && permissions.has("manageTask") ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+              placeholder="Task title"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+            />
+            <label className="flex items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                checked={newTaskMandatory}
+                onChange={(e) => setNewTaskMandatory(e.target.checked)}
+              />
+              required
+            </label>
+            <button
+              type="button"
+              className="rounded-full bg-md-sys-color-primary px-3 py-1 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+              onClick={() => {
+                void createTask();
+              }}
+              disabled={creatingTask || !newTaskTitle.trim()}
+            >
+              {creatingTask ? "Adding…" : "Add"}
+            </button>
+          </div>
+        ) : null}
         {tasks.length === 0 ? (
           <p className="text-sm text-md-sys-color-on-surface-variant">No tasks yet.</p>
         ) : (
@@ -734,7 +812,22 @@ export function CaseDetailPage({ caseId }: Props) {
                 <span className="font-mono text-xs">{t.status}</span>
                 <span>{t.title}</span>
                 {t.mandatory ? (
-                  <span className="ml-auto text-xs text-severity-3">required</span>
+                  <span className="text-xs text-severity-3">required</span>
+                ) : null}
+                {permissions.has("manageTask") ? (
+                  <select
+                    className="ml-auto rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-0.5 text-xs"
+                    value={t.status}
+                    onChange={(e) => {
+                      void setTaskStatus(t.id, e.target.value);
+                    }}
+                  >
+                    {["Waiting", "InProgress", "Completed", "Cancelled"].map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
                 ) : null}
               </li>
             ))}
