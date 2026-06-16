@@ -34,6 +34,7 @@ from adhkar.auth.oidc import (
     sign_state,
     verify_state,
 )
+from adhkar.auth.oidc_jwt import IdTokenInvalidError, verify_id_token
 from adhkar.auth.tokens import issue_tokens
 from adhkar.core.settings import Settings, get_settings
 from adhkar.db.models import User
@@ -165,7 +166,20 @@ async def callback(
     id_token = str(token_payload.get("id_token") or "")
     if not id_token:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "oidc_provider_returned_no_id_token")
-    claims = _decode_id_token_payload(id_token)
+    issuer = disc.metadata.get("issuer")
+    issuer_str = issuer if isinstance(issuer, str) else None
+    try:
+        claims = verify_id_token(
+            id_token=id_token,
+            jwks=disc.jwks,
+            audience=p.client_id,
+            issuer=issuer_str,
+        )
+    except IdTokenInvalidError as e:
+        if disc.jwks:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"oidc_id_token_invalid:{e}") from e
+        _log.warning("oidc_jwks_unavailable_using_unverified_payload provider=%s", provider)
+        claims = _decode_id_token_payload(id_token)
     email = str(claims.get("email") or "")
     display_name = str(claims.get("name") or claims.get("preferred_username") or email)
     if not email:

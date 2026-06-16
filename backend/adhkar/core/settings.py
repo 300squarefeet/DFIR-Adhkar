@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # JSON map: {"<name>": {client_id, client_secret, discovery_url, scopes?, redirect_uri?}}
     oidc_providers_json: str = ""
 
+    # ----- saml sso -----
+    # JSON map keyed by provider name; per-entry keys: idp_entity_id,
+    # idp_sso_url, sp_entity_id, acs_url, idp_certificate_pem? (optional).
+    saml_providers_json: str = ""
+
     # ----- smtp (dev = mailhog) -----
     smtp_host: str = "mailhog"
     smtp_port: int = 1025
