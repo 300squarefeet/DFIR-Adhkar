@@ -21,7 +21,7 @@ def get_engine(s: Annotated[Settings, Depends(get_settings)]) -> AsyncEngine:
     return create_engine(s)
 
 
-def get_redis(s: Annotated[Settings, Depends(get_settings)]) -> redis_async.Redis:
+def get_redis(s: Annotated[Settings, Depends(get_settings)]) -> "redis_async.Redis[str]":
     return redis_async.from_url(s.redis_url, decode_responses=True)
 
 
