@@ -76,6 +76,19 @@ export function AnalyzerJobsPage() {
     }
   };
 
+  // Auto-poll while any job for the active observable is queued or running.
+  useEffect(() => {
+    if (!activeObs) return;
+    const pending = jobs.some((j) => j.status === "queued" || j.status === "running");
+    if (!pending) return;
+    const id = window.setInterval(() => {
+      apiCall<AnalyzerJob[]>(`/v1/observables/${activeObs}/analyzer-jobs`)
+        .then(setJobs)
+        .catch(() => undefined);
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [apiCall, activeObs, jobs]);
+
   const enqueue = async (analyzerName: string) => {
     if (!activeObs) return;
     try {

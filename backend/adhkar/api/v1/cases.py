@@ -373,6 +373,27 @@ async def _load_case_or_404(db: AsyncSession, org_id: UUID, case_id: UUID) -> Ca
     return c
 
 
+@router.get("/v1/tasks", response_model=list[TaskDTO])
+async def list_all_tasks(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    assignee_id: UUID | None = None,
+    status_filter: TASK_STATUS | None = None,
+    limit: int = 200,
+) -> list[TaskDTO]:
+    """Cross-case task list. Used by the analyst's 'my queue' view."""
+    safe_limit = max(1, min(500, int(limit)))
+    stmt = select(Task).where(Task.organization_id == org_id)
+    if assignee_id:
+        stmt = stmt.where(Task.assignee_id == assignee_id)
+    if status_filter:
+        stmt = stmt.where(Task.status == status_filter)
+    stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc()).limit(safe_limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    return [_task_to_dto(t) for t in rows]
+
+
 @router.get("/v1/cases/{case_id}/tasks", response_model=list[TaskDTO])
 async def list_tasks(
     case_id: UUID,

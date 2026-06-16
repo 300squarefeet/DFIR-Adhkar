@@ -19,6 +19,7 @@ import { CaseTemplatesPage } from "@/pages/CaseTemplatesPage";
 import { GdprPage } from "@/pages/GdprPage";
 import { PortalPage } from "@/pages/PortalPage";
 import { SearchPage } from "@/pages/SearchPage";
+import { TasksPage } from "@/pages/TasksPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
@@ -179,6 +180,12 @@ const analyzerJobsRoute = createRoute({
   component: AnalyzerJobsPage,
 });
 
+const tasksRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/tasks",
+  component: TasksPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -213,6 +220,7 @@ export const router = createRouter({
       searchRoute,
       auditRoute,
       analyzerJobsRoute,
+      tasksRoute,
     ]),
   ]),
 });
