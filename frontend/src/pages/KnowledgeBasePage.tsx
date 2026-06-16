@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/ui/Toast";
 
 interface KbPage {
   id: string;
@@ -16,11 +17,17 @@ interface KbPage {
 }
 
 export function KnowledgeBasePage() {
-  const { apiCall } = useAuth();
+  const { apiCall, permissions } = useAuth();
+  const toast = useToast();
   const [pages, setPages] = useState<KbPage[] | null>(null);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [draftContent, setDraftContent] = useState("");
+  const [newSlug, setNewSlug] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +56,59 @@ export function KnowledgeBasePage() {
   }, [pages, filter]);
 
   const active = pages?.find((p) => p.slug === activeSlug) ?? null;
+  const canManage = permissions.has("manageConfig");
+
+  const refresh = async () => {
+    try {
+      const p = await apiCall<KbPage[]>("/v1/kb/pages");
+      setPages(p);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!active) return;
+    try {
+      const updated = await apiCall<KbPage>(`/v1/kb/pages/${active.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content: draftContent }),
+      });
+      setPages((prev) =>
+        prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev,
+      );
+      setEditing(false);
+      toast.success("Page saved.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const createPage = async () => {
+    if (!newSlug.trim() || !newTitle.trim()) return;
+    try {
+      const created = await apiCall<KbPage>("/v1/kb/pages", {
+        method: "POST",
+        body: JSON.stringify({
+          slug: newSlug.trim(),
+          title: newTitle.trim(),
+          content: "",
+        }),
+      });
+      await refresh();
+      setActiveSlug(created.slug);
+      setNewSlug("");
+      setNewTitle("");
+      setShowCreate(false);
+      toast.success("Page created.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    if (active) setDraftContent(active.content);
+  }, [active]);
 
   if (error)
     return (
@@ -63,7 +123,44 @@ export function KnowledgeBasePage() {
   return (
     <section className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[16rem_1fr]">
       <aside>
-        <h1 className="mb-2 text-xl font-semibold">Knowledge Base</h1>
+        <div className="mb-2 flex items-center gap-2">
+          <h1 className="text-xl font-semibold">Knowledge Base</h1>
+          {canManage ? (
+            <button
+              type="button"
+              className="ml-auto rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              onClick={() => setShowCreate((v) => !v)}
+            >
+              {showCreate ? "Cancel" : "+ Page"}
+            </button>
+          ) : null}
+        </div>
+        {showCreate && canManage ? (
+          <div className="mb-3 space-y-1 rounded border border-md-sys-color-outline-variant p-2">
+            <input
+              className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+              placeholder="slug (lowercase-hyphens)"
+              value={newSlug}
+              onChange={(e) => setNewSlug(e.target.value)}
+            />
+            <input
+              className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+              placeholder="Title"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
+            <button
+              type="button"
+              className="w-full rounded-full bg-md-sys-color-primary px-3 py-0.5 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+              onClick={() => {
+                void createPage();
+              }}
+              disabled={!newSlug.trim() || !newTitle.trim()}
+            >
+              Create
+            </button>
+          </div>
+        ) : null}
         <input
           className="mb-3 w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           placeholder="Filter…"
@@ -94,15 +191,50 @@ export function KnowledgeBasePage() {
       <article>
         {active ? (
           <>
-            <header className="mb-2">
-              <h2 className="text-2xl font-semibold">{active.title}</h2>
-              <p className="text-xs text-md-sys-color-on-surface-variant">
-                {active.slug} · updated {new Date(active.updated_at).toLocaleString()}
-              </p>
+            <header className="mb-2 flex items-baseline gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold">{active.title}</h2>
+                <p className="text-xs text-md-sys-color-on-surface-variant">
+                  {active.slug} · updated {new Date(active.updated_at).toLocaleString()}
+                </p>
+              </div>
+              {canManage ? (
+                <button
+                  type="button"
+                  className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                  onClick={() => setEditing((v) => !v)}
+                >
+                  {editing ? "Cancel" : "Edit"}
+                </button>
+              ) : null}
+              {editing ? (
+                <button
+                  type="button"
+                  className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-xs text-md-sys-color-on-primary"
+                  onClick={() => {
+                    void saveEdit();
+                  }}
+                >
+                  Save
+                </button>
+              ) : null}
             </header>
-            <pre className="whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
-              {active.content}
-            </pre>
+            {editing ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <textarea
+                  className="min-h-[24rem] rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 font-mono text-xs"
+                  value={draftContent}
+                  onChange={(e) => setDraftContent(e.target.value)}
+                />
+                <pre className="min-h-[24rem] whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
+                  {draftContent}
+                </pre>
+              </div>
+            ) : (
+              <pre className="whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
+                {active.content}
+              </pre>
+            )}
           </>
         ) : (
           <p className="text-sm text-md-sys-color-on-surface-variant">

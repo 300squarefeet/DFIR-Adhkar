@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Button } from "@/design-system/components/Button";
 import { getStoredTheme, toggleTheme } from "@/lib/theme";
+import { UserMenu } from "@/ui/UserMenu";
 
 interface TopAppBarProps {
   onOpenPalette: () => void;
@@ -34,7 +35,7 @@ export function TopAppBar({ onOpenPalette }: TopAppBarProps) {
             {themeIcon}
           </span>
         </Button>
-        <span className="text-xs text-on-surface-variant">@user</span>
+        <UserMenu />
       </div>
     </header>
   );
