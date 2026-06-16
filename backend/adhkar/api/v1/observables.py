@@ -82,6 +82,35 @@ def _to_dto(o: Observable) -> ObservableDTO:
     )
 
 
+@router.get("/search", response_model=list[ObservableDTO])
+async def search_observables(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    q: str = "",
+    data_type: str | None = None,
+    only_unattached: bool = False,
+    limit: int = 20,
+) -> list[ObservableDTO]:
+    """Substring search across (data_type, data, tags). Used by the
+    CaseDetailPage observable-attach picker; orders by created_at desc
+    so the most recent matches surface first."""
+    safe_limit = max(1, min(100, int(limit)))
+    pattern = f"%{q.strip()}%" if q.strip() else "%"
+    stmt = select(Observable).where(
+        Observable.organization_id == org_id, Observable.deleted_at.is_(None)
+    )
+    if data_type:
+        stmt = stmt.where(Observable.data_type == data_type)
+    if only_unattached:
+        stmt = stmt.where(Observable.case_id.is_(None))
+    if q.strip():
+        stmt = stmt.where(Observable.data.ilike(pattern))
+    stmt = stmt.order_by(Observable.created_at.desc()).limit(safe_limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    return [_to_dto(o) for o in rows]
+
+
 @router.get("", response_model=list[ObservableDTO])
 async def list_observables(
     _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
