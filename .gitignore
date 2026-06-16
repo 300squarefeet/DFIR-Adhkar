@@ -8,10 +8,13 @@ Thumbs.db
 *.swp
 *.swo
 
-# ----- Env -----
-deploy/.env
-deploy/.env.local
-deploy/.env.*.local
+# ----- Env (repo-wide; allowlist tracked example files explicitly) -----
+.env
+.env.local
+.env.*.local
+*.env
+*.env.local
+!deploy/.env.example
 
 # ----- Python -----
 __pycache__/
