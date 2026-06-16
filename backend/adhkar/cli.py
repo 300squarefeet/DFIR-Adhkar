@@ -33,8 +33,8 @@ async def _bootstrap(
 ) -> None:
     settings = get_settings()
     engine = create_engine(settings)
-    Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    async with Session() as session, session.begin():
+    session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    async with session_factory() as session, session.begin():
         existing_org = (
             await session.execute(select(Organization).where(Organization.name == org_name))
         ).scalar_one_or_none()
