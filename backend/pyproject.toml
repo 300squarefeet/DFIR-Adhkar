@@ -35,6 +35,7 @@ dependencies = [
   "zxcvbn>=4.4.28",
   "itsdangerous>=2.2",
   "email-validator>=2.2",
+  "defusedxml>=0.7.1",
 ]
 
 [dependency-groups]
