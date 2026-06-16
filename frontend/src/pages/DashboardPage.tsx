@@ -9,16 +9,82 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { CORE_WIDGETS, type WidgetSpec } from "@/ui/widgets";
 
+const LAYOUT_KEY = "adhkar.dashboard.layout.v1";
+
+interface DashboardLayout {
+  order: string[];
+  hidden: string[];
+}
+
+function loadLayout(): DashboardLayout {
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_KEY);
+    if (!raw) return { order: CORE_WIDGETS.map((w) => w.id), hidden: [] };
+    const parsed = JSON.parse(raw) as Partial<DashboardLayout>;
+    const order = Array.isArray(parsed.order)
+      ? parsed.order.filter((id) => CORE_WIDGETS.some((w) => w.id === id))
+      : [];
+    const known = new Set(order);
+    for (const w of CORE_WIDGETS) {
+      if (!known.has(w.id)) order.push(w.id);
+    }
+    const hidden = Array.isArray(parsed.hidden) ? parsed.hidden : [];
+    return { order, hidden };
+  } catch {
+    return { order: CORE_WIDGETS.map((w) => w.id), hidden: [] };
+  }
+}
+
 export function DashboardPage() {
   const { apiCall } = useAuth();
   const [responses, setResponses] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
+  const [layout, setLayout] = useState<DashboardLayout>(() => loadLayout());
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+  }, [layout]);
 
   const uniquePaths = useMemo(() => {
     const set = new Set<string>();
     for (const w of CORE_WIDGETS) set.add(w.path);
     return Array.from(set);
   }, []);
+
+  const orderedWidgets: WidgetSpec[] = useMemo(() => {
+    const byId = new Map(CORE_WIDGETS.map((w) => [w.id, w] as const));
+    return layout.order
+      .map((id) => byId.get(id))
+      .filter((w): w is WidgetSpec => w !== undefined);
+  }, [layout.order]);
+
+  const visibleWidgets = orderedWidgets.filter((w) => !layout.hidden.includes(w.id));
+
+  const move = (id: string, delta: -1 | 1) => {
+    setLayout((prev) => {
+      const idx = prev.order.indexOf(id);
+      if (idx < 0) return prev;
+      const next = [...prev.order];
+      const target = idx + delta;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target] as string, next[idx] as string];
+      return { ...prev, order: next };
+    });
+  };
+
+  const toggleHidden = (id: string) => {
+    setLayout((prev) => ({
+      ...prev,
+      hidden: prev.hidden.includes(id)
+        ? prev.hidden.filter((x) => x !== id)
+        : [...prev.hidden, id],
+    }));
+  };
+
+  const resetLayout = () => {
+    setLayout({ order: CORE_WIDGETS.map((w) => w.id), hidden: [] });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -51,12 +117,31 @@ export function DashboardPage() {
 
   return (
     <section className="p-6">
-      <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
+      <div className="mb-4 flex items-center gap-3">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <button
+          type="button"
+          className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? "Done" : "Customize"}
+        </button>
+        {editing ? (
+          <button
+            type="button"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+            onClick={resetLayout}
+          >
+            Reset
+          </button>
+        ) : null}
+      </div>
       {!loaded ? (
         <p className="text-md-sys-color-on-surface-variant">Loading…</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-          {CORE_WIDGETS.map((w: WidgetSpec) => {
+          {(editing ? orderedWidgets : visibleWidgets).map((w, i, arr) => {
+            const hidden = layout.hidden.includes(w.id);
             let value: number;
             try {
               value = w.derive(responses[w.path]);
@@ -72,12 +157,46 @@ export function DashboardPage() {
             return (
               <div
                 key={w.id}
-                className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-4"
+                className={
+                  "rounded border bg-md-sys-color-surface p-4 " +
+                  (hidden && editing
+                    ? "border-dashed border-md-sys-color-outline-variant/40 opacity-50"
+                    : "border-md-sys-color-outline-variant")
+                }
               >
                 <div className={"text-3xl font-semibold " + toneClass}>{value}</div>
                 <div className="text-xs text-md-sys-color-on-surface-variant">
                   {w.title}
                 </div>
+                {editing ? (
+                  <div className="mt-2 flex items-center gap-1 text-xs">
+                    <button
+                      type="button"
+                      className="rounded border border-md-sys-color-outline-variant px-1 disabled:opacity-30"
+                      onClick={() => move(w.id, -1)}
+                      disabled={i === 0}
+                      aria-label="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-md-sys-color-outline-variant px-1 disabled:opacity-30"
+                      onClick={() => move(w.id, 1)}
+                      disabled={i === arr.length - 1}
+                      aria-label="Move down"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="ml-auto rounded border border-md-sys-color-outline-variant px-1"
+                      onClick={() => toggleHidden(w.id)}
+                    >
+                      {hidden ? "Show" : "Hide"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             );
           })}
