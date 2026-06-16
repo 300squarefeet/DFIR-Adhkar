@@ -6,11 +6,14 @@ import {
   redirect,
 } from "@tanstack/react-router";
 
+import { AdhkarMindPage } from "@/pages/AdhkarMindPage";
+import { AlertsPage } from "@/pages/AlertsPage";
 import { CaseDetailPage } from "@/pages/CaseDetailPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { ObservablesPage } from "@/pages/ObservablesPage";
 
 import { AppShell } from "./AppShell";
 
@@ -64,6 +67,24 @@ const createCaseRoute = createRoute({
   component: CreateCasePage,
 });
 
+const alertsRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/alerts",
+  component: AlertsPage,
+});
+
+const observablesRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/observables",
+  component: ObservablesPage,
+});
+
+const mindRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/adhkar-mind",
+  component: AdhkarMindPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -82,6 +103,9 @@ export const router = createRouter({
       casesRoute,
       createCaseRoute,
       caseDetailRoute,
+      alertsRoute,
+      observablesRoute,
+      mindRoute,
     ]),
   ]),
 });

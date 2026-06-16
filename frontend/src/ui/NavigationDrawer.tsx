@@ -9,9 +9,10 @@ interface Item {
 
 const ITEMS: ReadonlyArray<Item> = [
   { to: "/health", label: "Health", icon: "monitor_heart" },
-  { label: "Cases", icon: "work", phase: 3 },
-  { label: "Alerts", icon: "warning", phase: 4 },
-  { label: "Tasks", icon: "task", phase: 3 },
+  { to: "/cases", label: "Cases", icon: "work" },
+  { to: "/alerts", label: "Alerts", icon: "warning" },
+  { to: "/observables", label: "Observables", icon: "fingerprint" },
+  { to: "/adhkar-mind", label: "Adhkar Mind", icon: "psychology" },
   { label: "Dashboards", icon: "dashboard", phase: 6 },
   { label: "Knowledge Base", icon: "menu_book", phase: 6 },
   { label: "Admin", icon: "settings", phase: 1 },
