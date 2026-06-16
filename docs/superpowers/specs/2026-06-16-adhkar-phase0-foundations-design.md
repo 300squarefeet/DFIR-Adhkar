@@ -1,6 +1,6 @@
 # Adhkar — Phase 0 Foundations (Design Spec)
 
-- Status: Approved (brainstorm) — pending implementation plan
+- Status: Implemented — Phase 0 closed 2026-06-17
 - Date: 2026-06-16
 - Author: lead engineer (Adhkar)
 - Scope: **Phase 0 only**. Phases 1–10 are scoped at a peek level (see §10) and will receive their own spec at their brainstorm gate.
