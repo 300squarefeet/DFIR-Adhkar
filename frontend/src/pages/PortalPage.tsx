@@ -25,6 +25,8 @@ interface CaseRow {
   stage: string;
   status: string;
   updated_at: string;
+  can_comment: boolean;
+  can_upload: boolean;
 }
 
 export function PortalPage() {
@@ -34,7 +36,7 @@ export function PortalPage() {
 
   useEffect(() => {
     let cancelled = false;
-    apiCall<CaseRow[]>("/v1/cases")
+    apiCall<CaseRow[]>("/v1/portal/cases")
       .then((rows) => {
         if (!cancelled) setCases(rows);
       })
