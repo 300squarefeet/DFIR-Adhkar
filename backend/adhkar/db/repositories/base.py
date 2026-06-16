@@ -16,7 +16,7 @@ from sqlalchemy.orm import DeclarativeBase
 T = TypeVar("T", bound=DeclarativeBase)
 
 
-class OrgScopedRepository(Generic[T]):
+class OrgScopedRepository(Generic[T]):  # noqa: UP046 — PEP 695 not yet
     """Base class — subclasses set `model: type[T]` and inherit org-scoped CRUD.
 
     Every method automatically applies WHERE organization_id = current_org_id.
@@ -41,7 +41,7 @@ class OrgScopedRepository(Generic[T]):
 
     async def get(self, entity_id: UUID) -> T | None:
         stmt = self._scoped(select(self.model).where(self.model.id == entity_id))  # type: ignore[attr-defined]
-        return (await self.session.execute(stmt)).scalar_one_or_none()  # type: ignore[no-any-return]
+        return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def add(self, entity: T) -> T:
         """Insert. Subclasses are responsible for setting organization_id correctly
