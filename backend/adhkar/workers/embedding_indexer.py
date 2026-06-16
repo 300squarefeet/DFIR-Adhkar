@@ -34,9 +34,7 @@ def _case_text(c: Case) -> str:
     return "\n".join(parts)[:_EXCERPT_LIMIT]
 
 
-async def _index_one_batch(
-    sm: async_sessionmaker[AsyncSession], embedder: EmbeddingRouter
-) -> int:
+async def _index_one_batch(sm: async_sessionmaker[AsyncSession], embedder: EmbeddingRouter) -> int:
     async with sm() as db:
         # Closed, not-yet-embedded
         existing_ids_stmt = select(CaseEmbedding.case_id)
