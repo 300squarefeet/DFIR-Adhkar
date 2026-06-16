@@ -19,21 +19,23 @@ describe("api()", () => {
   });
 
   it("throws ApiError with structured payload for 4xx/5xx problem+json", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          type: "https://adhkar.dev/problems/internal",
-          title: "I",
-          status: 500,
-          detail: "x",
-        }),
-        { status: 500, headers: { "Content-Type": "application/problem+json" } },
-      ),
+    const body = {
+      type: "https://adhkar.dev/problems/internal",
+      title: "I",
+      status: 500,
+      detail: "x",
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: 500,
+        headers: { "Content-Type": "application/problem+json" },
+      }),
     );
-    await expect(api(BASE).get("/boom")).rejects.toBeInstanceOf(ApiError);
     try {
       await api(BASE).get("/boom");
+      expect.fail("should have thrown");
     } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
       const err = e as ApiError;
       expect(err.status).toBe(500);
       expect(err.problem.title).toBe("I");
