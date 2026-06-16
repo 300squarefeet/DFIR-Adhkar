@@ -41,6 +41,14 @@ interface CommentRow {
   created_at: string;
 }
 
+interface CasePageRow {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  updated_at: string;
+}
+
 interface Props {
   caseId: string;
 }
@@ -68,22 +76,33 @@ export function CaseDetailPage({ caseId }: Props) {
   const [responders, setResponders] = useState<Responder[]>([]);
   const [responderBusy, setResponderBusy] = useState<string | null>(null);
   const [lastResponderResult, setLastResponderResult] = useState<ResponderResult | null>(null);
+  const [pages, setPages] = useState<CasePageRow[]>([]);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [pageDraft, setPageDraft] = useState("");
+  const [pageEditing, setPageEditing] = useState(false);
+  const [newPageSlug, setNewPageSlug] = useState("");
+  const [newPageTitle, setNewPageTitle] = useState("");
+  const [showNewPage, setShowNewPage] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [cd, ts, cs, rs] = await Promise.all([
+        const [cd, ts, cs, rs, ps] = await Promise.all([
           apiCall<CaseDetail>(`/v1/cases/${caseId}`),
           apiCall<TaskRow[]>(`/v1/cases/${caseId}/tasks`),
           apiCall<CommentRow[]>(`/v1/cases/${caseId}/comments`),
           apiCall<Responder[]>(`/v1/responders`).catch(() => [] as Responder[]),
+          apiCall<CasePageRow[]>(`/v1/cases/${caseId}/pages`).catch(
+            () => [] as CasePageRow[],
+          ),
         ]);
         if (cancelled) return;
         setCase(cd);
         setTasks(ts);
         setComments(cs);
         setResponders(rs.filter((r) => r.supported_entity_types.includes("case")));
+        setPages(ps);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -92,6 +111,47 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId]);
+
+  const activePage = pages.find((p) => p.id === activePageId) ?? null;
+
+  useEffect(() => {
+    if (activePage) setPageDraft(activePage.content);
+  }, [activePage]);
+
+  const savePage = async () => {
+    if (!activePage) return;
+    try {
+      const updated = await apiCall<CasePageRow>(`/v1/case-pages/${activePage.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content: pageDraft }),
+      });
+      setPages((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setPageEditing(false);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const createPage = async () => {
+    if (!newPageSlug.trim() || !newPageTitle.trim()) return;
+    try {
+      const created = await apiCall<CasePageRow>(`/v1/cases/${caseId}/pages`, {
+        method: "POST",
+        body: JSON.stringify({
+          slug: newPageSlug.trim(),
+          title: newPageTitle.trim(),
+          content: "",
+        }),
+      });
+      setPages((prev) => [...prev, created]);
+      setActivePageId(created.id);
+      setNewPageSlug("");
+      setNewPageTitle("");
+      setShowNewPage(false);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   const runResponder = async (name: string, confirmRequired: boolean) => {
     if (confirmRequired && !window.confirm(`Run responder "${name}" on this case?`)) {
@@ -224,6 +284,116 @@ export function CaseDetailPage({ caseId }: Props) {
               </li>
             ))}
           </ul>
+        )}
+      </article>
+
+      <article>
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="text-lg font-medium">Pages ({pages.length})</h2>
+          {permissions.has("manageCase") ? (
+            <button
+              type="button"
+              className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              onClick={() => setShowNewPage((v) => !v)}
+            >
+              {showNewPage ? "Cancel" : "+ Page"}
+            </button>
+          ) : null}
+        </div>
+        {showNewPage && permissions.has("manageCase") ? (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <input
+              className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+              placeholder="slug"
+              value={newPageSlug}
+              onChange={(e) => setNewPageSlug(e.target.value)}
+            />
+            <input
+              className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+              placeholder="Title"
+              value={newPageTitle}
+              onChange={(e) => setNewPageTitle(e.target.value)}
+            />
+            <button
+              type="button"
+              className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+              onClick={() => {
+                void createPage();
+              }}
+              disabled={!newPageSlug.trim() || !newPageTitle.trim()}
+            >
+              Create
+            </button>
+          </div>
+        ) : null}
+        {pages.length > 0 ? (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[12rem_1fr]">
+            <ul className="space-y-1 text-sm">
+              {pages.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className={
+                      "block w-full truncate rounded px-2 py-1 text-left hover:bg-md-sys-color-surface-container " +
+                      (p.id === activePageId ? "bg-md-sys-color-surface-container" : "")
+                    }
+                    onClick={() => {
+                      setActivePageId(p.id);
+                      setPageEditing(false);
+                    }}
+                  >
+                    {p.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div>
+              {activePage ? (
+                <article>
+                  <div className="mb-1 flex items-center gap-2">
+                    <h3 className="text-sm font-medium">{activePage.title}</h3>
+                    {permissions.has("manageCase") ? (
+                      <button
+                        type="button"
+                        className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                        onClick={() => setPageEditing((v) => !v)}
+                      >
+                        {pageEditing ? "Cancel" : "Edit"}
+                      </button>
+                    ) : null}
+                    {pageEditing ? (
+                      <button
+                        type="button"
+                        className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-xs text-md-sys-color-on-primary"
+                        onClick={() => {
+                          void savePage();
+                        }}
+                      >
+                        Save
+                      </button>
+                    ) : null}
+                  </div>
+                  {pageEditing ? (
+                    <textarea
+                      className="min-h-[16rem] w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 font-mono text-xs"
+                      value={pageDraft}
+                      onChange={(e) => setPageDraft(e.target.value)}
+                    />
+                  ) : (
+                    <pre className="whitespace-pre-wrap rounded border border-md-sys-color-outline-variant p-3 text-sm">
+                      {activePage.content || "(empty)"}
+                    </pre>
+                  )}
+                </article>
+              ) : (
+                <p className="text-sm text-md-sys-color-on-surface-variant">
+                  Select a page.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-md-sys-color-on-surface-variant">No pages yet.</p>
         )}
       </article>
 
