@@ -78,7 +78,8 @@ async def test_readyz_all_green_with_real_services(services, monkeypatch):
     )
     try:
         s3client.create_bucket(Bucket="adhkar-attachments")
-    except Exception:  # noqa: BLE001 — bucket may already exist
+    except Exception:
+        # bucket may already exist
         pass
 
     from alembic import command
