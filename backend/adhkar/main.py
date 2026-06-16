@@ -17,6 +17,7 @@ from adhkar.api.v1.attachments import router as attachments_router
 from adhkar.api.v1.audit import router as audit_router
 from adhkar.api.v1.auth import router as auth_router
 from adhkar.api.v1.case_comments import router as case_comments_router
+from adhkar.api.v1.case_observables import router as case_observables_router
 from adhkar.api.v1.case_pages import router as case_pages_router
 from adhkar.api.v1.case_timeline import router as case_timeline_router
 from adhkar.api.v1.cases import router as cases_router
@@ -114,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(analyzer_jobs_router)
     app.include_router(cases_router)
     app.include_router(case_comments_router)
+    app.include_router(case_observables_router)
     app.include_router(case_pages_router)
     app.include_router(case_timeline_router)
     app.include_router(alerts_router)

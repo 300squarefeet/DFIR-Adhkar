@@ -57,6 +57,16 @@ interface TimelineEntry {
   created_at: string;
 }
 
+interface CaseObservable {
+  id: string;
+  data_type: string;
+  data: string;
+  tlp: string;
+  tags: string[];
+  is_ioc: boolean;
+  sighted: boolean;
+}
+
 interface CaseReportResponse {
   markdown: string;
   number: number;
@@ -98,12 +108,15 @@ export function CaseDetailPage({ caseId }: Props) {
   const [showNewPage, setShowNewPage] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [reportBusy, setReportBusy] = useState(false);
+  const [caseObs, setCaseObs] = useState<CaseObservable[]>([]);
+  const [attachIds, setAttachIds] = useState("");
+  const [attachBusy, setAttachBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [cd, ts, cs, rs, ps, tl] = await Promise.all([
+        const [cd, ts, cs, rs, ps, tl, obs] = await Promise.all([
           apiCall<CaseDetail>(`/v1/cases/${caseId}`),
           apiCall<TaskRow[]>(`/v1/cases/${caseId}/tasks`),
           apiCall<CommentRow[]>(`/v1/cases/${caseId}/comments`),
@@ -114,6 +127,9 @@ export function CaseDetailPage({ caseId }: Props) {
           apiCall<{ entries: TimelineEntry[] }>(
             `/v1/cases/${caseId}/timeline?limit=100`,
           ).catch(() => ({ entries: [] as TimelineEntry[] })),
+          apiCall<CaseObservable[]>(`/v1/cases/${caseId}/observables`).catch(
+            () => [] as CaseObservable[],
+          ),
         ]);
         if (cancelled) return;
         setCase(cd);
@@ -122,6 +138,7 @@ export function CaseDetailPage({ caseId }: Props) {
         setResponders(rs.filter((r) => r.supported_entity_types.includes("case")));
         setPages(ps);
         setTimeline(tl.entries);
+        setCaseObs(obs);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -130,6 +147,51 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId]);
+
+  const refreshObservables = async () => {
+    try {
+      const obs = await apiCall<CaseObservable[]>(`/v1/cases/${caseId}/observables`);
+      setCaseObs(obs);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const attachObservables = async () => {
+    const ids = attachIds
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.length === 0) return;
+    setAttachBusy(true);
+    try {
+      await apiCall<{ attached: number }>(
+        `/v1/cases/${caseId}/observables/attach`,
+        {
+          method: "POST",
+          body: JSON.stringify({ observable_ids: ids }),
+        },
+      );
+      setAttachIds("");
+      await refreshObservables();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  const detachObservable = async (observableId: string) => {
+    try {
+      await apiCall(
+        `/v1/cases/${caseId}/observables/${observableId}/detach`,
+        { method: "POST", body: "{}" },
+      );
+      await refreshObservables();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   const downloadReport = async () => {
     setReportBusy(true);
@@ -450,6 +512,65 @@ export function CaseDetailPage({ caseId }: Props) {
         ) : (
           <p className="text-sm text-md-sys-color-on-surface-variant">No pages yet.</p>
         )}
+      </article>
+
+      <article>
+        <h2 className="mb-2 text-lg font-medium">Observables ({caseObs.length})</h2>
+        {caseObs.length === 0 ? (
+          <p className="text-sm text-md-sys-color-on-surface-variant">
+            No observables attached to this case yet.
+          </p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {caseObs.map((o) => (
+              <li
+                key={o.id}
+                className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant px-3 py-1.5"
+              >
+                <span className="rounded bg-md-sys-color-surface-container px-1.5 py-0.5 font-mono text-[10px] uppercase">
+                  {o.data_type}
+                </span>
+                <span className="break-all font-mono text-xs">{o.data}</span>
+                {o.is_ioc ? (
+                  <span className="rounded-full bg-severity-4/20 px-2 py-0.5 text-[10px] text-severity-4">
+                    IOC
+                  </span>
+                ) : null}
+                {permissions.has("manageCase") ? (
+                  <button
+                    type="button"
+                    className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                    onClick={() => {
+                      void detachObservable(o.id);
+                    }}
+                  >
+                    Detach
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {permissions.has("manageCase") ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input
+              className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+              placeholder="Observable UUIDs (comma- or space-separated)"
+              value={attachIds}
+              onChange={(e) => setAttachIds(e.target.value)}
+            />
+            <button
+              type="button"
+              className="rounded-full bg-md-sys-color-primary px-3 py-1 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+              onClick={() => {
+                void attachObservables();
+              }}
+              disabled={attachBusy || !attachIds.trim()}
+            >
+              {attachBusy ? "…" : "Attach"}
+            </button>
+          </div>
+        ) : null}
       </article>
 
       <article>
