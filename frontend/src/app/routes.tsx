@@ -26,6 +26,7 @@ import { HealthPage } from "@/pages/HealthPage";
 import { KnowledgeBasePage } from "@/pages/KnowledgeBasePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
+import { ObservableDetailPage } from "@/pages/ObservableDetailPage";
 import { ObservablesPage } from "@/pages/ObservablesPage";
 import { TtpsPage } from "@/pages/TtpsPage";
 
@@ -100,6 +101,15 @@ const observablesRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/observables",
   component: ObservablesPage,
+});
+
+const observableDetailRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/observables/$observableId",
+  component: function ObservableDetailRouteView() {
+    const { observableId } = observableDetailRoute.useParams();
+    return <ObservableDetailPage observableId={observableId} />;
+  },
 });
 
 const mindRoute = createRoute({
@@ -207,6 +217,7 @@ export const router = createRouter({
       alertsRoute,
       alertDetailRoute,
       observablesRoute,
+      observableDetailRoute,
       mindRoute,
       kbRoute,
       dashboardRoute,
