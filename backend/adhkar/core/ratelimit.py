@@ -47,9 +47,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: object, redis_url: str) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         self._redis_url = redis_url
-        self._redis: "redis_async.Redis[str] | None" = None
+        self._redis: redis_async.Redis[str] | None = None
 
-    async def _client(self) -> "redis_async.Redis[str] | None":
+    async def _client(self) -> redis_async.Redis[str] | None:
         if self._redis is None:
             try:
                 self._redis = redis_async.from_url(self._redis_url, decode_responses=True)

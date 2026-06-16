@@ -17,6 +17,7 @@ from adhkar.api.deps import (
     require_current_org,
     require_permission,
 )
+from adhkar.audit import audit_and_emit
 from adhkar.db.models import Alert, Case
 from adhkar.db.repositories.cases import CaseRepository
 
@@ -174,6 +175,15 @@ async def ingest_alert(
     )
     db.add(alert)
     await db.flush()
+    await audit_and_emit(
+        db,
+        actor_user_id=user.user_id,
+        organization_id=org_id,
+        action="ingested",
+        entity_type="alert",
+        entity_id=alert.id,
+        diff={"source": alert.source, "source_ref": alert.source_ref, "title": alert.title},
+    )
     return _alert_dto(alert)
 
 
@@ -264,6 +274,15 @@ async def promote_alert(
     a.status = "Imported"
     a.imported_at = datetime.now(tz=UTC)
     await db.flush()
+    await audit_and_emit(
+        db,
+        actor_user_id=user.user_id,
+        organization_id=org_id,
+        action="promoted",
+        entity_type="alert",
+        entity_id=a.id,
+        diff={"case_id": str(case.id), "case_number": case.number},
+    )
     return {"case_id": str(case.id), "case_number": case.number, "alert_id": str(a.id)}
 
 

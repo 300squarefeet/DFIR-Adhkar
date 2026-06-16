@@ -18,6 +18,7 @@ from adhkar.api.deps import (
     require_current_org,
     require_permission,
 )
+from adhkar.audit import audit_and_emit
 from adhkar.db.models import Case, Task, TaskLog
 from adhkar.db.repositories.cases import CaseRepository
 
@@ -165,6 +166,15 @@ async def create_case(
         except IntegrityError:
             await db.rollback()
             continue
+        await audit_and_emit(
+            db,
+            actor_user_id=user.user_id,
+            organization_id=org_id,
+            action="created",
+            entity_type="case",
+            entity_id=case.id,
+            diff={"number": case.number, "title": case.title, "severity": case.severity},
+        )
         return _case_to_dto(case)
     raise HTTPException(status.HTTP_409_CONFLICT, "case_number_assignment_failed")
 
@@ -187,7 +197,7 @@ async def get_case(
 async def patch_case(
     case_id: UUID,
     body: CasePatch,
-    _user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
+    user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CaseDTO:
@@ -201,13 +211,22 @@ async def patch_case(
     for field, value in patch.items():
         setattr(c, field, value)
     await db.flush()
+    await audit_and_emit(
+        db,
+        actor_user_id=user.user_id,
+        organization_id=org_id,
+        action="updated",
+        entity_type="case",
+        entity_id=c.id,
+        diff={k: str(v) for k, v in patch.items()},
+    )
     return _case_to_dto(c)
 
 
 @router.delete("/v1/cases/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_case(
     case_id: UUID,
-    _user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
+    user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
@@ -217,6 +236,14 @@ async def delete_case(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
     c.deleted_at = datetime.now(tz=UTC)
     await db.flush()
+    await audit_and_emit(
+        db,
+        actor_user_id=user.user_id,
+        organization_id=org_id,
+        action="deleted",
+        entity_type="case",
+        entity_id=c.id,
+    )
 
 
 # ---------- Tasks ----------
