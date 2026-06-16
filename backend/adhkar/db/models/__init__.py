@@ -7,6 +7,7 @@ from adhkar.db.models.audit_log import AuditLog
 from adhkar.db.models.case import Case
 from adhkar.db.models.case_link import CaseLink
 from adhkar.db.models.comment import Comment
+from adhkar.db.models.kb import CaseTemplate, KnowledgeBasePage
 from adhkar.db.models.membership import UserOrgMembership
 from adhkar.db.models.mfa_secret import MfaSecret
 from adhkar.db.models.observable import Observable
@@ -26,8 +27,10 @@ __all__ = [
     "AuditLog",
     "Case",
     "CaseLink",
+    "CaseTemplate",
     "CaseTtp",
     "Comment",
+    "KnowledgeBasePage",
     "MfaSecret",
     "Observable",
     "OrgSharing",
