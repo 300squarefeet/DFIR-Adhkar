@@ -1,7 +1,6 @@
 import pytest
-from pydantic import ValidationError
-
 from adhkar.core.settings import Settings
+from pydantic import ValidationError
 
 
 def test_settings_loads_with_defaults_when_secret_provided(monkeypatch):
