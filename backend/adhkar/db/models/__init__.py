@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models for Adhkar IR."""
 
+from adhkar.db.models.alert import Alert
 from adhkar.db.models.analyzer_job import AnalyzerJob
 from adhkar.db.models.api_key import ApiKey
 from adhkar.db.models.audit_log import AuditLog
@@ -18,6 +19,7 @@ from adhkar.db.models.task import Task, TaskLog
 from adhkar.db.models.user import User
 
 __all__ = [
+    "Alert",
     "AnalyzerJob",
     "ApiKey",
     "AuditLog",
