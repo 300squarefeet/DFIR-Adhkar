@@ -29,8 +29,7 @@ export function SeverityBadge({
 }: SeverityBadgeProps) {
   const label = LABELS[level];
   const ariaLabel = `Severity: ${label}`;
-  const base =
-    "inline-flex items-center gap-1 rounded-shape-small border font-medium leading-none";
+  const base = "inline-flex items-center gap-1 rounded-shape-small border font-medium leading-none";
   const sizing = compact ? "h-3 w-3 p-0" : "px-1.5 py-0.5 text-xs";
   return (
     <span
