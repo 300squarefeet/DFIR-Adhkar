@@ -22,7 +22,7 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vitest/globals", "@testing-library/jest-dom", "vite/client"]
   },
   "include": ["src", "stories", "tests", "vite.config.ts"]
 }

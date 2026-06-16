@@ -75,6 +75,6 @@ describe("<HealthPage>", () => {
     });
     render(wrap(<HealthPage apiBase={API} />));
     await waitFor(() => expect(screen.getByText(/Degraded/i)).toBeInTheDocument());
-    expect(screen.getByText(/Down/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Down/i).length).toBeGreaterThan(0);
   });
 });
