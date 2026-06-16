@@ -19,6 +19,7 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/ttps", label: "MITRE ATT&CK", icon: "shield" },
   { to: "/admin/users", label: "Admin · Users", icon: "group" },
   { to: "/admin/profiles", label: "Admin · Profiles", icon: "verified_user" },
+  { to: "/case-templates", label: "Case Templates", icon: "library_books" },
 ];
 
 export function NavigationDrawer() {
