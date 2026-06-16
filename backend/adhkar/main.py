@@ -8,6 +8,8 @@ from adhkar.api.errors import register_exception_handlers
 from adhkar.api.v1.auth import router as auth_router
 from adhkar.api.v1.meta import router as meta_router
 from adhkar.api.v1.mfa import router as mfa_router
+from adhkar.api.v1.organizations import router as orgs_router
+from adhkar.api.v1.profiles import router as profiles_router
 from adhkar.api.v1.users import router as users_router
 from adhkar.core.logging import configure_logging
 from adhkar.core.middleware import AccessLogMiddleware, RequestIdMiddleware
@@ -42,6 +44,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(users_router)
     app.include_router(mfa_router)
+    app.include_router(orgs_router)
+    app.include_router(profiles_router)
     register_exception_handlers(app)
     configure_otel(app, settings)
 
