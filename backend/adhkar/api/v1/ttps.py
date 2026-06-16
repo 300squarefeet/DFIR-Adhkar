@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date as date_cls
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -213,6 +213,71 @@ async def add_case_ttp(
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "technique_already_on_case") from e
     return _case_ttp_dto(ref)
+
+
+class CaseTtpPatch(BaseModel):
+    procedure_note: str | None = None
+    occurrence_date: date_cls | None = None
+
+
+@router.patch("/v1/case-ttps/{ttp_id}", response_model=CaseTtpDTO)
+async def patch_case_ttp(
+    ttp_id: UUID,
+    body: CaseTtpPatch,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CaseTtpDTO:
+    t = (
+        await db.execute(
+            select(CaseTtp).where(CaseTtp.id == ttp_id, CaseTtp.organization_id == org_id)
+        )
+    ).scalar_one_or_none()
+    if t is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_ttp_not_found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(t, field, value)
+    await db.flush()
+    return _case_ttp_dto(t)
+
+
+@router.get(
+    "/v1/cases-by-technique/{technique_id}",
+    response_model=list[dict[str, Any]],
+)
+async def cases_by_technique(
+    technique_id: str,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[dict[str, Any]]:
+    """Drill-down: every case in the org that carries the given technique.
+
+    Returns the case stub (id, number, title, severity, stage) — the UI
+    links each row to the existing case detail page."""
+    rows = (
+        await db.execute(
+            select(Case.id, Case.number, Case.title, Case.severity, Case.stage)
+            .join(CaseTtp, CaseTtp.case_id == Case.id)
+            .where(
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+                CaseTtp.technique_id == technique_id,
+            )
+            .order_by(Case.number.desc())
+            .limit(200)
+        )
+    ).all()
+    return [
+        {
+            "id": str(r[0]),
+            "number": int(r[1]),
+            "title": str(r[2]),
+            "severity": int(r[3]),
+            "stage": str(r[4]),
+        }
+        for r in rows
+    ]
 
 
 @router.delete("/v1/case-ttps/{ttp_id}", status_code=status.HTTP_204_NO_CONTENT)
