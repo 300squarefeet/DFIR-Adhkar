@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adhkar.ai.agent import run_agent
 from adhkar.ai.router import LlmRequest, get_router
 from adhkar.api.deps import (
     CurrentUser,
@@ -250,3 +251,74 @@ async def list_providers(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
 ) -> list[str]:
     return get_router().providers()
+
+
+class AgentPayload(BaseModel):
+    prompt: str = Field(min_length=1, max_length=8000)
+    provider: str | None = None
+    model: str | None = None
+    max_steps: int = Field(default=5, ge=1, le=10)
+
+
+class AgentStepDTO(BaseModel):
+    role: str
+    content: str
+    tool_name: str | None = None
+    tool_args: dict[str, Any] | None = None
+
+
+class AgentRunDTO(BaseModel):
+    final_text: str
+    tool_calls: int
+    steps: list[AgentStepDTO]
+
+
+@router.post("/agent", response_model=AgentRunDTO)
+async def run_tool_use_agent(
+    body: AgentPayload,
+    user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AgentRunDTO:
+    """ToolUse loop. Lets the LLM call Adhkar tools (search_cases,
+    get_case, search_observables, search_alerts) up to max_steps times
+    while answering the user's question. Every LLM call inside the loop
+    is recorded as a separate AiCall row by the underlying router."""
+    run = await run_agent(
+        db,
+        org_id,
+        system="You are Adhkar Mind, a SOC assistant. Use tools to ground answers.",
+        user_prompt=body.prompt,
+        provider=body.provider,
+        model=body.model,
+        max_steps=body.max_steps,
+    )
+    db.add(
+        AiCall(
+            organization_id=org_id,
+            user_id=user.user_id,
+            case_id=None,
+            purpose="agent",
+            provider=body.provider or "default",
+            model=body.model or "default",
+            prompt=body.prompt,
+            response_text=run.final_text,
+            input_tokens=0,
+            output_tokens=0,
+            extra={"tool_calls": run.tool_calls, "steps": len(run.steps)},
+        )
+    )
+    await db.flush()
+    return AgentRunDTO(
+        final_text=run.final_text,
+        tool_calls=run.tool_calls,
+        steps=[
+            AgentStepDTO(
+                role=s.role,
+                content=s.content,
+                tool_name=s.tool_name,
+                tool_args=s.tool_args,
+            )
+            for s in run.steps
+        ],
+    )
