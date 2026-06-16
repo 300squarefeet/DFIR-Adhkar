@@ -1,0 +1,5 @@
+# Architecture decisions: require owner review
+/docs/ADRs/                @300squarefeet
+
+# CI must always be reviewed by maintainers
+/.github/workflows/        @300squarefeet
