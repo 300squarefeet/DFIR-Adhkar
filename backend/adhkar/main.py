@@ -31,6 +31,8 @@ from adhkar.api.v1.users import router as users_router
 from adhkar.core.logging import configure_logging
 from adhkar.core.middleware import AccessLogMiddleware, RequestIdMiddleware
 from adhkar.core.otel import configure_otel
+from adhkar.core.ratelimit import RateLimitMiddleware
+from adhkar.core.security_headers import SecurityHeadersMiddleware
 from adhkar.core.settings import Settings, get_settings
 
 
@@ -69,6 +71,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RateLimitMiddleware, redis_url=str(settings.redis_url))
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
