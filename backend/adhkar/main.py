@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from adhkar import __version__
 from adhkar.api.errors import register_exception_handlers
 from adhkar.api.v1.api_keys import router as api_keys_router
+from adhkar.api.v1.audit import router as audit_router
 from adhkar.api.v1.auth import router as auth_router
 from adhkar.api.v1.live import router as live_router
 from adhkar.api.v1.meta import router as meta_router
@@ -68,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(orgs_router)
     app.include_router(profiles_router)
     app.include_router(api_keys_router)
+    app.include_router(audit_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)
