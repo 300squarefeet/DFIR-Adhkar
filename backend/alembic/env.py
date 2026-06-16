@@ -5,12 +5,11 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
-from sqlalchemy.engine import Connection
-
 from adhkar.core.settings import get_settings
 from adhkar.db.base import Base
 from adhkar.db.engine import create_engine
+from alembic import context
+from sqlalchemy.engine import Connection
 
 config = context.config
 if config.config_file_name is not None:
