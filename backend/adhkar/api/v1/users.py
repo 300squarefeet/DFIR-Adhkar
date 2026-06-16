@@ -92,7 +92,7 @@ async def invite_user(
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserDTO:
-    """Create a pending_invite user, bind to current org with the named profile, send signed invite link via email."""
+    """Create pending_invite user, bind to current org + profile, email invite link."""
     existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "user_email_exists")
@@ -116,11 +116,16 @@ async def invite_user(
         InvitePayload(user_id=new_user.id, org_id=org_id, profile_id=profile.id),
     )
     invite_link = f"{settings.cors_origins[0] if settings.cors_origins else 'http://localhost:5173'}/invite/{token}"
+    body_text = (
+        f"Hi {body.display_name},\n\n"
+        f"{user.user_id} has invited you to join Adhkar IR.\n\n"
+        f"Accept your invite within 24 hours: {invite_link}\n"
+    )
     await send_email(
         settings,
         to=body.email,
         subject="You're invited to Adhkar IR",
-        body=f"Hi {body.display_name},\n\n{user.user_id} has invited you to join Adhkar IR.\n\nAccept your invite within 24 hours: {invite_link}\n",
+        body=body_text,
     )
     return UserDTO(
         id=new_user.id,
@@ -188,11 +193,15 @@ async def forgot_password(
     if user and user.status == "active":
         token = sign_reset(settings.secret_key, ResetPayload(user_id=user.id))
         link = f"{settings.cors_origins[0] if settings.cors_origins else 'http://localhost:5173'}/password/reset/{token}"
+        body_text = (
+            f"To reset your password, follow this link within 1 hour:\n\n{link}\n\n"
+            "If you didn't request this, ignore this email."
+        )
         await send_email(
             settings,
             to=user.email,
             subject="Adhkar IR — password reset",
-            body=f"To reset your password, follow this link within 1 hour:\n\n{link}\n\nIf you didn't request this, ignore this email.",
+            body=body_text,
         )
 
 
