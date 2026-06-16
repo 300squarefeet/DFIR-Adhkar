@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { applyTheme, getStoredTheme } from "@/lib/theme";
+import { ActivityFeed } from "@/ui/ActivityFeed";
 import { CommandPalette } from "@/ui/CommandPalette";
 import { NavigationDrawer } from "@/ui/NavigationDrawer";
 import { TopAppBar } from "@/ui/TopAppBar";
@@ -30,6 +31,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex flex-1 overflow-hidden">
         <NavigationDrawer />
         <main className="flex-1 overflow-auto p-4">{children}</main>
+        <ActivityFeed />
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
