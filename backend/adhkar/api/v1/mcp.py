@@ -147,15 +147,12 @@ async def _call_tool(org_id: UUID, db: AsyncSession, params: dict[str, Any]) -> 
             ostmt = ostmt.where(Observable.data_type == data_type)
         if contains:
             ostmt = ostmt.where(Observable.data.ilike(f"%{contains}%"))
-        observables = (
-            (await db.execute(ostmt.limit(min(100, max(1, limit))))).scalars().all()
-        )
+        observables = (await db.execute(ostmt.limit(min(100, max(1, limit))))).scalars().all()
         return {
             "content": [
                 {
                     "type": "text",
-                    "text": "\n".join(f"{o.data_type}: {o.data}" for o in observables)
-                    or "(none)",
+                    "text": "\n".join(f"{o.data_type}: {o.data}" for o in observables) or "(none)",
                 }
             ]
         }
