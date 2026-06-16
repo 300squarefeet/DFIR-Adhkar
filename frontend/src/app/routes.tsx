@@ -9,6 +9,7 @@ import {
 import { AdhkarMindPage } from "@/pages/AdhkarMindPage";
 import { AdminProfilesPage } from "@/pages/AdminProfilesPage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
+import { AnalyzerJobsPage } from "@/pages/AnalyzerJobsPage";
 import { AuditLogPage } from "@/pages/AuditLogPage";
 import { AlertDetailPage } from "@/pages/AlertDetailPage";
 import { AlertsPage } from "@/pages/AlertsPage";
@@ -172,6 +173,12 @@ const auditRoute = createRoute({
   component: AuditLogPage,
 });
 
+const analyzerJobsRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/analyzer-jobs",
+  component: AnalyzerJobsPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -205,6 +212,7 @@ export const router = createRouter({
       portalRoute,
       searchRoute,
       auditRoute,
+      analyzerJobsRoute,
     ]),
   ]),
 });

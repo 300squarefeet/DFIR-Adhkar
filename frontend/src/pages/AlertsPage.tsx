@@ -29,6 +29,25 @@ interface PromoteResponse {
   case_number: number;
 }
 
+const SAVED_VIEW_KEY = "adhkar.alerts.savedView.v1";
+
+interface SavedView {
+  status: string;
+  source: string;
+  search: string;
+}
+
+function loadView(): SavedView {
+  try {
+    const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
+    if (!raw) return { status: "", source: "", search: "" };
+    const p = JSON.parse(raw) as Partial<SavedView>;
+    return { status: p.status ?? "", source: p.source ?? "", search: p.search ?? "" };
+  } catch {
+    return { status: "", source: "", search: "" };
+  }
+}
+
 export function AlertsPage() {
   const { apiCall, permissions } = useAuth();
   const router = useRouter();
@@ -38,10 +57,14 @@ export function AlertsPage() {
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [view, setView] = useState<SavedView>(() => loadView());
 
   const refresh = async () => {
     try {
-      const rows = await apiCall<AlertRow[]>("/v1/alerts?limit=200");
+      const params = new URLSearchParams({ limit: "200" });
+      if (view.status) params.set("alert_status", view.status);
+      if (view.source) params.set("source", view.source);
+      const rows = await apiCall<AlertRow[]>(`/v1/alerts?${params.toString()}`);
       setAlerts(rows);
       setSelected(new Set());
     } catch (e) {
@@ -52,7 +75,11 @@ export function AlertsPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall]);
+  }, [apiCall, view.status, view.source]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SAVED_VIEW_KEY, JSON.stringify(view));
+  }, [view]);
 
   const toggleOne = (id: string) => {
     setSelected((prev) => {
@@ -131,6 +158,16 @@ export function AlertsPage() {
   const allCheckable = (alerts ?? []).filter((a) => a.case_id === null);
   const allChecked = allCheckable.length > 0 && allCheckable.every((a) => selected.has(a.id));
 
+  const visible = (alerts ?? []).filter((a) => {
+    const q = view.search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      a.title.toLowerCase().includes(q) ||
+      a.source.toLowerCase().includes(q) ||
+      a.source_ref.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <section className="p-6">
       <div className="mb-4 flex items-center justify-between">
@@ -147,6 +184,31 @@ export function AlertsPage() {
             {bulkBusy ? "…" : `Ignore ${selected.size}`}
           </button>
         ) : null}
+      </div>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.status}
+          onChange={(e) => setView({ ...view, status: e.target.value })}
+        >
+          <option value="">All statuses</option>
+          <option value="New">New</option>
+          <option value="Updated">Updated</option>
+          <option value="Ignored">Ignored</option>
+          <option value="Imported">Imported</option>
+        </select>
+        <input
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          placeholder="Source filter (e.g. splunk)"
+          value={view.source}
+          onChange={(e) => setView({ ...view, source: e.target.value })}
+        />
+        <input
+          className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          placeholder="Local filter (title / source_ref)"
+          value={view.search}
+          onChange={(e) => setView({ ...view, search: e.target.value })}
+        />
       </div>
       <table className="w-full table-auto border-collapse text-sm">
         <thead>
@@ -170,7 +232,7 @@ export function AlertsPage() {
           </tr>
         </thead>
         <tbody>
-          {alerts.map((a) => (
+          {visible.map((a) => (
             <tr
               key={a.id}
               className="border-b border-md-sys-color-outline-variant/50 hover:bg-md-sys-color-surface-container"
