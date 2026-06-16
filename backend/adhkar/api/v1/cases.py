@@ -132,6 +132,63 @@ async def list_cases(
     return [_case_to_dto(c) for c in rows]
 
 
+class BulkPatchPayload(BaseModel):
+    ids: list[UUID] = Field(min_length=1, max_length=200)
+    patch: CasePatch
+
+
+class BulkPatchResult(BaseModel):
+    updated: int
+    ids: list[UUID]
+
+
+@router.post("/v1/cases/bulk-patch", response_model=BulkPatchResult)
+async def bulk_patch_cases(
+    body: BulkPatchPayload,
+    user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> BulkPatchResult:
+    """Apply the same patch to a list of cases. Same field validation as the
+    single-case PATCH; rows outside the caller's org are silently dropped."""
+    patch = body.patch.model_dump(exclude_unset=True)
+    if not patch:
+        return BulkPatchResult(updated=0, ids=[])
+    rows = (
+        (
+            await db.execute(
+                select(Case).where(
+                    Case.organization_id == org_id,
+                    Case.id.in_(body.ids),
+                    Case.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    updated_ids: list[UUID] = []
+    auto_close = patch.get("stage") == "closed" and "end_date" not in patch
+    for c in rows:
+        for field, value in patch.items():
+            setattr(c, field, value)
+        if auto_close and c.end_date is None:
+            c.end_date = datetime.now(tz=UTC)
+        updated_ids.append(c.id)
+    await db.flush()
+    for cid in updated_ids:
+        await audit_and_emit(
+            db,
+            actor_user_id=user.user_id,
+            organization_id=org_id,
+            action="bulk_updated",
+            entity_type="case",
+            entity_id=cid,
+            diff={k: str(v) for k, v in patch.items()},
+        )
+    return BulkPatchResult(updated=len(updated_ids), ids=updated_ids)
+
+
 @router.post("/v1/cases", response_model=CaseDTO, status_code=status.HTTP_201_CREATED)
 async def create_case(
     body: CaseCreate,

@@ -10,6 +10,7 @@ import { useRouter } from "@tanstack/react-router";
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/ui/Toast";
 
 interface AlertDetail {
   id: string;
@@ -39,6 +40,7 @@ const STATUSES = ["New", "Updated", "Ignored", "Imported"] as const;
 export function AlertDetailPage({ alertId }: Props) {
   const { apiCall, permissions } = useAuth();
   const router = useRouter();
+  const toast = useToast();
   const [alert, setAlert] = useState<AlertDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,8 +68,10 @@ export function AlertDetailPage({ alertId }: Props) {
         body: JSON.stringify({ status }),
       });
       setAlert(updated);
+      toast.success(`Status set to ${status}.`);
     } catch (e) {
       setError((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -77,13 +81,15 @@ export function AlertDetailPage({ alertId }: Props) {
     if (!alert) return;
     setBusy(true);
     try {
-      const r = await apiCall<{ case_id: string }>(
+      const r = await apiCall<{ case_id: string; case_number: number }>(
         `/v1/alerts/${alertId}/promote`,
         { method: "POST", body: "{}" },
       );
+      toast.success(`Promoted to case #${r.case_number}.`);
       await router.navigate({ to: "/cases/$caseId", params: { caseId: r.case_id } });
     } catch (e) {
       setError((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }

@@ -89,6 +89,8 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # SAML SSO
     "/v1/auth/saml/{provider}/login",
     "/v1/auth/saml/{provider}/acs",
+    # Bulk actions
+    "/v1/cases/bulk-patch",
 )
 
 
