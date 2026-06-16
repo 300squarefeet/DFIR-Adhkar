@@ -15,10 +15,26 @@ interface FreeformResponse {
   output_tokens: number;
 }
 
+interface AgentStep {
+  role: string;
+  content: string;
+  tool_name?: string | null;
+}
+
+interface AgentRunResponse {
+  final_text: string;
+  tool_calls: number;
+  steps: AgentStep[];
+}
+
+type Mode = "freeform" | "agent";
+
 export function AdhkarMindPage() {
   const { apiCall } = useAuth();
+  const [mode, setMode] = useState<Mode>("freeform");
   const [prompt, setPrompt] = useState("");
   const [reply, setReply] = useState<FreeformResponse | null>(null);
+  const [agentReply, setAgentReply] = useState<AgentRunResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,13 +42,22 @@ export function AdhkarMindPage() {
     if (!prompt.trim()) return;
     setBusy(true);
     setReply(null);
+    setAgentReply(null);
     setError(null);
     try {
-      const r = await apiCall<FreeformResponse>("/v1/ai/freeform", {
-        method: "POST",
-        body: JSON.stringify({ prompt: prompt.trim() }),
-      });
-      setReply(r);
+      if (mode === "freeform") {
+        const r = await apiCall<FreeformResponse>("/v1/ai/freeform", {
+          method: "POST",
+          body: JSON.stringify({ prompt: prompt.trim() }),
+        });
+        setReply(r);
+      } else {
+        const r = await apiCall<AgentRunResponse>("/v1/ai/agent", {
+          method: "POST",
+          body: JSON.stringify({ prompt: prompt.trim(), max_steps: 5 }),
+        });
+        setAgentReply(r);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -47,6 +72,23 @@ export function AdhkarMindPage() {
         Glass-box SOC assistant. Every call is logged with provider + model + token
         usage in the AI audit trail.
       </p>
+      <div className="flex gap-2 text-sm">
+        {(["freeform", "agent"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            className={
+              "rounded-full px-3 py-1 " +
+              (mode === m
+                ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                : "border border-md-sys-color-outline-variant")
+            }
+            onClick={() => setMode(m)}
+          >
+            {m === "freeform" ? "Freeform" : "ToolUse Agent"}
+          </button>
+        ))}
+      </div>
       <textarea
         className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
         rows={5}
@@ -76,6 +118,36 @@ export function AdhkarMindPage() {
             {reply.provider}/{reply.model} · in {reply.input_tokens} tok · out{" "}
             {reply.output_tokens} tok
           </p>
+        </article>
+      ) : null}
+      {agentReply ? (
+        <article className="space-y-2 rounded border border-md-sys-color-outline-variant p-3">
+          <p className="whitespace-pre-wrap text-sm">{agentReply.final_text}</p>
+          <p className="text-xs text-md-sys-color-on-surface-variant">
+            {agentReply.tool_calls} tool call{agentReply.tool_calls === 1 ? "" : "s"} ·{" "}
+            {agentReply.steps.length} step{agentReply.steps.length === 1 ? "" : "s"}
+          </p>
+          {agentReply.steps.length > 1 ? (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-md-sys-color-on-surface-variant">
+                Show transcript
+              </summary>
+              <ol className="mt-2 space-y-1">
+                {agentReply.steps.map((s, i) => (
+                  <li
+                    key={i}
+                    className="rounded border border-md-sys-color-outline-variant/50 p-2"
+                  >
+                    <div className="font-mono text-[10px] uppercase text-md-sys-color-on-surface-variant">
+                      {s.role}
+                      {s.tool_name ? ` · ${s.tool_name}` : ""}
+                    </div>
+                    <pre className="whitespace-pre-wrap">{s.content}</pre>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
         </article>
       ) : null}
     </section>
