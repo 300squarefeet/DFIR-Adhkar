@@ -26,6 +26,7 @@ from adhkar.db.models.outbox_event import OutboxEvent
 from adhkar.db.models.profile import Profile
 from adhkar.db.models.session import Session
 from adhkar.db.models.task import Task, TaskLog
+from adhkar.db.models.taxonomy import TaxonomyEntry
 from adhkar.db.models.ttp import CaseTtp, TtpCatalogEntry
 from adhkar.db.models.user import User
 
@@ -57,6 +58,7 @@ __all__ = [
     "Session",
     "Task",
     "TaskLog",
+    "TaxonomyEntry",
     "TtpCatalogEntry",
     "User",
     "UserOrgMembership",

@@ -18,6 +18,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -224,3 +225,48 @@ async def export_observables_to_misp(
             )
         )
     return MispExportResponse(case_number=case.number, case_title=case.title, attributes=attrs)
+
+
+@router.get(
+    "/v1/observables/export-csv",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def export_observables_csv(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    case_id: UUID | None = None,
+    is_ioc: bool | None = None,
+) -> PlainTextResponse:
+    """Round-trip-compatible inverse of /v1/observables/import-csv.
+
+    Same header order so an exported file can be re-imported without
+    reshaping. case_id and is_ioc are optional filters."""
+    stmt = select(Observable).where(
+        Observable.organization_id == org_id, Observable.deleted_at.is_(None)
+    )
+    if case_id is not None:
+        stmt = stmt.where(Observable.case_id == case_id)
+    if is_ioc is not None:
+        stmt = stmt.where(Observable.is_ioc.is_(is_ioc))
+    rows = (await db.execute(stmt.order_by(Observable.created_at))).scalars().all()
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer.writerow(["data_type", "data", "tlp", "is_ioc", "tags", "message"])
+    for o in rows:
+        writer.writerow(
+            [
+                o.data_type,
+                o.data,
+                o.tlp,
+                "true" if o.is_ioc else "false",
+                ",".join(o.tags),
+                o.message or "",
+            ]
+        )
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="adhkar-observables.csv"'},
+    )
