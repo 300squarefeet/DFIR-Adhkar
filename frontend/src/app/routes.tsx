@@ -20,6 +20,7 @@ import { GdprPage } from "@/pages/GdprPage";
 import { PortalPage } from "@/pages/PortalPage";
 import { SearchPage } from "@/pages/SearchPage";
 import { TasksPage } from "@/pages/TasksPage";
+import { TaxonomiesPage } from "@/pages/TaxonomiesPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
@@ -196,6 +197,12 @@ const tasksRoute = createRoute({
   component: TasksPage,
 });
 
+const taxonomiesRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/admin/taxonomies",
+  component: TaxonomiesPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -232,6 +239,7 @@ export const router = createRouter({
       auditRoute,
       analyzerJobsRoute,
       tasksRoute,
+      taxonomiesRoute,
     ]),
   ]),
 });

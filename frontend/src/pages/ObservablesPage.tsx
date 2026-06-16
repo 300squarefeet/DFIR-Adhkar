@@ -130,6 +130,14 @@ export function ObservablesPage() {
               {showImport ? "Cancel import" : "Import CSV"}
             </button>
           ) : null}
+          <a
+            href={`${(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000"}/v1/observables/export-csv`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+          >
+            Export CSV
+          </a>
           {canManage && selected.size > 0 ? (
             <button
               type="button"
