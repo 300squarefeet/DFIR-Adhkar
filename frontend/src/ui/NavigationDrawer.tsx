@@ -9,6 +9,7 @@ interface Item {
 
 const ITEMS: ReadonlyArray<Item> = [
   { to: "/health", label: "Health", icon: "monitor_heart" },
+  { to: "/search", label: "Search", icon: "search" },
   { to: "/cases", label: "Cases", icon: "work" },
   { to: "/alerts", label: "Alerts", icon: "warning" },
   { to: "/observables", label: "Observables", icon: "fingerprint" },

@@ -15,6 +15,7 @@ import { CaseDetailPage } from "@/pages/CaseDetailPage";
 import { CaseTemplatesPage } from "@/pages/CaseTemplatesPage";
 import { GdprPage } from "@/pages/GdprPage";
 import { PortalPage } from "@/pages/PortalPage";
+import { SearchPage } from "@/pages/SearchPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
@@ -148,6 +149,12 @@ const portalRoute = createRoute({
   component: PortalPage,
 });
 
+const searchRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/search",
+  component: SearchPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -178,6 +185,7 @@ export const router = createRouter({
       caseTemplatesRoute,
       gdprRoute,
       portalRoute,
+      searchRoute,
     ]),
   ]),
 });
