@@ -7,6 +7,7 @@ from adhkar.db.models.api_key import ApiKey
 from adhkar.db.models.attachment import Attachment, CaseShare
 from adhkar.db.models.audit_log import AuditLog
 from adhkar.db.models.case import Case
+from adhkar.db.models.case_embedding import CaseEmbedding
 from adhkar.db.models.case_link import CaseLink
 from adhkar.db.models.comment import Comment
 from adhkar.db.models.kb import CaseTemplate, KnowledgeBasePage
@@ -35,6 +36,7 @@ __all__ = [
     "Attachment",
     "AuditLog",
     "Case",
+    "CaseEmbedding",
     "CaseLink",
     "CaseShare",
     "CaseTemplate",
