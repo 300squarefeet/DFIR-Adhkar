@@ -1,0 +1,168 @@
+name: adhkar
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: adhkar-postgres
+    environment:
+      POSTGRES_USER: ${ADHKAR_DB_USER}
+      POSTGRES_PASSWORD: ${ADHKAR_DB_PASSWORD}
+      POSTGRES_DB: ${ADHKAR_DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ADHKAR_DB_USER} -d ${ADHKAR_DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [adhkar-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: adhkar-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [adhkar-net]
+
+  minio:
+    image: minio/minio:latest
+    container_name: adhkar-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${ADHKAR_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${ADHKAR_S3_SECRET_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [adhkar-net]
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: adhkar-minio-init
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${ADHKAR_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${ADHKAR_S3_SECRET_KEY}
+      BUCKET_NAME: ${ADHKAR_S3_BUCKET}
+    volumes:
+      - ./scripts/minio-bootstrap.sh:/bootstrap.sh:ro
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    restart: "no"
+    networks: [adhkar-net]
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: adhkar-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks: [adhkar-net]
+
+  api:
+    build:
+      context: ../backend
+      args:
+        INSTALL_GROUP: dev
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
+        BUILT_AT: ${BUILT_AT:-dev}
+    container_name: adhkar-api
+    environment:
+      ADHKAR_ENV: ${ADHKAR_ENV}
+      ADHKAR_LOG_LEVEL: ${ADHKAR_LOG_LEVEL}
+      ADHKAR_SECRET_KEY: ${ADHKAR_SECRET_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      ADHKAR_S3_ENDPOINT: ${ADHKAR_S3_ENDPOINT}
+      ADHKAR_S3_ACCESS_KEY: ${ADHKAR_S3_ACCESS_KEY}
+      ADHKAR_S3_SECRET_KEY: ${ADHKAR_S3_SECRET_KEY}
+      ADHKAR_S3_BUCKET: ${ADHKAR_S3_BUCKET}
+      ADHKAR_S3_REGION: ${ADHKAR_S3_REGION}
+      ADHKAR_SMTP_HOST: ${ADHKAR_SMTP_HOST}
+      ADHKAR_SMTP_PORT: ${ADHKAR_SMTP_PORT}
+      ADHKAR_SMTP_FROM: ${ADHKAR_SMTP_FROM}
+      ADHKAR_OTEL_EXPORTER_OTLP_ENDPOINT: ${ADHKAR_OTEL_EXPORTER_OTLP_ENDPOINT}
+      ADHKAR_OTEL_SERVICE_NAME: ${ADHKAR_OTEL_SERVICE_NAME}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    volumes:
+      - ../backend/adhkar:/app/adhkar:ro
+      - ../backend/alembic:/app/alembic:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks: [adhkar-net]
+
+  web:
+    build:
+      context: ../frontend
+      target: dev
+    container_name: adhkar-web
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    ports:
+      - "5173:5173"
+    depends_on:
+      api: { condition: service_healthy }
+    volumes:
+      - ../frontend/src:/app/src:ro
+      - ../frontend/public:/app/public:ro
+      - ../frontend/index.html:/app/index.html:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [adhkar-net]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: adhkar-jaeger
+    profiles: ["observability"]
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    networks: [adhkar-net]
+
+  # Phase 6+: OpenSearch placeholder. Uncomment when SearchIndex needs swap.
+  # opensearch:
+  #   image: opensearchproject/opensearch:2
+  #   profiles: ["search"]
+  #   environment:
+  #     - discovery.type=single-node
+  #     - DISABLE_SECURITY_PLUGIN=true
+  #   ports: ["9200:9200"]
+  #   networks: [adhkar-net]
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+
+networks:
+  adhkar-net:
+    driver: bridge
