@@ -1,6 +1,6 @@
 """FastAPI dependency providers."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated, Any
 from uuid import UUID
@@ -103,9 +103,6 @@ async def get_current_user(
         permissions=frozenset(claims.perms),
         claims=claims,
     )
-
-
-from collections.abc import Awaitable, Callable
 
 
 def require_permission(
