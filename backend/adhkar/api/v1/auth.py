@@ -156,6 +156,60 @@ async def refresh(
     )
 
 
+class SwitchOrgRequest(BaseModel):
+    organization_id: UUID
+
+
+@router.post("/switch-org", response_model=LoginResponse)
+async def switch_org(
+    body: SwitchOrgRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    redis: Annotated[redis_async.Redis, Depends(get_redis)],  # type: ignore[type-arg]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> LoginResponse:
+    membership = (
+        await db.execute(
+            select(UserOrgMembership).where(
+                UserOrgMembership.user_id == user.user_id,
+                UserOrgMembership.organization_id == body.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not membership:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not_a_member_of_target_org")
+    profile = (
+        await db.execute(select(Profile).where(Profile.id == membership.profile_id))
+    ).scalar_one()
+
+    # Revoke current access (push to denylist with remaining TTL).
+    await revoke_session(
+        session=db,
+        redis=redis,
+        jti=user.claims.jti,
+        expires_at=datetime.fromtimestamp(user.claims.exp, tz=UTC),
+    )
+
+    issued = await issue_tokens(
+        session=db,
+        user_id=user.user_id,
+        org_id=body.organization_id,
+        perms=sorted(profile.permissions),
+        secret=settings.secret_key,
+        user_agent=request.headers.get("user-agent"),
+        ip=request.client.host if request.client else None,
+    )
+    _set_refresh_cookie(response, issued.refresh_token, settings)
+    return LoginResponse(
+        access_token=issued.access_token,
+        expires_in=int(ACCESS_TTL.total_seconds()),
+        user_id=user.user_id,
+        current_org_id=body.organization_id,
+    )
+
+
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     response: Response,
