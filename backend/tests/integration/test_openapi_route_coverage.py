@@ -42,6 +42,8 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/observables",
     "/v1/analyzers",
     "/v1/observables/{observable_id}/similar",
+    "/v1/observables/import-csv",
+    "/v1/cases/{case_id}/observables/export-misp",
     # Phase 3
     "/v1/cases",
     "/v1/cases/{case_id}/tasks",

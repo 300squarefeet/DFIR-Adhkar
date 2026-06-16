@@ -30,6 +30,11 @@ export function ObservablesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText] = useState(
+    "data_type,data,tlp,is_ioc,tags,message\nip,1.2.3.4,amber,true,phish,seen in mail bounce\n",
+  );
+  const [importBusy, setImportBusy] = useState(false);
 
   const refresh = async () => {
     try {
@@ -77,6 +82,30 @@ export function ObservablesPage() {
 
   const canManage = permissions.has("manageObservable");
 
+  const importCsv = async () => {
+    if (!csvText.trim()) return;
+    setImportBusy(true);
+    try {
+      const r = await apiCall<{
+        imported: number;
+        skipped_duplicate: number;
+        skipped_invalid: number;
+      }>("/v1/observables/import-csv", {
+        method: "POST",
+        body: JSON.stringify({ csv_text: csvText }),
+      });
+      toast.success(
+        `Imported ${r.imported}, dedup ${r.skipped_duplicate}, invalid ${r.skipped_invalid}.`,
+      );
+      setShowImport(false);
+      await refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   if (error)
     return (
       <section className="p-6">
@@ -89,21 +118,55 @@ export function ObservablesPage() {
 
   return (
     <section className="p-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <h1 className="text-2xl font-semibold">Observables</h1>
-        {canManage && selected.size > 0 ? (
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {canManage ? (
+            <button
+              type="button"
+              className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+              onClick={() => setShowImport((v) => !v)}
+            >
+              {showImport ? "Cancel import" : "Import CSV"}
+            </button>
+          ) : null}
+          {canManage && selected.size > 0 ? (
+            <button
+              type="button"
+              className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
+              onClick={() => {
+                void bulkMarkIoc();
+              }}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? "…" : `Mark ${selected.size} as IOC`}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {showImport && canManage ? (
+        <article className="mb-4 rounded border border-md-sys-color-outline-variant p-3">
+          <p className="mb-2 text-xs text-md-sys-color-on-surface-variant">
+            CSV header required: data_type, data, tlp?, is_ioc?, tags?, message?
+          </p>
+          <textarea
+            className="mb-2 w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 font-mono text-xs"
+            rows={6}
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+          />
           <button
             type="button"
             className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
             onClick={() => {
-              void bulkMarkIoc();
+              void importCsv();
             }}
-            disabled={bulkBusy}
+            disabled={importBusy || !csvText.trim()}
           >
-            {bulkBusy ? "…" : `Mark ${selected.size} as IOC`}
+            {importBusy ? "Importing…" : "Import"}
           </button>
-        ) : null}
-      </div>
+        </article>
+      ) : null}
       {rows.length === 0 ? (
         <p className="text-md-sys-color-on-surface-variant">No observables.</p>
       ) : (
