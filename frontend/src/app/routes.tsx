@@ -17,6 +17,7 @@ import { KnowledgeBasePage } from "@/pages/KnowledgeBasePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ObservablesPage } from "@/pages/ObservablesPage";
+import { TtpsPage } from "@/pages/TtpsPage";
 
 import { AppShell } from "./AppShell";
 
@@ -106,6 +107,12 @@ const notificationsRoute = createRoute({
   component: NotificationsPage,
 });
 
+const ttpsRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/ttps",
+  component: TtpsPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -130,6 +137,7 @@ export const router = createRouter({
       kbRoute,
       dashboardRoute,
       notificationsRoute,
+      ttpsRoute,
     ]),
   ]),
 });
