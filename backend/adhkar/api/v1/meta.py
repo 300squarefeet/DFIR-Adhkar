@@ -18,7 +18,8 @@ class HealthResponse(BaseModel):
 class VersionResponse(BaseModel):
     version: str
     commit: str
-    builtAt: str
+    # camelCase intentional: matches client-facing JSON convention (spec §5.3).
+    builtAt: str  # noqa: N815
 
 
 @router.get("/healthz", response_model=HealthResponse)
