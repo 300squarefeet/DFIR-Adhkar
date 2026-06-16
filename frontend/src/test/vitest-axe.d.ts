@@ -2,12 +2,10 @@
 import "vitest";
 
 declare module "vitest" {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  interface Assertion<T = any> {
+  interface Assertion {
     toHaveNoViolations(): void;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  interface AsymmetricMatchersContaining<T = any> {
+  interface AsymmetricMatchersContaining {
     toHaveNoViolations(): void;
   }
 }
