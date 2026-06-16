@@ -26,17 +26,20 @@ describe("<AppShell>", () => {
     expect(screen.getByText("page")).toBeInTheDocument();
   });
 
-  it("NavigationDrawer shows Health enabled and other items disabled with tooltip", () => {
+  it("NavigationDrawer shows shipped items as links and unshipped as disabled", () => {
     render(
       <AppShell>
         <div />
       </AppShell>,
     );
-    const health = screen.getByRole("link", { name: /health/i });
-    expect(health).toBeInTheDocument();
-    const cases = screen.getByRole("button", { name: /cases/i });
-    expect(cases).toBeDisabled();
-    expect(cases).toHaveAttribute("title", expect.stringContaining("Phase"));
+    expect(screen.getByRole("link", { name: /health/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /cases/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /alerts/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /observables/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /adhkar mind/i })).toBeInTheDocument();
+    const dashboards = screen.getByRole("button", { name: /dashboards/i });
+    expect(dashboards).toBeDisabled();
+    expect(dashboards).toHaveAttribute("title", expect.stringContaining("Phase"));
   });
 
   it("⌘K opens the command palette", async () => {
