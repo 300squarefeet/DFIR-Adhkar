@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # ----- av webhook -----
     av_webhook_secret: str = ""  # empty disables /v1/attachments/av-scan-webhook
 
+    # ----- oidc sso -----
+    # JSON map: {"<name>": {client_id, client_secret, discovery_url, scopes?, redirect_uri?}}
+    oidc_providers_json: str = ""
+
     # ----- smtp (dev = mailhog) -----
     smtp_host: str = "mailhog"
     smtp_port: int = 1025
