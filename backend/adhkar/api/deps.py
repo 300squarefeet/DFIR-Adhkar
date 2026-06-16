@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-import boto3
+import boto3  # type: ignore[import-untyped]
 import redis.asyncio as redis_async
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -21,7 +21,7 @@ def get_engine(s: Annotated[Settings, Depends(get_settings)]) -> AsyncEngine:
     return create_engine(s)
 
 
-def get_redis(s: Annotated[Settings, Depends(get_settings)]) -> "redis_async.Redis[str]":
+def get_redis(s: Annotated[Settings, Depends(get_settings)]) -> redis_async.Redis:  # type: ignore[type-arg]
     return redis_async.from_url(s.redis_url, decode_responses=True)
 
 
