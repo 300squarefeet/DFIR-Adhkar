@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import (
@@ -20,7 +20,7 @@ from adhkar.api.deps import (
     require_current_org,
     require_permission,
 )
-from adhkar.db.models import Alert, Case
+from adhkar.db.models import Alert, Case, CaseTtp, TtpCatalogEntry
 
 router = APIRouter(prefix="/v1/stats", tags=["stats"])
 
@@ -76,6 +76,64 @@ async def cases_per_day(
         series="cases-per-day",
         points=await _count_per_day(db, org_id, "case", days),
     )
+
+
+class HeatmapEntry(BaseModel):
+    technique_id: str
+    name: str
+    tactic: str
+    case_count: int
+
+
+class HeatmapResponse(BaseModel):
+    entries: list[HeatmapEntry]
+
+
+@router.get("/ttps-heatmap", response_model=HeatmapResponse)
+async def ttps_heatmap(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> HeatmapResponse:
+    """Per-technique case count for the org, joined to the catalog so the
+    UI can render an ATT&CK-navigator-style grouped grid (tactic →
+    technique → case_count)."""
+    rows = (
+        await db.execute(
+            select(
+                CaseTtp.technique_id,
+                func.count(distinct(CaseTtp.case_id)).label("n"),
+            )
+            .where(CaseTtp.organization_id == org_id)
+            .group_by(CaseTtp.technique_id)
+        )
+    ).all()
+    counts: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    if not counts:
+        return HeatmapResponse(entries=[])
+    catalog = (
+        (
+            await db.execute(
+                select(TtpCatalogEntry).where(TtpCatalogEntry.technique_id.in_(list(counts.keys())))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    by_id = {c.technique_id: c for c in catalog}
+    entries: list[HeatmapEntry] = []
+    for tid, n in counts.items():
+        cat = by_id.get(tid)
+        entries.append(
+            HeatmapEntry(
+                technique_id=tid,
+                name=cat.name if cat else "(unknown — not in catalog)",
+                tactic=cat.tactic if cat else "uncategorized",
+                case_count=n,
+            )
+        )
+    entries.sort(key=lambda e: (e.tactic, -e.case_count, e.technique_id))
+    return HeatmapResponse(entries=entries)
 
 
 @router.get("/alerts-per-day", response_model=TimeSeriesResponse)
