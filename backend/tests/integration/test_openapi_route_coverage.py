@@ -32,6 +32,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/auth/logout",
     "/v1/auth/me",
     "/v1/users",
+    "/v1/users/search",
     "/v1/users/invite",
     "/v1/organizations",
     "/v1/profiles",

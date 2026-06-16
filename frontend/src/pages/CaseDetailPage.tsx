@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { ObservablePicker } from "@/ui/ObservablePicker";
 import { useToast } from "@/ui/Toast";
 import { TtpPicker } from "@/ui/TtpPicker";
+import { UserPicker } from "@/ui/UserPicker";
 
 interface CaseDetail {
   id: string;
@@ -135,6 +136,9 @@ export function CaseDetailPage({ caseId }: Props) {
     stage: "open",
   });
   const [headerBusy, setHeaderBusy] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState("");
+  const [showAssignee, setShowAssignee] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,6 +279,34 @@ export function CaseDetailPage({ caseId }: Props) {
       stage: c.stage as "open" | "in_progress" | "closed",
     });
     setEditingHeader(true);
+  };
+
+  const saveDescription = async () => {
+    try {
+      const updated = await apiCall<CaseDetail>(`/v1/cases/${caseId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ description: descDraft }),
+      });
+      setCase(updated);
+      setEditingDesc(false);
+      toast.success("Description saved.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const setAssignee = async (assigneeId: string | null, label: string) => {
+    try {
+      const updated = await apiCall<CaseDetail>(`/v1/cases/${caseId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assignee_id: assigneeId }),
+      });
+      setCase(updated);
+      toast.success(`Assignee: ${label}`);
+      setShowAssignee(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   const saveHeader = async () => {
@@ -565,9 +597,83 @@ export function CaseDetailPage({ caseId }: Props) {
             </span>
           ))}
         </div>
-        {c.description ? (
-          <p className="whitespace-pre-wrap text-sm">{c.description}</p>
+        <div className="flex items-center gap-2 text-xs text-md-sys-color-on-surface-variant">
+          <span>
+            Assignee:{" "}
+            {c.assignee_id ? (
+              <span className="font-mono">{c.assignee_id.slice(0, 8)}</span>
+            ) : (
+              <span>(unassigned)</span>
+            )}
+          </span>
+          {permissions.has("manageCase") ? (
+            <button
+              type="button"
+              className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container"
+              onClick={() => setShowAssignee((v) => !v)}
+            >
+              {showAssignee ? "Cancel" : "Change"}
+            </button>
+          ) : null}
+        </div>
+        {showAssignee && permissions.has("manageCase") ? (
+          <UserPicker
+            onPick={(id, label) => {
+              void setAssignee(id, label);
+            }}
+            placeholder="Search org members…"
+          />
         ) : null}
+        {editingDesc && permissions.has("manageCase") ? (
+          <div className="space-y-2">
+            <textarea
+              className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
+              rows={4}
+              value={descDraft}
+              onChange={(e) => setDescDraft(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-xs text-md-sys-color-on-primary"
+                onClick={() => {
+                  void saveDescription();
+                }}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs"
+                onClick={() => setEditingDesc(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2">
+            <p className="flex-1 whitespace-pre-wrap text-sm">
+              {c.description || (
+                <span className="text-md-sys-color-on-surface-variant">
+                  No description.
+                </span>
+              )}
+            </p>
+            {permissions.has("manageCase") ? (
+              <button
+                type="button"
+                className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container"
+                onClick={() => {
+                  setDescDraft(c.description ?? "");
+                  setEditingDesc(true);
+                }}
+              >
+                Edit desc
+              </button>
+            ) : null}
+          </div>
+        )}
       </header>
 
       {responders.length > 0 && permissions.has("manageCase") ? (
