@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 
 import { useAuth } from "@/lib/auth";
+import { useUserNames } from "@/lib/useUserNames";
 import { useToast } from "@/ui/Toast";
 
 type TaskStatus = "Waiting" | "InProgress" | "Completed" | "Cancelled";
@@ -49,6 +50,8 @@ export function TasksPage() {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiCall, status]);
+
+  const userNames = useUserNames(rows?.map((r) => r.assignee_id) ?? []);
 
   const groupedByCase = useMemo(() => {
     if (!rows) return new Map<string, TaskRow[]>();
@@ -143,6 +146,12 @@ export function TasksPage() {
                     <span>{t.title}</span>
                     {t.mandatory ? (
                       <span className="text-xs text-severity-3">required</span>
+                    ) : null}
+                    {t.assignee_id ? (
+                      <span className="text-xs text-md-sys-color-on-surface-variant">
+                        @
+                        {userNames[t.assignee_id] ?? t.assignee_id.slice(0, 8)}
+                      </span>
                     ) : null}
                     {t.due_date ? (
                       <span className="text-xs text-md-sys-color-on-surface-variant">
