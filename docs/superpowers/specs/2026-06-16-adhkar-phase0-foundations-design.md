@@ -1,15 +1,15 @@
-# Aegis — Phase 0 Foundations (Design Spec)
+# Adhkar — Phase 0 Foundations (Design Spec)
 
 - Status: Approved (brainstorm) — pending implementation plan
 - Date: 2026-06-16
-- Author: lead engineer (Aegis)
+- Author: lead engineer (Adhkar)
 - Scope: **Phase 0 only**. Phases 1–10 are scoped at a peek level (see §10) and will receive their own spec at their brainstorm gate.
 
 ---
 
 ## 1. Context
 
-Aegis adalah Security Incident Response Platform (SIRP) open-source self-hostable dengan target functional parity terhadap TheHive 5 Enterprise plus AI layer first-class. Lihat brief lengkap pemilik produk (mission statement, persona, feature checklist) sebagai dokumen induk — spec ini hanya membahas slice foundation (Phase 0).
+Adhkar adalah Security Incident Response Platform (SIRP) open-source self-hostable dengan target functional parity terhadap TheHive 5 Enterprise plus AI layer first-class. Lihat brief lengkap pemilik produk (mission statement, persona, feature checklist) sebagai dokumen induk — spec ini hanya membahas slice foundation (Phase 0).
 
 Phase 0 tidak ada feature domain. Tujuannya tunggal: **membuktikan tulang punggung berdiri** (compose boots clean, CI green, design system tokens lock, app shell render dark theme) sehingga setiap phase berikutnya dapat menumpang infrastruktur yang sama tanpa rework.
 
@@ -19,26 +19,26 @@ Phase 0 tidak ada feature domain. Tujuannya tunggal: **membuktikan tulang punggu
 
 Tiga keputusan strategis di-locked sebelum desain detail. Masing-masing akan diabadikan sebagai ADR di Phase 0 (lihat §7).
 
-### 2.1 Naming — Aegis
+### 2.1 Naming — Adhkar
 
-Nama produk **"TheBee"** yang diusulkan brief asli ditolak karena risiko trademark/dilution terhadap StrangeBee (pemilik TheHive) dan karena SDK `thebee4py`/`thebee4go` adalah mirror persis dari `thehive4py`/`thehive4go`. Diganti dengan **Aegis**:
+Nama produk **"TheBee"** yang diusulkan brief asli ditolak karena risiko trademark/dilution terhadap StrangeBee (pemilik TheHive) dan karena SDK `thebee4py`/`thebee4go` adalah mirror persis dari `thehive4py`/`thehive4go`. Diganti dengan **Adhkar**:
 
 | Aspek | Nilai |
 |---|---|
-| Nama produk | Aegis (long: "Aegis IR" dalam prosa public-facing) |
-| Repo | `aegis-ir` |
-| Package Python | `aegis` |
-| SDK | `aegis-py` (Python), `aegis-go` (Go) |
-| Sub-modul | Aegis Workers (analyzer/responder engine), Aegis Mind (AI), Aegis Portal (external collab) |
-| CLI | `aegisctl` |
-| Container registry | `ghcr.io/<org>/aegis-api`, `aegis-web`, `aegis-workers` |
+| Nama produk | Adhkar (long: "Adhkar IR" dalam prosa public-facing) |
+| Repo | `adhkar-ir` |
+| Package Python | `adhkar` |
+| SDK | `adhkar-py` (Python), `adhkar-go` (Go) |
+| Sub-modul | Adhkar Workers (analyzer/responder engine), Adhkar Mind (AI), Adhkar Portal (external collab) |
+| CLI | `adhkarctl` |
+| Container registry | `ghcr.io/<org>/adhkar-api`, `adhkar-web`, `adhkar-workers` |
 
 ### 2.2 License — Apache-2.0 core + commercial enterprise plugins (Grafana model)
 
-Repo `aegis-ir` ber-license **Apache-2.0**. Plugin enterprise hidup di repo private terpisah (`aegis-enterprise`, dibuat paling cepat Phase 7) dengan commercial license. Phase 0 **tidak** membangun license-enforcement code; sebaliknya, Phase 1+ menyediakan stable plugin interface sehingga enterprise dapat drop-in tanpa fork.
+Repo `adhkar-ir` ber-license **Apache-2.0**. Plugin enterprise hidup di repo private terpisah (`adhkar-enterprise`, dibuat paling cepat Phase 7) dengan commercial license. Phase 0 **tidak** membangun license-enforcement code; sebaliknya, Phase 1+ menyediakan stable plugin interface sehingga enterprise dapat drop-in tanpa fork.
 
 Konsekuensi langsung Phase 0:
-- File `LICENSE` (Apache-2.0), `NOTICE` (Aegis trademark + Apache attribution).
+- File `LICENSE` (Apache-2.0), `NOTICE` (Adhkar trademark + Apache attribution).
 - `CONTRIBUTING.md` mensyaratkan **DCO sign-off** (`-s`), bukan CLA.
 
 ### 2.3 Search — Postgres FTS dulu, OpenSearch ditunda
@@ -52,9 +52,9 @@ Spec asli mengusulkan OpenSearch dari Phase 0. Ditunda: PostgreSQL 16 punya `tsv
 ### 3.1 Direktori root
 
 ```
-aegis-ir/
+adhkar-ir/
 ├── backend/                 # FastAPI app (Python 3.12)
-│   ├── aegis/               # package: import path "aegis.*"
+│   ├── adhkar/               # package: import path "adhkar.*"
 │   │   ├── api/             # routers (v1/*.py), dependencies, errors
 │   │   ├── core/            # settings, logging, otel bootstrap, middleware
 │   │   ├── db/              # engine, session, base, readiness
@@ -139,9 +139,9 @@ Setiap placeholder folder berisi `README.md` yang menunjuk ke phase yang akan me
 
 | Service | Image | Port (host) | Tujuan Phase 0 | Healthcheck |
 |---|---|---|---|---|
-| `postgres` | `pgvector/pgvector:pg16` | 5432 | Primary store, pgvector siap dipakai Phase 8 | `pg_isready -U aegis` |
+| `postgres` | `pgvector/pgvector:pg16` | 5432 | Primary store, pgvector siap dipakai Phase 8 | `pg_isready -U adhkar` |
 | `redis` | `redis:7-alpine` | 6379 | Cache/broker/pubsub; dibangkitkan agar pola stabil & `/readyz` reachable | `redis-cli ping` |
-| `minio` | `minio/minio:latest` | 9000 (s3) / 9001 (console) | Object store; init-once container `minio-init` create bucket `aegis-attachments` | HTTP `/minio/health/ready` |
+| `minio` | `minio/minio:latest` | 9000 (s3) / 9001 (console) | Object store; init-once container `minio-init` create bucket `adhkar-attachments` | HTTP `/minio/health/ready` |
 | `mailhog` | `mailhog/mailhog` | 1025 (smtp) / 8025 (ui) | Capture email dev | TCP 1025 |
 | `api` | build `./backend` | 8000 | FastAPI app | HTTP `/healthz` |
 | `web` | build `./frontend` (stage `dev`) | 5173 | React shell, hot reload via bind mount | HTTP `/` |
@@ -154,9 +154,9 @@ minio  ────┘
 mailhog ─────────────┘
 ```
 
-**Network & volume**: satu bridge `aegis-net`; named volumes `pgdata`, `redisdata`, `miniodata`. Source code bind-mount untuk hot reload di dev.
+**Network & volume**: satu bridge `adhkar-net`; named volumes `pgdata`, `redisdata`, `miniodata`. Source code bind-mount untuk hot reload di dev.
 
-**Container naming**: setiap service punya `container_name: aegis-<service>` eksplisit (`aegis-postgres`, `aegis-redis`, `aegis-minio`, `aegis-mailhog`, `aegis-api`, `aegis-web`). Ini menjamin perintah `docker stop aegis-redis` di DoD demo (§10.7) bekerja apa pun nama project compose-nya, dan mempermudah log filtering.
+**Container naming**: setiap service punya `container_name: adhkar-<service>` eksplisit (`adhkar-postgres`, `adhkar-redis`, `adhkar-minio`, `adhkar-mailhog`, `adhkar-api`, `adhkar-web`). Ini menjamin perintah `docker stop adhkar-redis` di DoD demo (§10.7) bekerja apa pun nama project compose-nya, dan mempermudah log filtering.
 
 ### 4.2 Compose profiles
 
@@ -169,43 +169,43 @@ mailhog ─────────────┘
 ### 4.3 Konfigurasi (`deploy/.env.example`)
 
 ```env
-# ----- Aegis core -----
-AEGIS_ENV=dev
-AEGIS_LOG_LEVEL=INFO
-AEGIS_SECRET_KEY=change-me-32-chars-min-xxxxxxxxxxxx
+# ----- Adhkar core -----
+ADHKAR_ENV=dev
+ADHKAR_LOG_LEVEL=INFO
+ADHKAR_SECRET_KEY=change-me-32-chars-min-xxxxxxxxxxxx
 
 # ----- Database -----
-AEGIS_DB_HOST=postgres
-AEGIS_DB_PORT=5432
-AEGIS_DB_NAME=aegis
-AEGIS_DB_USER=aegis
-AEGIS_DB_PASSWORD=aegis-dev
-DATABASE_URL=postgresql+asyncpg://aegis:aegis-dev@postgres:5432/aegis
+ADHKAR_DB_HOST=postgres
+ADHKAR_DB_PORT=5432
+ADHKAR_DB_NAME=adhkar
+ADHKAR_DB_USER=adhkar
+ADHKAR_DB_PASSWORD=adhkar-dev
+DATABASE_URL=postgresql+asyncpg://adhkar:adhkar-dev@postgres:5432/adhkar
 
 # ----- Redis -----
 REDIS_URL=redis://redis:6379/0
 
 # ----- Object store (S3-compat) -----
-AEGIS_S3_ENDPOINT=http://minio:9000
-AEGIS_S3_ACCESS_KEY=minio-dev
-AEGIS_S3_SECRET_KEY=minio-dev-secret
-AEGIS_S3_BUCKET=aegis-attachments
-AEGIS_S3_REGION=us-east-1
+ADHKAR_S3_ENDPOINT=http://minio:9000
+ADHKAR_S3_ACCESS_KEY=minio-dev
+ADHKAR_S3_SECRET_KEY=minio-dev-secret
+ADHKAR_S3_BUCKET=adhkar-attachments
+ADHKAR_S3_REGION=us-east-1
 
 # ----- Mail (dev) -----
-AEGIS_SMTP_HOST=mailhog
-AEGIS_SMTP_PORT=1025
-AEGIS_SMTP_FROM=aegis@localhost
+ADHKAR_SMTP_HOST=mailhog
+ADHKAR_SMTP_PORT=1025
+ADHKAR_SMTP_FROM=adhkar@localhost
 
 # ----- Observability -----
-AEGIS_OTEL_EXPORTER_OTLP_ENDPOINT=
-AEGIS_OTEL_SERVICE_NAME=aegis-api
+ADHKAR_OTEL_EXPORTER_OTLP_ENDPOINT=
+ADHKAR_OTEL_SERVICE_NAME=adhkar-api
 
 # ----- Frontend -----
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
-Backend settings loader: Pydantic `BaseSettings` dengan env prefix `AEGIS_`, support `DATABASE_URL`/`REDIS_URL` (12-factor). Singleton module-level, injected via FastAPI dependency `Depends(get_settings)`. Tidak ada `os.getenv()` tersebar.
+Backend settings loader: Pydantic `BaseSettings` dengan env prefix `ADHKAR_`, support `DATABASE_URL`/`REDIS_URL` (12-factor). Singleton module-level, injected via FastAPI dependency `Depends(get_settings)`. Tidak ada `os.getenv()` tersebar.
 
 ### 4.4 Tidak di Phase 0
 
@@ -226,7 +226,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_otel(settings)            # no-op kalau OTEL endpoint kosong
 
     app = FastAPI(
-        title="Aegis API",
+        title="Adhkar API",
         version=__version__,
         openapi_url="/openapi.json",
         docs_url="/docs",
@@ -243,10 +243,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 Factory, bukan module-level `app = FastAPI()`, supaya test dapat instansiasi dengan settings override.
 
-### 5.2 Layout `backend/aegis/`
+### 5.2 Layout `backend/adhkar/`
 
 ```
-aegis/
+adhkar/
 ├── __init__.py            # __version__
 ├── main.py                # create_app()
 ├── api/
@@ -255,7 +255,7 @@ aegis/
 │   └── v1/
 │       └── meta.py        # /healthz /readyz /version
 ├── core/
-│   ├── settings.py        # Pydantic BaseSettings (prefix AEGIS_)
+│   ├── settings.py        # Pydantic BaseSettings (prefix ADHKAR_)
 │   ├── logging.py         # structlog JSON
 │   ├── otel.py            # OTel SDK bootstrap (FastAPI + SQLAlchemy auto-instrument)
 │   └── middleware.py      # RequestIdMiddleware, AccessLogMiddleware
@@ -271,7 +271,7 @@ aegis/
 |---|---|---|
 | GET | `/healthz` | Liveness. Selalu 200 jika proses hidup. Body `{"status":"ok"}`. Tidak sentuh I/O. |
 | GET | `/readyz` | Readiness. Parallel checks DB connect + Redis ping + S3 head-bucket (timeout 1 s each). 200 kalau semua hijau; 503 dengan body `{"checks":{"db":"ok","redis":"down",...}}` kalau ada gagal. |
-| GET | `/version` | `{"version":"0.1.0-dev","commit":"<short-sha>","builtAt":"<iso8601>"}`. Diisi via env `AEGIS_GIT_COMMIT`/`AEGIS_BUILT_AT` saat docker build (`--build-arg`). |
+| GET | `/version` | `{"version":"0.1.0-dev","commit":"<short-sha>","builtAt":"<iso8601>"}`. Diisi via env `ADHKAR_GIT_COMMIT`/`ADHKAR_BUILT_AT` saat docker build (`--build-arg`). |
 | GET | `/docs` | Swagger UI. |
 | GET | `/redoc` | ReDoc. |
 | GET | `/openapi.json` | OpenAPI 3 spec. |
@@ -282,7 +282,7 @@ Semua exception path translate ke struktur konsisten:
 
 ```json
 {
-  "type": "https://aegis.dev/problems/<slug>",
+  "type": "https://adhkar.dev/problems/<slug>",
   "title": "Short title",
   "status": 400,
   "detail": "Human-readable",
@@ -313,18 +313,18 @@ Handler yang di-register Phase 0:
 - Migrasi awal `0001_init_extensions.py`:
   `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS vector;`
   Tidak ada domain table.
-- Entrypoint `api` container menjalankan `alembic upgrade head` sebelum `uvicorn` start. Bisa di-skip via `AEGIS_SKIP_MIGRATIONS=1`.
+- Entrypoint `api` container menjalankan `alembic upgrade head` sebelum `uvicorn` start. Bisa di-skip via `ADHKAR_SKIP_MIGRATIONS=1`.
 
 ### 5.6 Logging
 
 - `structlog` → JSON ke stdout. Setiap line: `request_id`, `service`, `level`, `event`, `ts`.
-- Loglevel via `AEGIS_LOG_LEVEL`.
+- Loglevel via `ADHKAR_LOG_LEVEL`.
 - Access log middleware: satu line per request dengan `method`, `path`, `status`, `duration_ms`, `request_id`. **Body tidak di-log** (PII).
 
 ### 5.7 OpenTelemetry
 
 - Bootstrap di `core/otel.py`. Default disabled.
-- Saat enabled: auto-instrument FastAPI + SQLAlchemy + httpx + redis. Exporter OTLP gRPC ke `AEGIS_OTEL_EXPORTER_OTLP_ENDPOINT`.
+- Saat enabled: auto-instrument FastAPI + SQLAlchemy + httpx + redis. Exporter OTLP gRPC ke `ADHKAR_OTEL_EXPORTER_OTLP_ENDPOINT`.
 - `request_id` ↔ trace link via structlog processor.
 
 ### 5.8 Dockerfile (multi-stage)
@@ -338,16 +338,16 @@ COPY pyproject.toml uv.lock ./
 # Build-time arg: 'prod' (default) → no dev deps; 'dev' → include dev deps for hot reload container in compose
 ARG INSTALL_GROUP=prod
 RUN if [ "$INSTALL_GROUP" = "dev" ]; then uv sync --frozen; else uv sync --frozen --no-dev; fi
-COPY aegis ./aegis
+COPY adhkar ./adhkar
 COPY alembic.ini alembic ./
 COPY scripts/entrypoint.sh ./scripts/
 ARG GIT_COMMIT
 ARG BUILT_AT
-ENV AEGIS_GIT_COMMIT=${GIT_COMMIT} AEGIS_BUILT_AT=${BUILT_AT}
+ENV ADHKAR_GIT_COMMIT=${GIT_COMMIT} ADHKAR_BUILT_AT=${BUILT_AT}
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s CMD curl -fsS http://localhost:8000/healthz || exit 1
 ENTRYPOINT ["./scripts/entrypoint.sh"]
-CMD ["uvicorn", "aegis.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "adhkar.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ### 5.9 Tidak di Phase 0
@@ -377,7 +377,7 @@ src/
 ├── pages/
 │   └── HealthPage.tsx       # /health
 ├── design-system/
-│   ├── tokens.css           # CSS custom properties --aegis-*
+│   ├── tokens.css           # CSS custom properties --adhkar-*
 │   ├── tailwind.config.ts   # tokens → theme.extend
 │   └── components/
 │       ├── Button/
@@ -412,48 +412,48 @@ src/
 
 ```css
 :root {
-  --aegis-radius-sm: 4px; --aegis-radius-md: 6px; --aegis-radius-lg: 10px;
-  --aegis-space-1: 4px;  --aegis-space-2: 8px;  --aegis-space-3: 12px;
-  --aegis-space-4: 16px; --aegis-space-6: 24px; --aegis-space-8: 32px;
-  --aegis-font-sans: 'Inter Variable', system-ui, sans-serif;
-  --aegis-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --adhkar-radius-sm: 4px; --adhkar-radius-md: 6px; --adhkar-radius-lg: 10px;
+  --adhkar-space-1: 4px;  --adhkar-space-2: 8px;  --adhkar-space-3: 12px;
+  --adhkar-space-4: 16px; --adhkar-space-6: 24px; --adhkar-space-8: 32px;
+  --adhkar-font-sans: 'Inter Variable', system-ui, sans-serif;
+  --adhkar-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 
   /* severity */
-  --aegis-severity-1: #3b82f6;   /* low */
-  --aegis-severity-2: #eab308;   /* medium */
-  --aegis-severity-3: #f97316;   /* high */
-  --aegis-severity-4: #ef4444;   /* critical */
+  --adhkar-severity-1: #3b82f6;   /* low */
+  --adhkar-severity-2: #eab308;   /* medium */
+  --adhkar-severity-3: #f97316;   /* high */
+  --adhkar-severity-4: #ef4444;   /* critical */
 
   /* TLP (FIRST.org) */
-  --aegis-tlp-white: #ffffff;
-  --aegis-tlp-green: #22c55e;
-  --aegis-tlp-amber: #f59e0b;
-  --aegis-tlp-amber-strict: #d97706;
-  --aegis-tlp-red:   #dc2626;
+  --adhkar-tlp-white: #ffffff;
+  --adhkar-tlp-green: #22c55e;
+  --adhkar-tlp-amber: #f59e0b;
+  --adhkar-tlp-amber-strict: #d97706;
+  --adhkar-tlp-red:   #dc2626;
 }
 
 :root, [data-theme='dark'] {
-  --aegis-bg-canvas:  #0b0d12;
-  --aegis-bg-surface: #11141b;
-  --aegis-bg-elevated:#181c25;
-  --aegis-bg-input:   #0f1218;
-  --aegis-border:     #1f2430;
-  --aegis-fg-primary: #e6e8ee;
-  --aegis-fg-muted:   #8a93a6;
-  --aegis-fg-subtle:  #5a6275;
-  --aegis-accent:     #f59e0b;   /* Aegis brand accent */
+  --adhkar-bg-canvas:  #0b0d12;
+  --adhkar-bg-surface: #11141b;
+  --adhkar-bg-elevated:#181c25;
+  --adhkar-bg-input:   #0f1218;
+  --adhkar-border:     #1f2430;
+  --adhkar-fg-primary: #e6e8ee;
+  --adhkar-fg-muted:   #8a93a6;
+  --adhkar-fg-subtle:  #5a6275;
+  --adhkar-accent:     #f59e0b;   /* Adhkar brand accent */
 }
 
 [data-theme='light'] {
-  --aegis-bg-canvas:  #f7f8fa;
-  --aegis-bg-surface: #ffffff;
-  --aegis-bg-elevated:#ffffff;
-  --aegis-bg-input:   #ffffff;
-  --aegis-border:     #e4e7ec;
-  --aegis-fg-primary: #1f2430;
-  --aegis-fg-muted:   #5a6275;
-  --aegis-fg-subtle:  #8a93a6;
-  --aegis-accent:     #d97706;
+  --adhkar-bg-canvas:  #f7f8fa;
+  --adhkar-bg-surface: #ffffff;
+  --adhkar-bg-elevated:#ffffff;
+  --adhkar-bg-input:   #ffffff;
+  --adhkar-border:     #e4e7ec;
+  --adhkar-fg-primary: #1f2430;
+  --adhkar-fg-muted:   #5a6275;
+  --adhkar-fg-subtle:  #8a93a6;
+  --adhkar-accent:     #d97706;
 }
 ```
 
@@ -474,7 +474,7 @@ Tailwind `theme.extend.colors` di-wire dari CSS variables. Theme toggle = ubah `
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│ TopBar:  AEGIS · breadcrumb     ⌘K · 🌙 · @user            │  48px
+│ TopBar:  ADHKAR · breadcrumb     ⌘K · 🌙 · @user            │  48px
 ├────────┬───────────────────────────────────────────────────┤
 │ LeftNav│              <Outlet/>                            │
 │ 220px  │                                                   │
@@ -493,12 +493,12 @@ Placeholder nav: `<NavItem disabled tooltipText="Coming in Phase N"/>`. Struktur
 ### 6.6 Halaman Health (`/health`)
 
 ```
-Aegis status
+Adhkar status
 ────────────
 API           ✓ Healthy            v0.1.0-dev  (abc1234 · 2026-06-16 10:42 UTC)
 Database      ✓ Connected
 Redis         ✓ Reachable
-Object store  ✓ Bucket "aegis-attachments" present
+Object store  ✓ Bucket "adhkar-attachments" present
 
 [Refresh]
 ```
@@ -537,7 +537,7 @@ Compose pakai stage `dev`. Stage `runtime` untuk Phase 10 production image.
 - Data grid scaffold (TanStack Table) → Phase 2.
 - Filter sidebar layout → Phase 2.
 - WebSocket client → Phase 1.
-- Aegis Mind copilot rail → Phase 8.
+- Adhkar Mind copilot rail → Phase 8.
 - i18n → tidak default; tambah saat ada permintaan eksplisit.
 - Light theme polish lengkap → Phase 10 (Phase 0 tokens saja).
 
@@ -549,7 +549,7 @@ Empat ADR ditulis Phase 0 dalam format MADR 3.0. ADR immutable; perubahan = ADR 
 
 | File | Topik | Decision |
 |---|---|---|
-| `docs/ADRs/0001-naming-aegis.md` | Naming & namespace | Aegis (lihat §2.1) |
+| `docs/ADRs/0001-naming-adhkar.md` | Naming & namespace | Adhkar (lihat §2.1) |
 | `docs/ADRs/0002-license-apache-core-plus-enterprise.md` | License model | Apache-2.0 core + commercial enterprise plugins (Grafana model). DCO sign-off untuk kontribusi. |
 | `docs/ADRs/0003-persistence-postgres-pgvector.md` | Primary store | PostgreSQL 16 + pgvector; repository pattern Phase 1+ supaya backend pluggable. Trade-off vs Cassandra/Elasticsearch/MongoDB ditangkap. |
 | `docs/ADRs/0004-search-deferred-opensearch.md` | Search engine | Postgres FTS dulu via `SearchIndex` interface; OpenSearch ditambah saat trigger spesifik tercapai (latency p95 listing > 500 ms @ 500k observables, FTS attachment body, atau permintaan ES API compatibility). |
@@ -597,7 +597,7 @@ tests/
 - Test name = behavior, bukan nomor urut.
 
 **Cakupan Phase 0 (~10 tes):**
-1. `Settings` parse `AEGIS_*` env vars dengan default benar.
+1. `Settings` parse `ADHKAR_*` env vars dengan default benar.
 2. `Settings` reject `SECRET_KEY` < 32 chars.
 3. JSON logger output punya `request_id`, `event`, `level`, `ts`.
 4. RFC 7807 handler `RequestValidationError` → 422 struktur benar.
@@ -688,7 +688,7 @@ Plus `pull_request_template.md` dan CODEOWNERS (`docs/ADRs/* @<owner>`).
 | Job | Depends on | Trigger condition | Steps |
 |---|---|---|---|
 | `changes` | — | always | paths-filter detect backend/frontend/docs/deploy changes |
-| `backend-quality` | `changes` | backend changed | uv sync; ruff check; ruff format --check; mypy aegis; pytest --cov --cov-fail-under=70 (per-file) |
+| `backend-quality` | `changes` | backend changed | uv sync; ruff check; ruff format --check; mypy adhkar; pytest --cov --cov-fail-under=70 (per-file) |
 | `frontend-quality` | `changes` | frontend changed | pnpm install; pnpm lint; pnpm format:check; pnpm typecheck; pnpm test --run; pnpm build; pnpm storybook:build |
 | `integration` | backend+frontend quality | always (pada PR) | service containers postgres+redis+minio; alembic upgrade head; pytest tests/integration |
 | `build-images` | integration | push to main / release tag | docker buildx; push backend+frontend ke ghcr.io dengan tag `sha-<short>` + `:main`; SBOM SPDX via anchore/sbom-action; cosign keyless OIDC sign |
@@ -730,7 +730,7 @@ Concurrency group per-branch + `cancel-in-progress: true`.
 Phase 0 disebut **Done** jika dan hanya jika semua butir berikut hijau.
 
 ### 10.1 Repo & dokumen
-- [ ] Repo `aegis-ir` di GitHub, public, Apache-2.0 + NOTICE + CONTRIBUTING (DCO) + CODE_OF_CONDUCT + PR template + CODEOWNERS.
+- [ ] Repo `adhkar-ir` di GitHub, public, Apache-2.0 + NOTICE + CONTRIBUTING (DCO) + CODE_OF_CONDUCT + PR template + CODEOWNERS.
 - [ ] Layout direktori sesuai §3.1; tiap placeholder folder berisi `README.md` mengarah ke phase pengisinya.
 - [ ] Empat ADR di `docs/ADRs/` (naming, license, persistence, search-deferred) — status `Accepted`.
 - [ ] `docs/architecture.md` satu halaman + system diagram (mermaid) + seksi **Integration roadmap** (§11).
@@ -763,7 +763,7 @@ Phase 0 disebut **Done** jika dan hanya jika semua butir berikut hijau.
 - [ ] `backend-quality`: ruff check, ruff format --check, mypy strict, pytest dengan coverage ≥ 70% per-file.
 - [ ] `frontend-quality`: eslint, prettier --check, tsc --noEmit, vitest coverage ≥ 60% per-file, `pnpm build`, `pnpm storybook:build`.
 - [ ] `integration`: services postgres+redis+minio; alembic upgrade head; `test_readyz` hijau.
-- [ ] `build-images` (push main): images ter-publish ke `ghcr.io/<org>/aegis-{api,web}:sha-<short>` + `:main`; SBOM SPDX terlampir; cosign signature ada.
+- [ ] `build-images` (push main): images ter-publish ke `ghcr.io/<org>/adhkar-{api,web}:sha-<short>` + `:main`; SBOM SPDX terlampir; cosign signature ada.
 - [ ] `container-scan` weekly: terjadwal; CRITICAL = fail; HIGH = warn.
 
 ### 10.6 Repo hygiene
@@ -773,7 +773,7 @@ Phase 0 disebut **Done** jika dan hanya jika semua butir berikut hijau.
 
 ### 10.7 Sanity demo (screencast 90 detik untuk arsip)
 - [ ] `git clone … && cd … && docker compose up -d && open http://localhost:5173`.
-- [ ] Health page hijau → `docker stop aegis-redis` → Redis menunjukkan down → `docker start aegis-redis` → kembali hijau.
+- [ ] Health page hijau → `docker stop adhkar-redis` → Redis menunjukkan down → `docker start adhkar-redis` → kembali hijau.
 - [ ] Tunjukkan Swagger `:8000/docs`, Storybook `:6006`, MailHog `:8025`, MinIO console `:9001`.
 
 Jika satu butir tidak hijau → Phase 0 belum done; tidak boleh mulai Phase 1.
@@ -782,7 +782,7 @@ Jika satu butir tidak hijau → Phase 0 belum done; tidak boleh mulai Phase 1.
 
 ## 11. Integration roadmap (di-document ke `docs/architecture.md`)
 
-Aegis dirancang sebagai platform integrasi, bukan re-implementasi EDR/SIEM. Integrasi pihak ketiga mendarat di tiga lapisan, masing-masing pada phase yang berbeda.
+Adhkar dirancang sebagai platform integrasi, bukan re-implementasi EDR/SIEM. Integrasi pihak ketiga mendarat di tiga lapisan, masing-masing pada phase yang berbeda.
 
 | Lapisan | Mendarat | Vendor/protokol yang ditangani |
 |---|---|---|
@@ -831,7 +831,7 @@ Hal-hal berikut **bukan** Phase 0. Tertulis di sini agar tidak ada ambiguitas te
 - WebSocket plumbing — Phase 1.
 - Analyzer / responder engine dan plugin SDK — Phase 2.
 - Helm chart, production compose, HA topology — Phase 10.
-- SDK generation (`aegis-py`, `aegis-go`) — Phase 10.
+- SDK generation (`adhkar-py`, `adhkar-go`) — Phase 10.
 - License enforcement module — tidak akan ditambahkan; license enforcement diserahkan ke plugin presence (lihat ADR 0002).
 - Email intake (IMAP/MS Graph) — Phase 7a.
 - MISP connector — Phase 7a.
@@ -861,7 +861,7 @@ Spec ini memakai dua placeholder yang harus diganti saat repo dibuat. Implemente
 
 | Placeholder | Diganti dengan | Muncul di |
 |---|---|---|
-| `<org>` | GitHub organization atau username pemilik repo | `ghcr.io/<org>/aegis-*` (§3.1, §9.2, §10.5), `gh:<org>/aegis-ir` (README badge) |
+| `<org>` | GitHub organization atau username pemilik repo | `ghcr.io/<org>/adhkar-*` (§3.1, §9.2, §10.5), `gh:<org>/adhkar-ir` (README badge) |
 | `<owner>` | GitHub handle yang berperan CODEOWNER untuk ADR | `CODEOWNERS` entry (§9.1) |
 
 Diisi saat task "init repo" di implementation plan, bukan ditinggal untuk fase berikutnya.
