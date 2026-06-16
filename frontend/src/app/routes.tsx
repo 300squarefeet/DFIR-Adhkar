@@ -10,6 +10,7 @@ import { AdhkarMindPage } from "@/pages/AdhkarMindPage";
 import { AdminProfilesPage } from "@/pages/AdminProfilesPage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { AnalyzerJobsPage } from "@/pages/AnalyzerJobsPage";
+import { AttackHeatmapPage } from "@/pages/AttackHeatmapPage";
 import { AuditLogPage } from "@/pages/AuditLogPage";
 import { AlertDetailPage } from "@/pages/AlertDetailPage";
 import { AlertsPage } from "@/pages/AlertsPage";
@@ -203,6 +204,12 @@ const taxonomiesRoute = createRoute({
   component: TaxonomiesPage,
 });
 
+const attackHeatmapRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/attack-heatmap",
+  component: AttackHeatmapPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -240,6 +247,7 @@ export const router = createRouter({
       analyzerJobsRoute,
       tasksRoute,
       taxonomiesRoute,
+      attackHeatmapRoute,
     ]),
   ]),
 });
