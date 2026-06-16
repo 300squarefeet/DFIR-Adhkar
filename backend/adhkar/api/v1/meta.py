@@ -60,7 +60,7 @@ async def readyz(
     response: Response,
     s: Annotated[Settings, Depends(get_settings)],
     engine: Annotated[AsyncEngine, Depends(get_engine)],
-    redis: Annotated["Redis[str]", Depends(get_redis)],
+    redis: Annotated[Redis, Depends(get_redis)],  # type: ignore[type-arg]
     s3: Annotated[Any, Depends(get_s3)],
 ) -> ReadyResponse:
     results = await asyncio.gather(
