@@ -81,6 +81,9 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # OIDC SSO
     "/v1/auth/oidc/{provider}/login",
     "/v1/auth/oidc/{provider}/callback",
+    # Portal
+    "/v1/portal/cases",
+    "/v1/portal/cases/{case_id}/comments",
 )
 
 
