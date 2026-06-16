@@ -1,5 +1,9 @@
 """FastAPI application factory."""
 
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,12 +27,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from adhkar.workers.outbox_publisher import run_outbox_publisher
+
+        task = asyncio.create_task(run_outbox_publisher(settings))
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+
     app = FastAPI(
         title="Adhkar IR API",
         version=__version__,
         openapi_url="/openapi.json",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     app.add_middleware(AccessLogMiddleware)
@@ -50,25 +69,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profiles_router)
     app.include_router(api_keys_router)
     app.include_router(live_router)
-
-    # Background outbox publisher (Phase 1b in-process worker)
-    import asyncio
-
-    from adhkar.workers.outbox_publisher import run_outbox_publisher
-
-    @app.on_event("startup")  # type: ignore[no-untyped-call]
-    async def _start_outbox() -> None:
-        app.state.outbox_task = asyncio.create_task(run_outbox_publisher(settings))
-
-    @app.on_event("shutdown")  # type: ignore[no-untyped-call]
-    async def _stop_outbox() -> None:
-        task = getattr(app.state, "outbox_task", None)
-        if task is not None:
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
 
     register_exception_handlers(app)
     configure_otel(app, settings)
