@@ -13,6 +13,7 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/cases", label: "Cases", icon: "work" },
   { to: "/alerts", label: "Alerts", icon: "warning" },
   { to: "/observables", label: "Observables", icon: "fingerprint" },
+  { to: "/analyzer-jobs", label: "Analyzers", icon: "biotech" },
   { to: "/adhkar-mind", label: "Adhkar Mind", icon: "psychology" },
   { to: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { to: "/knowledge-base", label: "Knowledge Base", icon: "menu_book" },
