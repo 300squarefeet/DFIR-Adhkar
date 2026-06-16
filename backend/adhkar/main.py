@@ -15,6 +15,7 @@ from adhkar.api.v1.auth import router as auth_router
 from adhkar.api.v1.live import router as live_router
 from adhkar.api.v1.meta import router as meta_router
 from adhkar.api.v1.mfa import router as mfa_router
+from adhkar.api.v1.observables import router as observables_router
 from adhkar.api.v1.organizations import router as orgs_router
 from adhkar.api.v1.profiles import router as profiles_router
 from adhkar.api.v1.users import router as users_router
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profiles_router)
     app.include_router(api_keys_router)
     app.include_router(audit_router)
+    app.include_router(observables_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)
