@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     s3_bucket: str = "adhkar-attachments"
     s3_region: str = "us-east-1"
 
+    # ----- av webhook -----
+    av_webhook_secret: str = ""  # empty disables /v1/attachments/av-scan-webhook
+
     # ----- smtp (dev = mailhog) -----
     smtp_host: str = "mailhog"
     smtp_port: int = 1025

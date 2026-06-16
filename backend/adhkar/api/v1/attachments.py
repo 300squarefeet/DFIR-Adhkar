@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +30,19 @@ from adhkar.db.models import Attachment, Case, CaseShare, Task, User
 from adhkar.storage.presigned import S3Config, presigned_put_url
 
 router = APIRouter(tags=["attachments"])
+
+
+class AvScanWebhook(BaseModel):
+    """Incoming AV scanner verdict. We accept either a storage_key or
+    the attachment id. The webhook body is signed with HMAC-SHA256 of
+    `f"{attachment_id_or_key}|{verdict}"` using ADHKAR_AV_WEBHOOK_SECRET
+    in the X-Adhkar-Signature header. We don't trust the JSON until that
+    signature verifies."""
+
+    attachment_id: UUID | None = None
+    storage_key: str | None = None
+    verdict: Literal["clean", "infected", "skipped"]
+    scanner: str | None = Field(default=None, max_length=100)
 
 
 class PresignRequest(BaseModel):
@@ -72,6 +85,49 @@ async def presign_upload(
     expires = 3600
     url = presigned_put_url(cfg, key, body.content_type, expires)
     return PresignResponse(url=url, storage_key=key, expires_in=expires)
+
+
+@router.post("/v1/attachments/av-scan-webhook", status_code=status.HTTP_204_NO_CONTENT)
+async def av_scan_webhook(
+    body: AvScanWebhook,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """AV scanner callback. No bearer auth — protected by HMAC signature on
+    the request body using the configured webhook secret."""
+    import hashlib
+    import hmac
+
+    settings = get_settings()
+    secret = settings.av_webhook_secret
+    if not secret:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "av_webhook_disabled")
+    sig_header = request.headers.get("X-Adhkar-Signature", "")
+    target = str(body.attachment_id or body.storage_key or "")
+    if not target:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "missing_attachment_id_or_key")
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        f"{target}|{body.verdict}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(sig_header, expected):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad_signature")
+    stmt = select(Attachment)
+    stmt = (
+        stmt.where(Attachment.id == body.attachment_id)
+        if body.attachment_id
+        else stmt.where(Attachment.storage_key == body.storage_key)
+    )
+    a = (await db.execute(stmt)).scalar_one_or_none()
+    if not a:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "attachment_not_found")
+    a.av_scan_status = body.verdict
+    if body.verdict == "clean":
+        a.is_quarantined = False
+    elif body.verdict == "infected":
+        a.is_quarantined = True
+    await db.flush()
 
 
 # ---------- Attachments ----------
