@@ -162,6 +162,7 @@ async def logout(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     redis: Annotated[redis_async.Redis, Depends(get_redis)],  # type: ignore[type-arg]
     db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
     refresh_cookie: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ) -> Response:
     # Revoke current access token jti
@@ -175,7 +176,7 @@ async def logout(
         try:
             from adhkar.auth.jwt import decode_jwt
 
-            refresh_claims = decode_jwt(refresh_cookie, secret="ignored-validation-only")
+            refresh_claims = decode_jwt(refresh_cookie, secret=settings.secret_key)
         except Exception:
             refresh_claims = None
         if refresh_claims is not None:
