@@ -75,6 +75,12 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # RAG similarity + ToolUse agent
     "/v1/similarity/cases",
     "/v1/ai/agent",
+    # GDPR
+    "/v1/gdpr/users/{user_id}/export",
+    "/v1/gdpr/users/{user_id}/erase",
+    # OIDC SSO
+    "/v1/auth/oidc/{provider}/login",
+    "/v1/auth/oidc/{provider}/callback",
 )
 
 
