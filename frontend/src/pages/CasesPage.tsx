@@ -5,6 +5,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Link } from "@tanstack/react-router";
+
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
@@ -23,7 +25,7 @@ interface CaseRow {
 }
 
 export function CasesPage() {
-  const { apiCall } = useAuth();
+  const { apiCall, permissions } = useAuth();
   const [cases, setCases] = useState<CaseRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +76,17 @@ export function CasesPage() {
 
   return (
     <section className="p-6">
-      <h1 className="mb-4 text-2xl font-semibold">Cases</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Cases</h1>
+        {permissions.has("manageCase") ? (
+          <Link
+            to="/cases/new"
+            className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary"
+          >
+            + New Case
+          </Link>
+        ) : null}
+      </div>
       <table className="w-full table-auto border-collapse text-sm">
         <thead>
           <tr className="border-b border-md-sys-color-outline-variant text-left">
@@ -92,8 +104,16 @@ export function CasesPage() {
               key={c.id}
               className="border-b border-md-sys-color-outline-variant/50 hover:bg-md-sys-color-surface-container"
             >
-              <td className="py-2 pr-3 font-mono">#{c.number}</td>
-              <td className="py-2 pr-3">{c.title}</td>
+              <td className="py-2 pr-3 font-mono">
+                <Link to="/cases/$caseId" params={{ caseId: c.id }} className="hover:underline">
+                  #{c.number}
+                </Link>
+              </td>
+              <td className="py-2 pr-3">
+                <Link to="/cases/$caseId" params={{ caseId: c.id }} className="hover:underline">
+                  {c.title}
+                </Link>
+              </td>
               <td className="py-2 pr-3">
                 <SeverityBadge level={c.severity} compact />
               </td>
