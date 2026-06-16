@@ -176,10 +176,13 @@ class UserPatch(BaseModel):
 @router.get("/v1/users/{user_id}", response_model=UserDTO)
 async def get_user(
     user_id: UUID,
-    _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserDTO:
+    """Read one org-member by id. viewCase is enough since the response
+    only exposes id/email/display_name/status — the assignee chip and
+    comment author labels need this without inheriting manageUser."""
     row = (
         await db.execute(
             select(User)

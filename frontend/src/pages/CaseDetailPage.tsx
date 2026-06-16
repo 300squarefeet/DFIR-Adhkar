@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
+import { useUserNames } from "@/lib/useUserNames";
 import { ObservablePicker } from "@/ui/ObservablePicker";
 import { useToast } from "@/ui/Toast";
 import { TtpPicker } from "@/ui/TtpPicker";
@@ -100,6 +101,7 @@ interface ResponderResult {
 export function CaseDetailPage({ caseId }: Props) {
   const { apiCall, permissions } = useAuth();
   const toast = useToast();
+  // (initial value populated after `c` arrives via useUserNames below)
   const [c, setCase] = useState<CaseDetail | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [comments, setComments] = useState<CommentRow[]>([]);
@@ -386,6 +388,14 @@ export function CaseDetailPage({ caseId }: Props) {
 
   const activePage = pages.find((p) => p.id === activePageId) ?? null;
 
+  // Resolve assignee + comment author ids → display names through the
+  // shared session cache.
+  const idsToResolve: (string | null | undefined)[] = [
+    c?.assignee_id,
+    ...comments.map((cm) => cm.author_id),
+  ];
+  const userNames = useUserNames(idsToResolve);
+
   useEffect(() => {
     if (activePage) setPageDraft(activePage.content);
   }, [activePage]);
@@ -601,7 +611,9 @@ export function CaseDetailPage({ caseId }: Props) {
           <span>
             Assignee:{" "}
             {c.assignee_id ? (
-              <span className="font-mono">{c.assignee_id.slice(0, 8)}</span>
+              <span className="font-medium text-md-sys-color-on-surface">
+                {userNames[c.assignee_id] ?? c.assignee_id.slice(0, 8)}
+              </span>
             ) : (
               <span>(unassigned)</span>
             )}
@@ -1070,7 +1082,10 @@ export function CaseDetailPage({ caseId }: Props) {
             >
               <p className="whitespace-pre-wrap">{cm.content}</p>
               <p className="mt-1 text-xs text-md-sys-color-on-surface-variant">
-                {new Date(cm.created_at).toLocaleString()}
+                {cm.author_id
+                  ? (userNames[cm.author_id] ?? cm.author_id.slice(0, 8))
+                  : "system"}{" "}
+                · {new Date(cm.created_at).toLocaleString()}
               </p>
             </li>
           ))}
