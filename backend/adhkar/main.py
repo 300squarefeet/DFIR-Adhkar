@@ -28,6 +28,7 @@ from adhkar.api.v1.observables import router as observables_router
 from adhkar.api.v1.organizations import router as orgs_router
 from adhkar.api.v1.profiles import router as profiles_router
 from adhkar.api.v1.responders import router as responders_router
+from adhkar.api.v1.similarity import router as similarity_router
 from adhkar.api.v1.ttps import router as ttps_router
 from adhkar.api.v1.users import router as users_router
 from adhkar.core.logging import configure_logging
@@ -46,17 +47,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from adhkar.notifications.dispatcher import run_notification_dispatcher
         from adhkar.workers.analyzer_runner import run_analyzer_runner
+        from adhkar.workers.embedding_indexer import run_embedding_indexer
         from adhkar.workers.outbox_publisher import run_outbox_publisher
 
         outbox = asyncio.create_task(run_outbox_publisher(settings))
         analyzer = asyncio.create_task(run_analyzer_runner(settings))
         notif = asyncio.create_task(run_notification_dispatcher(settings))
+        indexer = asyncio.create_task(run_embedding_indexer(settings))
         try:
             yield
         finally:
-            for t in (outbox, analyzer, notif):
+            for t in (outbox, analyzer, notif, indexer):
                 t.cancel()
-            for t in (outbox, analyzer, notif):
+            for t in (outbox, analyzer, notif, indexer):
                 try:
                     await t
                 except (asyncio.CancelledError, Exception):  # noqa: S110
@@ -104,6 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(attachments_router)
     app.include_router(responders_router)
     app.include_router(mcp_router)
+    app.include_router(similarity_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)

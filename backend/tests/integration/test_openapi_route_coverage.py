@@ -72,6 +72,9 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/responders/{name}/{entity_type}/{entity_id}",
     # MCP server
     "/v1/mcp/rpc",
+    # RAG similarity + ToolUse agent
+    "/v1/similarity/cases",
+    "/v1/ai/agent",
 )
 
 
