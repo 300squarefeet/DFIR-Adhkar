@@ -32,7 +32,7 @@ class OrgScopedRepository(Generic[T]):
         self.current_org_id = current_org_id
 
     def _scoped(self, stmt: Select[Any]) -> Select[Any]:
-        org_col = self.model.organization_id
+        org_col = self.model.organization_id  # type: ignore[attr-defined]
         return stmt.where(org_col == self.current_org_id)
 
     async def list(self) -> list[T]:
@@ -41,7 +41,7 @@ class OrgScopedRepository(Generic[T]):
 
     async def get(self, entity_id: UUID) -> T | None:
         stmt = self._scoped(select(self.model).where(self.model.id == entity_id))  # type: ignore[attr-defined]
-        return (await self.session.execute(stmt)).scalar_one_or_none()
+        return (await self.session.execute(stmt)).scalar_one_or_none()  # type: ignore[no-any-return]
 
     async def add(self, entity: T) -> T:
         """Insert. Subclasses are responsible for setting organization_id correctly
@@ -57,7 +57,9 @@ class OrgScopedRepository(Generic[T]):
         return entity
 
     async def delete(self, entity_id: UUID) -> bool:
-        stmt = self._scoped(delete(self.model).where(self.model.id == entity_id))  # type: ignore[attr-defined]
+        org_col = self.model.organization_id  # type: ignore[attr-defined]
+        id_col = self.model.id  # type: ignore[attr-defined]
+        stmt = delete(self.model).where(id_col == entity_id, org_col == self.current_org_id)
         result = await self.session.execute(stmt)
         await self.session.flush()
         return result.rowcount > 0  # type: ignore[attr-defined,no-any-return]
