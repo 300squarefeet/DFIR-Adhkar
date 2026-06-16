@@ -45,6 +45,18 @@ interface Props {
   caseId: string;
 }
 
+interface Responder {
+  name: string;
+  description: string;
+  supported_entity_types: string[];
+  confirm_required: boolean;
+}
+
+interface ResponderResult {
+  status: string;
+  summary: string;
+}
+
 export function CaseDetailPage({ caseId }: Props) {
   const { apiCall, permissions } = useAuth();
   const [c, setCase] = useState<CaseDetail | null>(null);
@@ -53,20 +65,25 @@ export function CaseDetailPage({ caseId }: Props) {
   const [commentDraft, setCommentDraft] = useState("");
   const [postBusy, setPostBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [responders, setResponders] = useState<Responder[]>([]);
+  const [responderBusy, setResponderBusy] = useState<string | null>(null);
+  const [lastResponderResult, setLastResponderResult] = useState<ResponderResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [cd, ts, cs] = await Promise.all([
+        const [cd, ts, cs, rs] = await Promise.all([
           apiCall<CaseDetail>(`/v1/cases/${caseId}`),
           apiCall<TaskRow[]>(`/v1/cases/${caseId}/tasks`),
           apiCall<CommentRow[]>(`/v1/cases/${caseId}/comments`),
+          apiCall<Responder[]>(`/v1/responders`).catch(() => [] as Responder[]),
         ]);
         if (cancelled) return;
         setCase(cd);
         setTasks(ts);
         setComments(cs);
+        setResponders(rs.filter((r) => r.supported_entity_types.includes("case")));
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -75,6 +92,30 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId]);
+
+  const runResponder = async (name: string, confirmRequired: boolean) => {
+    if (confirmRequired && !window.confirm(`Run responder "${name}" on this case?`)) {
+      return;
+    }
+    const url = window.prompt("Webhook URL to notify");
+    if (!url) return;
+    setResponderBusy(name);
+    setLastResponderResult(null);
+    try {
+      const r = await apiCall<ResponderResult>(
+        `/v1/responders/${encodeURIComponent(name)}/case/${caseId}`,
+        {
+          method: "POST",
+          body: JSON.stringify({ payload: { url, message: `Case ${caseId}` } }),
+        },
+      );
+      setLastResponderResult(r);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setResponderBusy(null);
+    }
+  };
 
   const submitComment = async () => {
     if (!commentDraft.trim()) return;
@@ -131,6 +172,38 @@ export function CaseDetailPage({ caseId }: Props) {
           <p className="whitespace-pre-wrap text-sm">{c.description}</p>
         ) : null}
       </header>
+
+      {responders.length > 0 && permissions.has("manageCase") ? (
+        <article>
+          <h2 className="mb-2 text-lg font-medium">Responders</h2>
+          <div className="flex flex-wrap gap-2">
+            {responders.map((r) => (
+              <button
+                key={r.name}
+                type="button"
+                title={r.description}
+                className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container disabled:opacity-50"
+                onClick={() => {
+                  void runResponder(r.name, r.confirm_required);
+                }}
+                disabled={responderBusy === r.name}
+              >
+                {responderBusy === r.name ? "Running…" : r.name}
+              </button>
+            ))}
+          </div>
+          {lastResponderResult ? (
+            <p
+              className={
+                "mt-2 text-xs " +
+                (lastResponderResult.status === "ok" ? "text-tlp-green" : "text-severity-4")
+              }
+            >
+              {lastResponderResult.status}: {lastResponderResult.summary}
+            </p>
+          ) : null}
+        </article>
+      ) : null}
 
       <article>
         <h2 className="mb-2 text-lg font-medium">Tasks ({tasks.length})</h2>

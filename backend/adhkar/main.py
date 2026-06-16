@@ -26,6 +26,7 @@ from adhkar.api.v1.notifications import router as notifications_router
 from adhkar.api.v1.observables import router as observables_router
 from adhkar.api.v1.organizations import router as orgs_router
 from adhkar.api.v1.profiles import router as profiles_router
+from adhkar.api.v1.responders import router as responders_router
 from adhkar.api.v1.ttps import router as ttps_router
 from adhkar.api.v1.users import router as users_router
 from adhkar.core.logging import configure_logging
@@ -100,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(notifications_router)
     app.include_router(ai_router)
     app.include_router(attachments_router)
+    app.include_router(responders_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)
