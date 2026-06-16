@@ -79,4 +79,4 @@ async def run_outbox_publisher(settings: Settings) -> None:
                 _log.exception("outbox publisher iteration failed")
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
     finally:
-        await redis.aclose()
+        await redis.close()
