@@ -49,6 +49,19 @@ interface CasePageRow {
   updated_at: string;
 }
 
+interface TimelineEntry {
+  id: string;
+  action: string;
+  entity_type: string;
+  actor_user_id: string | null;
+  created_at: string;
+}
+
+interface CaseReportResponse {
+  markdown: string;
+  number: number;
+}
+
 interface Props {
   caseId: string;
 }
@@ -83,12 +96,14 @@ export function CaseDetailPage({ caseId }: Props) {
   const [newPageSlug, setNewPageSlug] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
   const [showNewPage, setShowNewPage] = useState(false);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [reportBusy, setReportBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [cd, ts, cs, rs, ps] = await Promise.all([
+        const [cd, ts, cs, rs, ps, tl] = await Promise.all([
           apiCall<CaseDetail>(`/v1/cases/${caseId}`),
           apiCall<TaskRow[]>(`/v1/cases/${caseId}/tasks`),
           apiCall<CommentRow[]>(`/v1/cases/${caseId}/comments`),
@@ -96,6 +111,9 @@ export function CaseDetailPage({ caseId }: Props) {
           apiCall<CasePageRow[]>(`/v1/cases/${caseId}/pages`).catch(
             () => [] as CasePageRow[],
           ),
+          apiCall<{ entries: TimelineEntry[] }>(
+            `/v1/cases/${caseId}/timeline?limit=100`,
+          ).catch(() => ({ entries: [] as TimelineEntry[] })),
         ]);
         if (cancelled) return;
         setCase(cd);
@@ -103,6 +121,7 @@ export function CaseDetailPage({ caseId }: Props) {
         setComments(cs);
         setResponders(rs.filter((r) => r.supported_entity_types.includes("case")));
         setPages(ps);
+        setTimeline(tl.entries);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -111,6 +130,24 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId]);
+
+  const downloadReport = async () => {
+    setReportBusy(true);
+    try {
+      const r = await apiCall<CaseReportResponse>(`/v1/cases/${caseId}/report`);
+      const blob = new Blob([r.markdown], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `adhkar-case-${r.number}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setReportBusy(false);
+    }
+  };
 
   const activePage = pages.find((p) => p.id === activePageId) ?? null;
 
@@ -211,6 +248,16 @@ export function CaseDetailPage({ caseId }: Props) {
         <div className="flex items-center gap-3">
           <span className="font-mono text-md-sys-color-on-surface-variant">#{c.number}</span>
           <h1 className="text-2xl font-semibold">{c.title}</h1>
+          <button
+            type="button"
+            className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container disabled:opacity-50"
+            onClick={() => {
+              void downloadReport();
+            }}
+            disabled={reportBusy}
+          >
+            {reportBusy ? "…" : "Download report (.md)"}
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SeverityBadge level={c.severity} />
@@ -394,6 +441,30 @@ export function CaseDetailPage({ caseId }: Props) {
           </div>
         ) : (
           <p className="text-sm text-md-sys-color-on-surface-variant">No pages yet.</p>
+        )}
+      </article>
+
+      <article>
+        <h2 className="mb-2 text-lg font-medium">Timeline ({timeline.length})</h2>
+        {timeline.length === 0 ? (
+          <p className="text-sm text-md-sys-color-on-surface-variant">
+            No audit entries for this case yet.
+          </p>
+        ) : (
+          <ol className="space-y-1 text-xs">
+            {timeline.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant/50 px-3 py-1"
+              >
+                <span className="font-mono uppercase">{t.entity_type}</span>
+                <span className="font-medium">{t.action}</span>
+                <span className="ml-auto text-md-sys-color-on-surface-variant">
+                  {new Date(t.created_at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
         )}
       </article>
 
