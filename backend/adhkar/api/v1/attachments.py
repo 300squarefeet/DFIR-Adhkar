@@ -25,9 +25,53 @@ from adhkar.api.deps import (
     require_current_org,
     require_permission,
 )
+from adhkar.core.settings import get_settings
 from adhkar.db.models import Attachment, Case, CaseShare, Task, User
+from adhkar.storage.presigned import S3Config, presigned_put_url
 
 router = APIRouter(tags=["attachments"])
+
+
+class PresignRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=500)
+    content_type: str = Field(min_length=1, max_length=200)
+
+
+class PresignResponse(BaseModel):
+    url: str
+    storage_key: str
+    expires_in: int
+
+
+def _s3_from_settings() -> S3Config:
+    s = get_settings()
+    return S3Config(
+        region=s.s3_region,
+        bucket=s.s3_bucket,
+        endpoint=s.s3_endpoint,
+        access_key_id=s.s3_access_key,
+        secret_access_key=s.s3_secret_key,
+        path_style=True,
+    )
+
+
+@router.post("/v1/attachments/presign", response_model=PresignResponse)
+async def presign_upload(
+    body: PresignRequest,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+) -> PresignResponse:
+    """Hand the client a presigned PUT URL for direct upload to MinIO/S3.
+
+    The client uploads the blob, then POSTs to /v1/cases/{id}/attachments
+    with the returned storage_key + sha256."""
+    cfg = _s3_from_settings()
+    from uuid import uuid4 as _uuid4
+
+    key = f"org/{org_id}/{_uuid4()}/{body.filename}"
+    expires = 3600
+    url = presigned_put_url(cfg, key, body.content_type, expires)
+    return PresignResponse(url=url, storage_key=key, expires_in=expires)
 
 
 # ---------- Attachments ----------
