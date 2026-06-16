@@ -43,17 +43,26 @@ export function KnowledgeBasePage() {
     };
   }, [apiCall]);
 
+  const allTags = useMemo(() => {
+    if (!pages) return [] as string[];
+    return Array.from(new Set(pages.flatMap((p) => p.tags))).sort();
+  }, [pages]);
+
+  const [activeTag, setActiveTag] = useState<string>("");
+
   const filtered = useMemo(() => {
     if (!pages) return [];
-    if (!filter.trim()) return pages;
+    let out = pages;
+    if (activeTag) out = out.filter((p) => p.tags.includes(activeTag));
     const q = filter.trim().toLowerCase();
-    return pages.filter(
+    if (!q) return out;
+    return out.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
         p.slug.toLowerCase().includes(q) ||
         p.tags.some((t) => t.toLowerCase().includes(q)),
     );
-  }, [pages, filter]);
+  }, [pages, filter, activeTag]);
 
   const active = pages?.find((p) => p.slug === activeSlug) ?? null;
   const canManage = permissions.has("manageConfig");
@@ -167,6 +176,37 @@ export function KnowledgeBasePage() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        {allTags.length > 0 ? (
+          <div className="mb-3 flex flex-wrap gap-1">
+            <button
+              type="button"
+              className={
+                "rounded-full px-2 py-0.5 text-[10px] " +
+                (activeTag === ""
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant")
+              }
+              onClick={() => setActiveTag("")}
+            >
+              All
+            </button>
+            {allTags.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={
+                  "rounded-full px-2 py-0.5 text-[10px] " +
+                  (activeTag === t
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant")
+                }
+                onClick={() => setActiveTag(t === activeTag ? "" : t)}
+              >
+                #{t}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {filtered.length === 0 ? (
           <p className="text-sm text-md-sys-color-on-surface-variant">No pages.</p>
         ) : (
