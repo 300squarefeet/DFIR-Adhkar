@@ -48,6 +48,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/cases/{case_id}/observables",
     "/v1/cases/{case_id}/observables/attach",
     "/v1/cases/{case_id}/observables/{observable_id}/detach",
+    "/v1/cases/{case_id}/observables/similarity-counts",
     "/v1/cases/{case_id}/observables/export-misp",
     "/v1/taxonomies",
     "/v1/taxonomies/import-misp",

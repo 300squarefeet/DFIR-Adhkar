@@ -14,7 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import (
@@ -105,6 +105,70 @@ async def list_case_observables(
         )
         for o in rows
     ]
+
+
+class SimilarityCount(BaseModel):
+    observable_id: UUID
+    total_seen: int
+    """Includes this observable. >1 means the indicator surfaced before."""
+
+
+class SimilarityCountsResponse(BaseModel):
+    counts: list[SimilarityCount]
+
+
+@router.get(
+    "/v1/cases/{case_id}/observables/similarity-counts",
+    response_model=SimilarityCountsResponse,
+)
+async def case_observable_similarity_counts(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SimilarityCountsResponse:
+    """Per-attached-observable count of org-wide sightings of the same
+    (data_type, data) pair. Drives the 'seen Nx' badge on the case
+    detail page so analysts spot recurrent indicators immediately."""
+    await _load_case(db, org_id, case_id)
+    attached = (
+        await db.execute(
+            select(Observable.id, Observable.data_type, Observable.data).where(
+                Observable.organization_id == org_id,
+                Observable.case_id == case_id,
+                Observable.deleted_at.is_(None),
+            )
+        )
+    ).all()
+    if not attached:
+        return SimilarityCountsResponse(counts=[])
+    pairs = [(row[1], row[2]) for row in attached]
+    pair_counts: dict[tuple[str, str], int] = dict.fromkeys(pairs, 0)
+    rows = (
+        await db.execute(
+            select(
+                Observable.data_type,
+                Observable.data,
+                func.count().label("n"),
+            )
+            .where(
+                Observable.organization_id == org_id,
+                Observable.deleted_at.is_(None),
+                tuple_(Observable.data_type, Observable.data).in_(
+                    [tuple_(p[0], p[1]) for p in set(pairs)]
+                ),
+            )
+            .group_by(Observable.data_type, Observable.data)
+        )
+    ).all()
+    for r in rows:
+        pair_counts[(r[0], r[1])] = int(r[2])
+    return SimilarityCountsResponse(
+        counts=[
+            SimilarityCount(observable_id=oid, total_seen=pair_counts.get((dt, d), 1))
+            for (oid, dt, d) in attached
+        ]
+    )
 
 
 @router.post(
