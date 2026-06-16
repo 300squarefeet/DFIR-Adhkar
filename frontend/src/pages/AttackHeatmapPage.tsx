@@ -6,6 +6,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { Link } from "@tanstack/react-router";
+
 import { useAuth } from "@/lib/auth";
 
 interface HeatmapEntry {
@@ -28,10 +30,32 @@ function tierClass(count: number, max: number): string {
   return "bg-severity-1/20";
 }
 
+interface CaseStub {
+  id: string;
+  number: number;
+  title: string;
+  severity: number;
+  stage: string;
+}
+
 export function AttackHeatmapPage() {
   const { apiCall } = useAuth();
   const [data, setData] = useState<HeatmapResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTechnique, setActiveTechnique] = useState<string | null>(null);
+  const [drilldown, setDrilldown] = useState<CaseStub[]>([]);
+
+  const openTechnique = async (techniqueId: string) => {
+    setActiveTechnique(techniqueId);
+    try {
+      const rows = await apiCall<CaseStub[]>(
+        `/v1/cases-by-technique/${encodeURIComponent(techniqueId)}`,
+      );
+      setDrilldown(rows);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -103,21 +127,79 @@ export function AttackHeatmapPage() {
             </h2>
             <ul className="space-y-1 text-xs">
               {(byTactic.get(tactic) ?? []).map((e) => (
-                <li
-                  key={e.technique_id}
-                  className={
-                    "flex items-center gap-2 rounded px-2 py-1 " + tierClass(e.case_count, max)
-                  }
-                >
-                  <span className="font-mono">{e.technique_id}</span>
-                  <span className="truncate">{e.name}</span>
-                  <span className="ml-auto font-mono">{e.case_count}</span>
+                <li key={e.technique_id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void openTechnique(e.technique_id);
+                    }}
+                    className={
+                      "flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:ring-1 hover:ring-md-sys-color-outline-variant " +
+                      tierClass(e.case_count, max)
+                    }
+                  >
+                    <span className="font-mono">{e.technique_id}</span>
+                    <span className="truncate">{e.name}</span>
+                    <span className="ml-auto font-mono">{e.case_count}</span>
+                  </button>
                 </li>
               ))}
             </ul>
           </article>
         ))}
       </div>
+      {activeTechnique ? (
+        <article className="rounded border border-md-sys-color-outline-variant p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <h2 className="text-sm font-medium">
+              Cases tagged with <span className="font-mono">{activeTechnique}</span> (
+              {drilldown.length})
+            </h2>
+            <button
+              type="button"
+              className="ml-auto text-xs text-md-sys-color-on-surface-variant hover:underline"
+              onClick={() => {
+                setActiveTechnique(null);
+                setDrilldown([]);
+              }}
+            >
+              Close
+            </button>
+          </div>
+          {drilldown.length === 0 ? (
+            <p className="text-sm text-md-sys-color-on-surface-variant">
+              No cases.
+            </p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {drilldown.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant/50 px-3 py-1"
+                >
+                  <Link
+                    to="/cases/$caseId"
+                    params={{ caseId: c.id }}
+                    className="font-mono text-xs hover:underline"
+                  >
+                    #{c.number}
+                  </Link>
+                  <Link
+                    to="/cases/$caseId"
+                    params={{ caseId: c.id }}
+                    className="hover:underline"
+                  >
+                    {c.title}
+                  </Link>
+                  <span className="ml-auto text-xs text-md-sys-color-on-surface-variant">
+                    sev {c.severity} · {c.stage}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+      ) : null}
     </section>
   );
 }
