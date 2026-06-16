@@ -13,6 +13,7 @@ from adhkar.api.v1.ai import router as ai_router
 from adhkar.api.v1.alerts import router as alerts_router
 from adhkar.api.v1.analyzer_jobs import router as analyzer_jobs_router
 from adhkar.api.v1.api_keys import router as api_keys_router
+from adhkar.api.v1.attachments import router as attachments_router
 from adhkar.api.v1.audit import router as audit_router
 from adhkar.api.v1.auth import router as auth_router
 from adhkar.api.v1.case_comments import router as case_comments_router
@@ -94,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(kb_router)
     app.include_router(notifications_router)
     app.include_router(ai_router)
+    app.include_router(attachments_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)

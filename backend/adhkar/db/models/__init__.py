@@ -4,6 +4,7 @@ from adhkar.db.models.ai_call import AiCall
 from adhkar.db.models.alert import Alert
 from adhkar.db.models.analyzer_job import AnalyzerJob
 from adhkar.db.models.api_key import ApiKey
+from adhkar.db.models.attachment import Attachment, CaseShare
 from adhkar.db.models.audit_log import AuditLog
 from adhkar.db.models.case import Case
 from adhkar.db.models.case_link import CaseLink
@@ -31,9 +32,11 @@ __all__ = [
     "Alert",
     "AnalyzerJob",
     "ApiKey",
+    "Attachment",
     "AuditLog",
     "Case",
     "CaseLink",
+    "CaseShare",
     "CaseTemplate",
     "CaseTtp",
     "Comment",
