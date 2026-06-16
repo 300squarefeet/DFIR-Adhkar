@@ -34,6 +34,7 @@ from adhkar.api.v1.responders import router as responders_router
 from adhkar.api.v1.saml import router as saml_router
 from adhkar.api.v1.search import router as search_router
 from adhkar.api.v1.similarity import router as similarity_router
+from adhkar.api.v1.stats import router as stats_router
 from adhkar.api.v1.ttps import router as ttps_router
 from adhkar.api.v1.users import router as users_router
 from adhkar.core.logging import configure_logging
@@ -120,6 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(saml_router)
     app.include_router(portal_router)
     app.include_router(search_router)
+    app.include_router(stats_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)
