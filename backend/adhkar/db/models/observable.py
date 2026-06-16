@@ -17,6 +17,9 @@ class Observable(Base, IdMixin):
     organization_id: Mapped[UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True
     )
+    case_id: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("cases.id"), nullable=True, index=True
+    )
     data_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     data: Mapped[str] = mapped_column(String(2000), nullable=False)
     tlp: Mapped[str] = mapped_column(String(20), nullable=False, server_default="amber")
