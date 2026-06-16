@@ -7,7 +7,18 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { Sparkline } from "@/ui/Sparkline";
 import { CORE_WIDGETS, type WidgetSpec } from "@/ui/widgets";
+
+interface TimeSeriesPoint {
+  day: string;
+  count: number;
+}
+
+interface TimeSeriesResponse {
+  series: string;
+  points: TimeSeriesPoint[];
+}
 
 const LAYOUT_KEY = "adhkar.dashboard.layout.v1";
 
@@ -38,9 +49,31 @@ function loadLayout(): DashboardLayout {
 export function DashboardPage() {
   const { apiCall } = useAuth();
   const [responses, setResponses] = useState<Record<string, unknown>>({});
+  const [casesSeries, setCasesSeries] = useState<TimeSeriesResponse | null>(null);
+  const [alertsSeries, setAlertsSeries] = useState<TimeSeriesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [layout, setLayout] = useState<DashboardLayout>(() => loadLayout());
   const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [c, a] = await Promise.all([
+          apiCall<TimeSeriesResponse>("/v1/stats/cases-per-day?days=14"),
+          apiCall<TimeSeriesResponse>("/v1/stats/alerts-per-day?days=14"),
+        ]);
+        if (cancelled) return;
+        setCasesSeries(c);
+        setAlertsSeries(a);
+      } catch {
+        // silent — KPI cards still render
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall]);
 
   useEffect(() => {
     window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
@@ -136,6 +169,50 @@ export function DashboardPage() {
           </button>
         ) : null}
       </div>
+      {casesSeries || alertsSeries ? (
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          {casesSeries ? (
+            <div className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-4">
+              <div className="mb-2 flex items-baseline justify-between">
+                <span className="text-xs text-md-sys-color-on-surface-variant">
+                  Cases per day · last {casesSeries.points.length}
+                </span>
+                <span className="font-mono text-sm">
+                  Σ {casesSeries.points.reduce((s, p) => s + p.count, 0)}
+                </span>
+              </div>
+              <div className="text-md-sys-color-primary">
+                <Sparkline
+                  values={casesSeries.points.map((p) => p.count)}
+                  width={320}
+                  height={48}
+                  ariaLabel="Cases per day"
+                />
+              </div>
+            </div>
+          ) : null}
+          {alertsSeries ? (
+            <div className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-4">
+              <div className="mb-2 flex items-baseline justify-between">
+                <span className="text-xs text-md-sys-color-on-surface-variant">
+                  Alerts per day · last {alertsSeries.points.length}
+                </span>
+                <span className="font-mono text-sm">
+                  Σ {alertsSeries.points.reduce((s, p) => s + p.count, 0)}
+                </span>
+              </div>
+              <div className="text-severity-3">
+                <Sparkline
+                  values={alertsSeries.points.map((p) => p.count)}
+                  width={320}
+                  height={48}
+                  ariaLabel="Alerts per day"
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {!loaded ? (
         <p className="text-md-sys-color-on-surface-variant">Loading…</p>
       ) : (
