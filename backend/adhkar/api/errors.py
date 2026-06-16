@@ -66,7 +66,7 @@ async def _unhandled_handler(_request: Request, exc: Exception) -> JSONResponse:
     # test orderings. The response body is the contract; logging is best-effort.)
     try:
         structlog.get_logger().error("unhandled_exception", exc_type=type(exc).__name__)
-    except Exception:  # noqa: BLE001 — logging must never break error responses
+    except Exception:  # noqa: S110 — logging must never break error responses
         pass
     return _problem(
         slug="internal",
