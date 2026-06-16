@@ -92,6 +92,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # Bulk actions
     "/v1/cases/bulk-patch",
     "/v1/alerts/bulk-patch",
+    "/v1/observables/bulk-patch",
 )
 
 

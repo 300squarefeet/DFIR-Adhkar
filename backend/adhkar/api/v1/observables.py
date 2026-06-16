@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -155,6 +155,50 @@ async def patch_observable(
         setattr(o, field, value)
     await db.flush()
     return _to_dto(o)
+
+
+class BulkObservablePatch(BaseModel):
+    ids: list[UUID] = Field(min_length=1, max_length=500)
+    patch: ObservablePatch
+
+
+class BulkObservableResult(BaseModel):
+    updated: int
+    ids: list[UUID]
+
+
+@router.post("/bulk-patch", response_model=BulkObservableResult)
+async def bulk_patch_observables(
+    body: BulkObservablePatch,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> BulkObservableResult:
+    """Apply one ObservablePatch to up to 500 observables. Useful for bulk
+    marking IOCs sighted or flipping the is_ioc bit across a CSV import."""
+    patch = body.patch.model_dump(exclude_unset=True)
+    if not patch:
+        return BulkObservableResult(updated=0, ids=[])
+    rows = (
+        (
+            await db.execute(
+                select(Observable).where(
+                    Observable.organization_id == org_id,
+                    Observable.id.in_(body.ids),
+                    Observable.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    updated_ids: list[UUID] = []
+    for o in rows:
+        for field, value in patch.items():
+            setattr(o, field, value)
+        updated_ids.append(o.id)
+    await db.flush()
+    return BulkObservableResult(updated=len(updated_ids), ids=updated_ids)
 
 
 @router.delete("/{observable_id}", status_code=status.HTTP_204_NO_CONTENT)

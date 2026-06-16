@@ -37,6 +37,8 @@ async def list_audit(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(100, ge=1, le=500),
     entity_type: str | None = None,
+    action: str | None = None,
+    actor_user_id: UUID | None = None,
 ) -> list[AuditLogDTO]:
     stmt = (
         select(AuditLog)
@@ -46,6 +48,10 @@ async def list_audit(
     )
     if entity_type:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
+    if actor_user_id:
+        stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
     rows = (await db.execute(stmt)).scalars().all()
     return [
         AuditLogDTO(

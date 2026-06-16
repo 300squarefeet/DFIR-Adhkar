@@ -25,11 +25,16 @@ export function AuditLogPage() {
   const [rows, setRows] = useState<AuditRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [entityType, setEntityType] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
   const [active, setActive] = useState<AuditRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    apiCall<AuditRow[]>("/v1/audit?limit=200")
+    const params = new URLSearchParams({ limit: "200" });
+    if (entityType) params.set("entity_type", entityType);
+    if (actionFilter) params.set("action", actionFilter);
+    apiCall<AuditRow[]>(`/v1/audit?${params.toString()}`)
       .then((r) => {
         if (!cancelled) setRows(r);
       })
@@ -39,7 +44,7 @@ export function AuditLogPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall]);
+  }, [apiCall, entityType, actionFilter]);
 
   const filtered = useMemo(() => {
     if (!rows) return [];
@@ -77,12 +82,32 @@ export function AuditLogPage() {
     <section className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[1fr_24rem]">
       <article>
         <h1 className="mb-2 text-2xl font-semibold">Audit Log</h1>
-        <input
-          className="mb-3 w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
-          placeholder="Filter action / entity / id…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input
+            className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+            placeholder="Local filter (id, action, entity)…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <select
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+            value={entityType}
+            onChange={(e) => setEntityType(e.target.value)}
+          >
+            <option value="">All entities</option>
+            <option value="case">case</option>
+            <option value="alert">alert</option>
+            <option value="user">user</option>
+            <option value="observable">observable</option>
+            <option value="responder">responder</option>
+          </select>
+          <input
+            className="w-40 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+            placeholder="action (e.g. created)"
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+          />
+        </div>
         {filtered.length === 0 ? (
           <p className="text-sm text-md-sys-color-on-surface-variant">No entries.</p>
         ) : (
