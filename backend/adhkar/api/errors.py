@@ -10,7 +10,6 @@ from fastapi.responses import JSONResponse
 from adhkar.core.logging import get_request_id
 
 _PROBLEM_BASE = "https://adhkar.dev/problems/"
-_log = structlog.get_logger()
 
 
 def _problem(
@@ -61,7 +60,14 @@ async def _validation_handler(_request: Request, exc: RequestValidationError) ->
 
 
 async def _unhandled_handler(_request: Request, exc: Exception) -> JSONResponse:
-    _log.exception("unhandled_exception", exc_type=type(exc).__name__)
+    # Log defensively: never let a structlog hiccup empty out the error response.
+    # (See history: writing through the module-level cached logger after another
+    # test reconfigured structlog could swallow the JSONResponse body under some
+    # test orderings. The response body is the contract; logging is best-effort.)
+    try:
+        structlog.get_logger().error("unhandled_exception", exc_type=type(exc).__name__)
+    except Exception:  # noqa: BLE001 — logging must never break error responses
+        pass
     return _problem(
         slug="internal",
         title="Internal Server Error",
