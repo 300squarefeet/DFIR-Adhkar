@@ -114,6 +114,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [caseObs, setCaseObs] = useState<CaseObservable[]>([]);
   const [attachIds, setAttachIds] = useState("");
   const [attachBusy, setAttachBusy] = useState(false);
+  const [simCounts, setSimCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -153,8 +154,16 @@ export function CaseDetailPage({ caseId }: Props) {
 
   const refreshObservables = async () => {
     try {
-      const obs = await apiCall<CaseObservable[]>(`/v1/cases/${caseId}/observables`);
+      const [obs, sims] = await Promise.all([
+        apiCall<CaseObservable[]>(`/v1/cases/${caseId}/observables`),
+        apiCall<{ counts: { observable_id: string; total_seen: number }[] }>(
+          `/v1/cases/${caseId}/observables/similarity-counts`,
+        ).catch(() => ({ counts: [] as { observable_id: string; total_seen: number }[] })),
+      ]);
       setCaseObs(obs);
+      const m: Record<string, number> = {};
+      for (const r of sims.counts) m[r.observable_id] = r.total_seen;
+      setSimCounts(m);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -537,6 +546,11 @@ export function CaseDetailPage({ caseId }: Props) {
                 {o.is_ioc ? (
                   <span className="rounded-full bg-severity-4/20 px-2 py-0.5 text-[10px] text-severity-4">
                     IOC
+                  </span>
+                ) : null}
+                {simCounts[o.id] && simCounts[o.id]! > 1 ? (
+                  <span className="rounded-full bg-severity-3/20 px-2 py-0.5 text-[10px] text-severity-3">
+                    seen {simCounts[o.id]}×
                   </span>
                 ) : null}
                 {permissions.has("manageCase") ? (
