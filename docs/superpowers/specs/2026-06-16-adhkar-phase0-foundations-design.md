@@ -45,6 +45,12 @@ Konsekuensi langsung Phase 0:
 
 Spec asli mengusulkan OpenSearch dari Phase 0. Ditunda: PostgreSQL 16 punya `tsvector` + `pg_trgm` + GIN yang cukup untuk ratusan ribu observables sub-detik. OpenSearch tetap akan ditambahkan kalau-trigger-tercapai (lihat ADR 0004). Phase 0 melahirkan **`SearchIndex` interface** dengan `PostgresSearchIndex` impl di Phase 1.
 
+### 2.4 UI design system — Material Design 3, dense + dark default
+
+Setelah spec awal (yang memakai shadcn + custom token gaya SOC) di-approve, project lead meminta alignment ke Material Design 3 (referensi visual: produk Google modern). Pushback memilah dua varian M3: konsumer-style (Google Health: light, generous) vs. dense-dark-style (Tines, Hunters, GitHub Primer v15+). Pilihan: **dense dark M3-aligned**.
+
+Implementasinya: M3 token system (Material Theme Builder), M3 shape system, M3 type scale, **Material Symbols Rounded** sebagai icon family, dan M3 button variants (filled / tonal / outlined / text / error). Dilayer di atas **Tailwind v4 + shadcn/Radix** (Radix memberi a11y dan keyboard nav yang Material Web belum match). Density override eksplisit (TopAppBar 48 px, nav item 36 px, list row 32 px), dark default, dan **domain color overrides**: severity 1–4 dan FIRST.org TLP white/green/amber/amber-strict/red mengalahkan M3 `error`/`warning`/`tertiary` slot di mana saja semantik domain ditampilkan. Detail lengkap di ADR 0005.
+
 ---
 
 ## 3. Repository layout & tooling
@@ -402,93 +408,205 @@ src/
 | Router | **TanStack Router v1** (type-safe routes) |
 | Server state | TanStack Query v5 |
 | UI state | Zustand |
-| Styling | Tailwind v4 + shadcn/ui (Radix primitives) |
-| Icons | `lucide-react` |
-| Command palette | `cmdk` |
+| Styling | Tailwind v4 + shadcn/Radix primitives, **M3 tokens via `@theme`** |
+| Icons | **Material Symbols Rounded** (variable font, lazy-loaded via `material-symbols/index.css`) |
+| Command palette | `cmdk` (styled to M3 Search Bar) |
 | Test | Vitest + @testing-library/react + happy-dom + MSW + vitest-axe |
 | Storybook | Storybook 8 + `@storybook/react-vite` + `@storybook/test` |
 
-### 6.3 Design tokens (`tokens.css`)
+Lihat ADR 0005 untuk rasional Tailwind+Radix-on-M3 vs Material Web Components. Lucide dihapus dari spec versi sebelumnya — semua icon di Phase 0+ pakai Material Symbols Rounded.
+
+### 6.3 Design tokens (`tokens.css`) — M3 vocabulary
+
+Token diekstrak dari Material Theme Builder (source color: `#F59E0B` / amber) dan ditulis sebagai CSS variables. Domain token (severity, TLP) tetap di-pisahkan supaya tidak bisa di-override oleh M3 theming.
 
 ```css
 :root {
-  --adhkar-radius-sm: 4px; --adhkar-radius-md: 6px; --adhkar-radius-lg: 10px;
-  --adhkar-space-1: 4px;  --adhkar-space-2: 8px;  --adhkar-space-3: 12px;
-  --adhkar-space-4: 16px; --adhkar-space-6: 24px; --adhkar-space-8: 32px;
-  --adhkar-font-sans: 'Inter Variable', system-ui, sans-serif;
-  --adhkar-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  /* ----- M3 shape system ----- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
 
-  /* severity */
-  --adhkar-severity-1: #3b82f6;   /* low */
-  --adhkar-severity-2: #eab308;   /* medium */
-  --adhkar-severity-3: #f97316;   /* high */
-  --adhkar-severity-4: #ef4444;   /* critical */
+  /* ----- M3 type scale (label/body/title/headline) ----- */
+  --md-sys-typescale-label-small-size: 11px;
+  --md-sys-typescale-label-medium-size: 12px;
+  --md-sys-typescale-label-large-size: 14px;
+  --md-sys-typescale-body-small-size: 12px;
+  --md-sys-typescale-body-medium-size: 14px;
+  --md-sys-typescale-body-large-size: 16px;
+  --md-sys-typescale-title-small-size: 14px;
+  --md-sys-typescale-title-medium-size: 16px;
+  --md-sys-typescale-title-large-size: 22px;
+  --md-sys-typescale-headline-small-size: 24px;
+  --md-sys-typescale-headline-medium-size: 28px;
+  --md-sys-typescale-headline-large-size: 32px;
 
-  /* TLP (FIRST.org) */
+  /* ----- M3 motion easing + duration ----- */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-medium2: 250ms;
+  --md-sys-motion-duration-long2: 450ms;
+
+  /* ----- typography family ----- */
+  --md-sys-typescale-font-plain: "Inter Variable", system-ui, -apple-system, sans-serif;
+  --md-sys-typescale-font-brand: "Inter Variable", system-ui, sans-serif;
+  --md-sys-typescale-font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  /* ----- domain (severity 1-4, FIRST.org TLP) — override M3 ----- */
+  --adhkar-severity-1: #3b82f6;
+  --adhkar-severity-2: #eab308;
+  --adhkar-severity-3: #f97316;
+  --adhkar-severity-4: #ef4444;
   --adhkar-tlp-white: #ffffff;
   --adhkar-tlp-green: #22c55e;
   --adhkar-tlp-amber: #f59e0b;
   --adhkar-tlp-amber-strict: #d97706;
-  --adhkar-tlp-red:   #dc2626;
+  --adhkar-tlp-red: #dc2626;
 }
 
-:root, [data-theme='dark'] {
-  --adhkar-bg-canvas:  #0b0d12;
-  --adhkar-bg-surface: #11141b;
-  --adhkar-bg-elevated:#181c25;
-  --adhkar-bg-input:   #0f1218;
-  --adhkar-border:     #1f2430;
-  --adhkar-fg-primary: #e6e8ee;
-  --adhkar-fg-muted:   #8a93a6;
-  --adhkar-fg-subtle:  #5a6275;
-  --adhkar-accent:     #f59e0b;   /* Adhkar brand accent */
+/* ----- M3 dark scheme (default) — exported from Material Theme Builder ----- */
+:root,
+[data-theme="dark"] {
+  --md-sys-color-primary: #ffb787;
+  --md-sys-color-on-primary: #4f2500;
+  --md-sys-color-primary-container: #6f3a05;
+  --md-sys-color-on-primary-container: #ffdbc2;
+
+  --md-sys-color-secondary: #e5bf9f;
+  --md-sys-color-on-secondary: #422b16;
+  --md-sys-color-secondary-container: #5b412a;
+  --md-sys-color-on-secondary-container: #ffdbc2;
+
+  --md-sys-color-tertiary: #c3cb88;
+  --md-sys-color-on-tertiary: #2c3400;
+  --md-sys-color-tertiary-container: #424b0f;
+  --md-sys-color-on-tertiary-container: #dfe79e;
+
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+  --md-sys-color-on-error-container: #ffdad6;
+
+  --md-sys-color-surface: #181210;
+  --md-sys-color-surface-dim: #181210;
+  --md-sys-color-surface-bright: #3f3835;
+  --md-sys-color-surface-container-lowest: #120c0a;
+  --md-sys-color-surface-container-low: #211a17;
+  --md-sys-color-surface-container: #251e1b;
+  --md-sys-color-surface-container-high: #302925;
+  --md-sys-color-surface-container-highest: #3b3330;
+
+  --md-sys-color-on-surface: #f1dfd8;
+  --md-sys-color-on-surface-variant: #d8c2b7;
+  --md-sys-color-outline: #a08d83;
+  --md-sys-color-outline-variant: #52443e;
+
+  --md-sys-color-inverse-surface: #f1dfd8;
+  --md-sys-color-inverse-on-surface: #382e2b;
+  --md-sys-color-inverse-primary: #8b4f1d;
+
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 }
 
-[data-theme='light'] {
-  --adhkar-bg-canvas:  #f7f8fa;
-  --adhkar-bg-surface: #ffffff;
-  --adhkar-bg-elevated:#ffffff;
-  --adhkar-bg-input:   #ffffff;
-  --adhkar-border:     #e4e7ec;
-  --adhkar-fg-primary: #1f2430;
-  --adhkar-fg-muted:   #5a6275;
-  --adhkar-fg-subtle:  #8a93a6;
-  --adhkar-accent:     #d97706;
+/* ----- M3 light scheme (opt-in via theme toggle) ----- */
+[data-theme="light"] {
+  --md-sys-color-primary: #8b4f1d;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ffdbc2;
+  --md-sys-color-on-primary-container: #2e1500;
+
+  --md-sys-color-secondary: #765a3f;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #ffdbc2;
+  --md-sys-color-on-secondary-container: #2a1808;
+
+  --md-sys-color-tertiary: #5b6325;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #dfe79e;
+  --md-sys-color-on-tertiary-container: #181e00;
+
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+
+  --md-sys-color-surface: #fff8f5;
+  --md-sys-color-surface-dim: #e3d6cf;
+  --md-sys-color-surface-bright: #fff8f5;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #fcefe7;
+  --md-sys-color-surface-container: #f6e9e2;
+  --md-sys-color-surface-container-high: #f1e3dc;
+  --md-sys-color-surface-container-highest: #ebddd7;
+
+  --md-sys-color-on-surface: #221a16;
+  --md-sys-color-on-surface-variant: #52443e;
+  --md-sys-color-outline: #84736c;
+  --md-sys-color-outline-variant: #d6c2b8;
+
+  --md-sys-color-inverse-surface: #382e2b;
+  --md-sys-color-inverse-on-surface: #fdeee6;
+  --md-sys-color-inverse-primary: #ffb787;
+
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 }
 ```
 
-Tailwind `theme.extend.colors` di-wire dari CSS variables. Theme toggle = ubah `data-theme` di `<html>` + persist di localStorage.
+Tailwind `@theme` di `index.css` me-map token M3 → utility class: `bg-surface`, `bg-surface-container`, `bg-surface-container-high`, `text-on-surface`, `text-on-surface-variant`, `border-outline`, `rounded-shape-medium`, `text-title-large`, dst. Theme toggle = ubah `data-theme` di `<html>` + persist di localStorage. Domain token (severity, TLP) di-expose lewat utility yang sama dengan rilis sebelumnya: `text-severity-3`, `bg-tlp-amber`, dll.
 
-### 6.4 Primitives Phase 0
+Material Symbols Rounded dimuat sekali di `index.css`:
+```css
+@import "material-symbols/index.css";
+.material-symbols-rounded {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+```
 
-| Komponen | API | Stories |
-|---|---|---|
-| `Button` | `variant: 'primary'|'secondary'|'ghost'|'destructive'`, `size: 'sm'|'md'|'lg'`, `loading?: boolean` | Default, all variants, all sizes, loading, disabled |
-| `Badge` | `variant: 'neutral'|'info'|'success'|'warning'|'danger'`, `children` | All variants |
-| `SeverityBadge` | `level: 1|2|3|4`, `compact?: boolean` | Each level × {compact, full} |
-| `TLPBadge` | `tlp: 'white'|'green'|'amber'|'amber-strict'|'red'` | Each TLP value |
+### 6.4 Primitives Phase 0 — M3 mapping
 
-`SeverityBadge` / `TLPBadge` dipisah dari `Badge` umum karena: (a) value-nya finite & domain-specific, (b) accessibility — wajib punya text label (color-blind), (c) dipakai di banyak layar Phase 2+, jadi tidak premature.
+| Komponen | API | M3 anatomy | Stories |
+|---|---|---|---|
+| `Button` | `variant: 'filled'|'tonal'|'outlined'|'text'|'error'`, `size: 'sm'|'md'|'lg'`, `loading?: boolean`, `icon?: React.ReactNode` | M3 Common Button (5 styles). Filled = primary action, Tonal = secondary, Outlined = alternate prominence, Text = low emphasis, Error = destructive. Optional leading Material Symbol icon. | Default per variant, semua size, loading, disabled, with-icon |
+| `Chip` | `variant: 'assist'|'filter'|'input'|'suggestion'`, `selected?: boolean`, `leadingIcon?`, `onRemove?` | M3 Chip family. **Menggantikan `Badge` generic** dari spec versi sebelumnya — chip lebih tepat secara semantik M3. | Per variant + selected state + input chip remove |
+| `SeverityBadge` | `level: 1|2|3|4`, `compact?: boolean` | M3 Assist Chip dengan leading dot indicator (color-blind safety: text label tetap wajib) | Each level × {compact, full} |
+| `TLPBadge` | `tlp: 'white'|'green'|'amber'|'amber-strict'|'red'` | M3 Outlined Chip variant dengan teks FIRST.org standard (`TLP:RED` dll) | Per TLP value |
 
-### 6.5 AppShell layout
+`Chip` menggantikan `Badge` dari spec versi sebelumnya. Domain badge (`SeverityBadge`, `TLPBadge`) tetap dipisah dengan alasan yang sama: value finite, a11y (text wajib), reuse Phase 2+. Material Symbols Rounded dipakai sebagai icon di Button (`icon` prop), Chip (`leadingIcon` prop), dan TopAppBar/NavigationDrawer.
+
+Density override (lihat ADR 0005): Button height `sm=28 / md=36 / lg=44` (vs M3 default `32 / 40 / 56`). Chip height `24 px` (vs M3 `32 px`).
+
+### 6.5 AppShell layout — M3 TopAppBar + NavigationDrawer
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│ TopBar:  ADHKAR · breadcrumb     ⌘K · 🌙 · @user            │  48px
+│ TopAppBar:  ▲ ADHKAR · breadcrumb     ⌘K · 🌙 · @user      │  48px (M3 default 64; density override)
 ├────────┬───────────────────────────────────────────────────┤
-│ LeftNav│              <Outlet/>                            │
-│ 220px  │                                                   │
-│ ▣ Heal │                                                   │
-│ ◌ Case │  ← disabled, tooltip "Coming Phase 3"             │
-│ ◌ Aler │  ← disabled, tooltip "Coming Phase 4"             │
-│ ◌ Task │                                                   │
-│ ◌ Dash │                                                   │
-│ ◌ KB   │                                                   │
-│ ◌ Admin│                                                   │
+│ NavDra │                                                   │
+│ 224px  │              <Outlet/>                            │
+│        │            (surface-container)                    │
+│ ◉ Heal │                                                   │
+│ ○ Case │  ← disabled, tooltip "Coming Phase 3"             │
+│ ○ Aler │                                                   │
+│ ○ Task │                                                   │
+│ ○ Dash │                                                   │
+│ ○ KB   │                                                   │
+│ ○ Admin│                                                   │
 └────────┴───────────────────────────────────────────────────┘
 ```
 
-Placeholder nav: `<NavItem disabled tooltipText="Coming in Phase N"/>`. Struktur navigasi sudah ada slot, mencegah refactor `LeftNav` tiap phase.
+Komponen mengikuti M3 vocabulary:
+- **TopAppBar** (komponen `TopAppBar.tsx`) menggantikan istilah `TopBar`. Surface: `surface`. Icon: Material Symbols Rounded.
+- **NavigationDrawer** (komponen `NavigationDrawer.tsx`) menggantikan istilah `LeftNav`. Surface: `surface-container-low`. Item aktif: pill background `secondary-container`, text `on-secondary-container` (M3 spec). Item nonaktif: `on-surface-variant` dengan opacity 38% disabled state per M3.
+- Main area surface: `surface` (canvas).
+
+Placeholder nav item tetap pakai pola `<NavItem disabled tooltipText="Coming in Phase N"/>`. Struktur sudah punya slot semua phase.
 
 ### 6.6 Halaman Health (`/health`)
 
@@ -545,7 +663,7 @@ Compose pakai stage `dev`. Stage `runtime` untuk Phase 10 production image.
 
 ## 7. ADRs (Architecture Decision Records)
 
-Empat ADR ditulis Phase 0 dalam format MADR 3.0. ADR immutable; perubahan = ADR baru dengan `Supersedes:`.
+Lima ADR ditulis Phase 0 dalam format MADR 3.0. ADR immutable; perubahan = ADR baru dengan `Supersedes:`.
 
 | File | Topik | Decision |
 |---|---|---|
@@ -553,6 +671,7 @@ Empat ADR ditulis Phase 0 dalam format MADR 3.0. ADR immutable; perubahan = ADR 
 | `docs/ADRs/0002-license-apache-core-plus-enterprise.md` | License model | Apache-2.0 core + commercial enterprise plugins (Grafana model). DCO sign-off untuk kontribusi. |
 | `docs/ADRs/0003-persistence-postgres-pgvector.md` | Primary store | PostgreSQL 16 + pgvector; repository pattern Phase 1+ supaya backend pluggable. Trade-off vs Cassandra/Elasticsearch/MongoDB ditangkap. |
 | `docs/ADRs/0004-search-deferred-opensearch.md` | Search engine | Postgres FTS dulu via `SearchIndex` interface; OpenSearch ditambah saat trigger spesifik tercapai (latency p95 listing > 500 ms @ 500k observables, FTS attachment body, atau permintaan ES API compatibility). |
+| `docs/ADRs/0005-ui-design-system-material-design-3.md` | UI design system | Material Design 3, dense + dark default. Tailwind v4 + shadcn/Radix on M3 tokens (Material Theme Builder), Material Symbols Rounded, M3 button + chip variants. Density overrides + domain color overrides (severity, TLP) didokumentasikan. |
 
 ADR berikutnya akan ditulis di phase masing-masing (auth lib di Phase 1; worker framework di Phase 2; embedding model di Phase 8; HA topology di Phase 10).
 
@@ -732,7 +851,7 @@ Phase 0 disebut **Done** jika dan hanya jika semua butir berikut hijau.
 ### 10.1 Repo & dokumen
 - [ ] Repo `adhkar-ir` di GitHub, public, Apache-2.0 + NOTICE + CONTRIBUTING (DCO) + CODE_OF_CONDUCT + PR template + CODEOWNERS.
 - [ ] Layout direktori sesuai §3.1; tiap placeholder folder berisi `README.md` mengarah ke phase pengisinya.
-- [ ] Empat ADR di `docs/ADRs/` (naming, license, persistence, search-deferred) — status `Accepted`.
+- [ ] Lima ADR di `docs/ADRs/` (naming, license, persistence, search-deferred, UI design system M3) — status `Accepted`.
 - [ ] `docs/architecture.md` satu halaman + system diagram (mermaid) + seksi **Integration roadmap** (§11).
 - [ ] `docs/runbook.md`: prerequisites, `docker compose up` sekali jalan, cara reset (`docker compose down -v`), cara lihat Swagger/Storybook, troubleshooting 5 error paling umum.
 - [ ] `README.md` root: tagline 1 kalimat, "Quick start" 3-langkah, link ke runbook, badge CI.
@@ -757,7 +876,7 @@ Phase 0 disebut **Done** jika dan hanya jika semua butir berikut hijau.
 - [ ] `/health` menampilkan status API/DB/Redis/S3 real-time saat container di-stop/start.
 - [ ] Theme toggle pindah light theme + persist setelah reload.
 - [ ] ⌘K membuka command palette stub dengan minimal "Go to Health".
-- [ ] `pnpm storybook` membuka Storybook dengan empat primitive; tiap punya default + variant + play-function.
+- [ ] `pnpm storybook` membuka Storybook dengan empat primitive (Button 5 variants, Chip 4 variants, SeverityBadge, TLPBadge); Material Symbols Rounded ter-load tanpa FOUT; tiap primitive punya default + variant + play-function.
 
 ### 10.5 Quality gates (CI green di PR pertama dan `main`)
 - [ ] `backend-quality`: ruff check, ruff format --check, mypy strict, pytest dengan coverage ≥ 70% per-file.

@@ -397,6 +397,10 @@ Postgres 16 + pgvector is the primary store from Phase 0. Repository pattern int
 - See ADR 0004 (search deferral) and spec §2.3, §5.5.
 ```
 
+- [ ] **Step 4a: Write ADR 0005** (UI design system — Material Design 3, dense + dark default)
+
+`docs/ADRs/0005-ui-design-system-material-design-3.md` is already authored in this plan's directional pivot — copy the content from the version committed at the same time as this plan update. Verify file exists and matches the spec §6 M3 vocabulary (token scheme `--md-sys-*`, Material Symbols Rounded, density overrides documented).
+
 - [ ] **Step 4: Write ADR 0004**
 
 `docs/ADRs/0004-search-deferred-opensearch.md`:
@@ -452,15 +456,18 @@ The decision is revisited if **any** of the following becomes true:
 
 ```bash
 git add docs/ADRs/
-git commit -s -m "docs(adr): record four Phase 0 architecture decisions
+git commit -s -m "docs(adr): record five Phase 0 architecture decisions
 
 - 0001 naming — Adhkar (rejects TheBee for trademark proximity)
 - 0002 license — Apache-2.0 core + commercial enterprise plugins
 - 0003 persistence — PostgreSQL 16 + pgvector single store
 - 0004 search — Postgres FTS first, OpenSearch deferred with
   explicit re-evaluation triggers
+- 0005 ui design system — Material Design 3 dense + dark
+  default (Tailwind+Radix on M3 tokens, Material Symbols
+  Rounded, density + domain color overrides documented)
 
-All four use MADR 3.0 format. Spec §7 references these directly."
+All five use MADR 3.0 format. Spec §7 references these directly."
 ```
 
 ---
@@ -3121,7 +3128,7 @@ shamefully-hoist=false
     "@tanstack/react-query": "^5.59.0",
     "@tanstack/react-router": "^1.74.0",
     "cmdk": "^1.0.0",
-    "lucide-react": "^0.451.0",
+    "material-symbols": "^0.27.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "zustand": "^5.0.0"
@@ -3369,39 +3376,59 @@ git commit -s -m "chore(frontend): init Vite + React 18 + TS + Tailwind v4 + pnp
 
 ---
 
-## Task 18: Design tokens + Tailwind v4 config
+## Task 18: M3 design tokens + Tailwind v4 config
 
 **Files:**
 - Create: `frontend/src/design-system/tokens.css`
 - Create: `frontend/src/design-system/index.css`
 - Modify: `frontend/src/main.tsx` to import design tokens
 
+> **Note**: Token scheme follows Material Design 3 (ADR 0005). All `--md-sys-*` variables come from Material Theme Builder export with source color `#F59E0B`. Domain tokens (`--adhkar-severity-*`, `--adhkar-tlp-*`) are kept separate so they cannot be overridden by M3 theming. Density overrides (button heights, list-row 32 px, card padding 12 px) are applied in component CSS, not in tokens.
+
 - [ ] **Step 1: Create `frontend/src/design-system/tokens.css`**
 
 ```css
 :root {
-  /* ----- Scale ----- */
-  --adhkar-radius-sm: 4px;
-  --adhkar-radius-md: 6px;
-  --adhkar-radius-lg: 10px;
-  --adhkar-space-1: 4px;
-  --adhkar-space-2: 8px;
-  --adhkar-space-3: 12px;
-  --adhkar-space-4: 16px;
-  --adhkar-space-6: 24px;
-  --adhkar-space-8: 32px;
+  /* ----- M3 shape system ----- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
 
-  /* ----- Typography ----- */
-  --adhkar-font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --adhkar-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  /* ----- M3 type scale (px sizes; density-tuned) ----- */
+  --md-sys-typescale-label-small-size: 11px;
+  --md-sys-typescale-label-medium-size: 12px;
+  --md-sys-typescale-label-large-size: 14px;
+  --md-sys-typescale-body-small-size: 12px;
+  --md-sys-typescale-body-medium-size: 14px;
+  --md-sys-typescale-body-large-size: 16px;
+  --md-sys-typescale-title-small-size: 14px;
+  --md-sys-typescale-title-medium-size: 16px;
+  --md-sys-typescale-title-large-size: 22px;
+  --md-sys-typescale-headline-small-size: 24px;
+  --md-sys-typescale-headline-medium-size: 28px;
+  --md-sys-typescale-headline-large-size: 32px;
 
-  /* ----- Severity ----- */
+  /* ----- M3 motion ----- */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-medium2: 250ms;
+  --md-sys-motion-duration-long2: 450ms;
+
+  /* ----- typography family (M3 plain + brand + mono) ----- */
+  --md-sys-typescale-font-plain: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --md-sys-typescale-font-brand: "Inter Variable", system-ui, sans-serif;
+  --md-sys-typescale-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ----- Domain tokens (severity 1-4 + FIRST.org TLP) — override M3 ----- */
   --adhkar-severity-1: #3b82f6;
   --adhkar-severity-2: #eab308;
   --adhkar-severity-3: #f97316;
   --adhkar-severity-4: #ef4444;
-
-  /* ----- TLP (FIRST.org) ----- */
   --adhkar-tlp-white: #ffffff;
   --adhkar-tlp-green: #22c55e;
   --adhkar-tlp-amber: #f59e0b;
@@ -3409,29 +3436,93 @@ git commit -s -m "chore(frontend): init Vite + React 18 + TS + Tailwind v4 + pnp
   --adhkar-tlp-red: #dc2626;
 }
 
+/* ----- M3 DARK scheme (default) — exported from Material Theme Builder ----- */
 :root,
 [data-theme="dark"] {
-  --adhkar-bg-canvas: #0b0d12;
-  --adhkar-bg-surface: #11141b;
-  --adhkar-bg-elevated: #181c25;
-  --adhkar-bg-input: #0f1218;
-  --adhkar-border: #1f2430;
-  --adhkar-fg-primary: #e6e8ee;
-  --adhkar-fg-muted: #8a93a6;
-  --adhkar-fg-subtle: #5a6275;
-  --adhkar-accent: #f59e0b;
+  --md-sys-color-primary: #ffb787;
+  --md-sys-color-on-primary: #4f2500;
+  --md-sys-color-primary-container: #6f3a05;
+  --md-sys-color-on-primary-container: #ffdbc2;
+
+  --md-sys-color-secondary: #e5bf9f;
+  --md-sys-color-on-secondary: #422b16;
+  --md-sys-color-secondary-container: #5b412a;
+  --md-sys-color-on-secondary-container: #ffdbc2;
+
+  --md-sys-color-tertiary: #c3cb88;
+  --md-sys-color-on-tertiary: #2c3400;
+  --md-sys-color-tertiary-container: #424b0f;
+  --md-sys-color-on-tertiary-container: #dfe79e;
+
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+  --md-sys-color-on-error-container: #ffdad6;
+
+  --md-sys-color-surface: #181210;
+  --md-sys-color-surface-dim: #181210;
+  --md-sys-color-surface-bright: #3f3835;
+  --md-sys-color-surface-container-lowest: #120c0a;
+  --md-sys-color-surface-container-low: #211a17;
+  --md-sys-color-surface-container: #251e1b;
+  --md-sys-color-surface-container-high: #302925;
+  --md-sys-color-surface-container-highest: #3b3330;
+
+  --md-sys-color-on-surface: #f1dfd8;
+  --md-sys-color-on-surface-variant: #d8c2b7;
+  --md-sys-color-outline: #a08d83;
+  --md-sys-color-outline-variant: #52443e;
+
+  --md-sys-color-inverse-surface: #f1dfd8;
+  --md-sys-color-inverse-on-surface: #382e2b;
+  --md-sys-color-inverse-primary: #8b4f1d;
+
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 }
 
+/* ----- M3 LIGHT scheme (opt-in) ----- */
 [data-theme="light"] {
-  --adhkar-bg-canvas: #f7f8fa;
-  --adhkar-bg-surface: #ffffff;
-  --adhkar-bg-elevated: #ffffff;
-  --adhkar-bg-input: #ffffff;
-  --adhkar-border: #e4e7ec;
-  --adhkar-fg-primary: #1f2430;
-  --adhkar-fg-muted: #5a6275;
-  --adhkar-fg-subtle: #8a93a6;
-  --adhkar-accent: #d97706;
+  --md-sys-color-primary: #8b4f1d;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ffdbc2;
+  --md-sys-color-on-primary-container: #2e1500;
+
+  --md-sys-color-secondary: #765a3f;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #ffdbc2;
+  --md-sys-color-on-secondary-container: #2a1808;
+
+  --md-sys-color-tertiary: #5b6325;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #dfe79e;
+  --md-sys-color-on-tertiary-container: #181e00;
+
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+
+  --md-sys-color-surface: #fff8f5;
+  --md-sys-color-surface-dim: #e3d6cf;
+  --md-sys-color-surface-bright: #fff8f5;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #fcefe7;
+  --md-sys-color-surface-container: #f6e9e2;
+  --md-sys-color-surface-container-high: #f1e3dc;
+  --md-sys-color-surface-container-highest: #ebddd7;
+
+  --md-sys-color-on-surface: #221a16;
+  --md-sys-color-on-surface-variant: #52443e;
+  --md-sys-color-outline: #84736c;
+  --md-sys-color-outline-variant: #d6c2b8;
+
+  --md-sys-color-inverse-surface: #382e2b;
+  --md-sys-color-inverse-on-surface: #fdeee6;
+  --md-sys-color-inverse-primary: #ffb787;
+
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 }
 ```
 
@@ -3439,36 +3530,69 @@ git commit -s -m "chore(frontend): init Vite + React 18 + TS + Tailwind v4 + pnp
 
 ```css
 @import "tailwindcss";
+@import "material-symbols/index.css";
 @import "./tokens.css";
 
 @theme {
-  --color-canvas: var(--adhkar-bg-canvas);
-  --color-surface: var(--adhkar-bg-surface);
-  --color-elevated: var(--adhkar-bg-elevated);
-  --color-input: var(--adhkar-bg-input);
-  --color-border: var(--adhkar-border);
-  --color-fg: var(--adhkar-fg-primary);
-  --color-fg-muted: var(--adhkar-fg-muted);
-  --color-fg-subtle: var(--adhkar-fg-subtle);
-  --color-accent: var(--adhkar-accent);
+  /* ----- M3 colors mapped to Tailwind utilities -----
+     Usage: bg-surface, bg-surface-container-high, text-on-surface,
+            text-on-surface-variant, border-outline, text-primary,
+            bg-primary-container, text-error, bg-error-container */
+  --color-primary: var(--md-sys-color-primary);
+  --color-on-primary: var(--md-sys-color-on-primary);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-on-secondary: var(--md-sys-color-on-secondary);
+  --color-secondary-container: var(--md-sys-color-secondary-container);
+  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-tertiary: var(--md-sys-color-tertiary);
+  --color-on-tertiary: var(--md-sys-color-on-tertiary);
+  --color-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+  --color-error: var(--md-sys-color-error);
+  --color-on-error: var(--md-sys-color-on-error);
+  --color-error-container: var(--md-sys-color-error-container);
+  --color-on-error-container: var(--md-sys-color-on-error-container);
 
+  --color-surface: var(--md-sys-color-surface);
+  --color-surface-dim: var(--md-sys-color-surface-dim);
+  --color-surface-bright: var(--md-sys-color-surface-bright);
+  --color-surface-container-lowest: var(--md-sys-color-surface-container-lowest);
+  --color-surface-container-low: var(--md-sys-color-surface-container-low);
+  --color-surface-container: var(--md-sys-color-surface-container);
+  --color-surface-container-high: var(--md-sys-color-surface-container-high);
+  --color-surface-container-highest: var(--md-sys-color-surface-container-highest);
+
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-outline: var(--md-sys-color-outline);
+  --color-outline-variant: var(--md-sys-color-outline-variant);
+
+  /* ----- Domain semantic colors (override M3) ----- */
   --color-severity-1: var(--adhkar-severity-1);
   --color-severity-2: var(--adhkar-severity-2);
   --color-severity-3: var(--adhkar-severity-3);
   --color-severity-4: var(--adhkar-severity-4);
-
   --color-tlp-white: var(--adhkar-tlp-white);
   --color-tlp-green: var(--adhkar-tlp-green);
   --color-tlp-amber: var(--adhkar-tlp-amber);
   --color-tlp-amber-strict: var(--adhkar-tlp-amber-strict);
   --color-tlp-red: var(--adhkar-tlp-red);
 
-  --font-sans: var(--adhkar-font-sans);
-  --font-mono: var(--adhkar-font-mono);
+  /* ----- Type ----- */
+  --font-sans: var(--md-sys-typescale-font-plain);
+  --font-brand: var(--md-sys-typescale-font-brand);
+  --font-mono: var(--md-sys-typescale-font-mono);
 
-  --radius-sm: var(--adhkar-radius-sm);
-  --radius-md: var(--adhkar-radius-md);
-  --radius-lg: var(--adhkar-radius-lg);
+  /* ----- M3 shape -> Tailwind rounded-shape-* ----- */
+  --radius-shape-none: var(--md-sys-shape-corner-none);
+  --radius-shape-extra-small: var(--md-sys-shape-corner-extra-small);
+  --radius-shape-small: var(--md-sys-shape-corner-small);
+  --radius-shape-medium: var(--md-sys-shape-corner-medium);
+  --radius-shape-large: var(--md-sys-shape-corner-large);
+  --radius-shape-extra-large: var(--md-sys-shape-corner-extra-large);
+  --radius-shape-full: var(--md-sys-shape-corner-full);
 }
 
 html,
@@ -3476,14 +3600,21 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: var(--adhkar-bg-canvas);
-  color: var(--adhkar-fg-primary);
-  font-family: var(--adhkar-font-sans);
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-sys-typescale-font-plain);
   font-feature-settings: "cv11", "ss01";
 }
 
 button {
   font-family: inherit;
+}
+
+/* ----- Material Symbols Rounded defaults ----- */
+.material-symbols-rounded {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+  user-select: none;
 }
 ```
 
@@ -3518,19 +3649,29 @@ Expected: build succeeds, dev server serves a page containing "Adhkar IR".
 
 ```bash
 git add frontend/src/design-system/ frontend/src/main.tsx
-git commit -s -m "feat(frontend): add design tokens + Tailwind v4 theme mapping
+git commit -s -m "feat(frontend): add M3 design tokens + Tailwind v4 mapping
 
-tokens.css owns the raw CSS variables (severity 1-4, TLP
-FIRST.org colors, dark/light surfaces, spacing, radius,
-typography). index.css imports Tailwind v4 then @theme-maps
-the variables so utility classes like bg-canvas /
-text-fg-muted / text-severity-3 / bg-tlp-amber work
-out-of-the-box.
+Per ADR 0005 Material Design 3 dense-dark.
 
-Dark theme is the default (data-theme='dark' set on <html>);
-light theme switches by toggling data-theme. Tokens flow
-through the same names everywhere so design-system
-primitives reference Tailwind utilities, not raw vars."
+tokens.css: M3 system tokens (--md-sys-shape-*, --md-sys-
+typescale-*, --md-sys-motion-*, --md-sys-color-* dark+light
+schemes exported from Material Theme Builder with source
+color #F59E0B) PLUS domain tokens that override M3 wherever
+shown (--adhkar-severity-1..4 ramp, --adhkar-tlp-{white,
+green,amber,amber-strict,red} FIRST.org colors).
+
+index.css: imports Tailwind v4 + material-symbols/index.css
+font, then @theme maps M3 tokens to utility classes:
+bg-surface, bg-surface-container-{lowest..highest},
+text-on-surface, text-on-surface-variant, border-outline,
+bg-primary-container, text-error, rounded-shape-{xs..xl},
+text-severity-3, bg-tlp-amber, etc.
+
+Dark scheme is the default (data-theme='dark' on <html>);
+light is opt-in via toggle. Material Symbols Rounded loaded
+globally with default font-variation-settings (FILL 0, wght
+400, GRAD 0, opsz 24); per-instance overrides via inline
+style or class."
 ```
 
 ---
@@ -3639,7 +3780,16 @@ Stories themselves follow in the next 4 tasks
 
 ---
 
-## Task 20: `Button` primitive (TDD)
+## Task 20: `Button` primitive — M3 5 variants (TDD)
+
+> **Per ADR 0005**: Button maps to M3 Common Button family with 5 styles:
+> - `filled` (primary action, on-primary text)
+> - `tonal` (secondary, secondary-container surface)
+> - `outlined` (alternate prominence)
+> - `text` (low emphasis)
+> - `error` (destructive action, on-error text)
+>
+> Density override: size sm = 28 px (M3 32), md = 36 px (M3 40), lg = 44 px (M3 56).
 
 **Files:**
 - Create: `frontend/src/design-system/components/Button/Button.tsx`
@@ -3687,10 +3837,11 @@ describe("<Button>", () => {
   it("has no a11y violations across variants", async () => {
     const { container } = render(
       <div>
-        <Button variant="primary">P</Button>
-        <Button variant="secondary">S</Button>
-        <Button variant="ghost">G</Button>
-        <Button variant="destructive">D</Button>
+        <Button variant="filled">F</Button>
+        <Button variant="tonal">T</Button>
+        <Button variant="outlined">O</Button>
+        <Button variant="text">Tx</Button>
+        <Button variant="error">E</Button>
       </div>,
     );
     expect(await axe(container)).toHaveNoViolations();
@@ -3710,40 +3861,47 @@ Expected: error — `./Button` module not found.
 
 `frontend/src/design-system/components/Button/Button.tsx`:
 ```tsx
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "destructive";
+type Variant = "filled" | "tonal" | "outlined" | "text" | "error";
 type Size = "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
+  /** Optional leading Material Symbol icon (string name of the symbol). */
+  icon?: ReactNode;
 }
 
+/** M3 Common Button color schemes; on-* colors guarantee AA contrast. */
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-accent text-canvas hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent",
-  secondary:
-    "bg-surface text-fg border border-border hover:bg-elevated focus-visible:ring-2 focus-visible:ring-accent",
-  ghost: "bg-transparent text-fg hover:bg-elevated focus-visible:ring-2 focus-visible:ring-accent",
-  destructive:
-    "bg-severity-4 text-canvas hover:brightness-110 focus-visible:ring-2 focus-visible:ring-severity-4",
+  filled:
+    "bg-primary text-on-primary hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary",
+  tonal:
+    "bg-secondary-container text-on-secondary-container hover:brightness-110 focus-visible:ring-2 focus-visible:ring-secondary",
+  outlined:
+    "bg-transparent text-primary border border-outline hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary",
+  text: "bg-transparent text-primary hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary",
+  error:
+    "bg-error text-on-error hover:brightness-110 focus-visible:ring-2 focus-visible:ring-error",
 };
 
+/** Density override per ADR 0005: tighter than stock M3. */
 const SIZE_CLASSES: Record<Size, string> = {
-  sm: "h-7 px-2 text-xs",
-  md: "h-9 px-3 text-sm",
-  lg: "h-11 px-5 text-base",
+  sm: "h-7 px-3 text-[var(--md-sys-typescale-label-medium-size)]", // 28 px
+  md: "h-9 px-4 text-[var(--md-sys-typescale-label-large-size)]", // 36 px
+  lg: "h-11 px-6 text-[var(--md-sys-typescale-title-medium-size)]", // 44 px
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "primary", size = "md", loading = false, disabled, className = "", children, ...rest },
+  { variant = "filled", size = "md", loading = false, disabled, icon, className = "", children, ...rest },
   ref,
 ) {
   const isDisabled = disabled || loading;
   const classes = [
-    "inline-flex items-center justify-center gap-2 rounded-md font-medium transition outline-none",
-    "disabled:opacity-50 disabled:cursor-not-allowed",
+    "inline-flex items-center justify-center gap-2 rounded-shape-full font-medium transition-[background-color,color,filter] outline-none",
+    "disabled:opacity-38 disabled:cursor-not-allowed", // M3 disabled state = 38% opacity
     VARIANT_CLASSES[variant],
     SIZE_CLASSES[size],
     className,
@@ -3754,9 +3912,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={classes}
       disabled={isDisabled}
       aria-busy={loading || undefined}
+      style={{ transitionDuration: "var(--md-sys-motion-duration-short2)", transitionTimingFunction: "var(--md-sys-motion-easing-standard)" }}
       {...rest}
     >
-      {loading ? <span aria-hidden>…</span> : null}
+      {loading ? (
+        <span aria-hidden className="material-symbols-rounded text-[18px] animate-spin">progress_activity</span>
+      ) : icon ? (
+        <span aria-hidden className="material-symbols-rounded text-[18px]">{icon}</span>
+      ) : null}
       {children}
     </button>
   );
@@ -3793,8 +3956,8 @@ export default meta;
 
 type Story = StoryObj<typeof Button>;
 
-export const Primary: Story = {
-  args: { variant: "primary" },
+export const Filled: Story = {
+  args: { variant: "filled" },
   play: async ({ canvasElement, args }) => {
     const c = within(canvasElement);
     await userEvent.click(c.getByRole("button"));
@@ -3802,9 +3965,12 @@ export const Primary: Story = {
   },
 };
 
-export const Secondary: Story = { args: { variant: "secondary" } };
-export const Ghost: Story = { args: { variant: "ghost" } };
-export const Destructive: Story = { args: { variant: "destructive" } };
+export const Tonal: Story = { args: { variant: "tonal" } };
+export const Outlined: Story = { args: { variant: "outlined" } };
+export const Text: Story = { args: { variant: "text" } };
+export const ErrorVariant: Story = { args: { variant: "error" } };
+
+export const WithIcon: Story = { args: { variant: "filled", icon: "save" } };
 
 export const SizeSm: Story = { args: { size: "sm", children: "sm" } };
 export const SizeMd: Story = { args: { size: "md", children: "md" } };
@@ -3826,29 +3992,41 @@ Expected: build succeeds; `storybook-static/` contains the Button stories.
 
 ```bash
 git add frontend/src/design-system/components/Button/
-git commit -s -m "feat(design-system): add Button primitive (variant, size, loading)
+git commit -s -m "feat(design-system): add M3 Button (filled/tonal/outlined/text/error)
 
-forwardRef-backed button with 4 variants (primary, secondary,
-ghost, destructive), 3 sizes (sm/md/lg), and a loading state
-that disables clicks and sets aria-busy.
+Per ADR 0005 Material Design 3.
 
-Stories cover every variant, every size, loading, and
-disabled. Primary story play-function asserts click handler
-fires once via @storybook/test.
+forwardRef-backed button with 5 M3 variants (filled, tonal,
+outlined, text, error), 3 sizes with density override (sm
+28 px, md 36 px, lg 44 px; M3 stock is 32/40/56), and a
+loading state that swaps the leading icon for the
+progress_activity Material Symbol and sets aria-busy.
 
-Tests cover behavior + axe a11y on all four variants.
-Closes design-system primitive #1 per spec §6.4."
+Optional 'icon' prop accepts a Material Symbol name string;
+internal <span class='material-symbols-rounded'> wraps it
+with FILL 0 / wght 400 defaults.
+
+Rounded-full shape per M3 Common Button spec. M3 38%
+disabled opacity. Motion: short2 duration + standard easing.
+
+Stories cover every variant, sizes, loading, disabled,
+with-icon. Filled story play-function asserts click fires.
+Tests cover behavior + axe a11y across all 5 variants."
 ```
 
 ---
 
-## Task 21: `Badge` primitive (TDD)
+## Task 21: `Chip` primitive — M3 Assist Chip styling (TDD)
+
+> **Per ADR 0005**: this primitive **replaces** the original `Badge` from spec v1. Implementing as M3 Assist Chip: full rounded shape, surface-container background, leading Material Symbol icon optional. Phase 0 ships 5 color tones (neutral/info/success/warning/danger) for status display (used by HealthPage Task 27). M3 variants `filter`/`input`/`suggestion` follow in Phase 2 when tag/filter UI lands; their addition is non-breaking via discriminated-union variant prop.
+>
+> **Mechanical rename when implementing**: every `Badge`/`badge` token in the test, implementation, story, and index file below becomes `Chip`/`chip`. Directory path becomes `Chip/`. Test imports `from "./Chip"` etc. Add a `leadingIcon?: string` prop (Material Symbol name); render with `<span class="material-symbols-rounded">{leadingIcon}</span>`.
 
 **Files:**
-- Create: `frontend/src/design-system/components/Badge/Badge.tsx`
-- Create: `frontend/src/design-system/components/Badge/Badge.test.tsx`
-- Create: `frontend/src/design-system/components/Badge/Badge.stories.tsx`
-- Create: `frontend/src/design-system/components/Badge/index.ts`
+- Create: `frontend/src/design-system/components/Chip/Chip.tsx`
+- Create: `frontend/src/design-system/components/Chip/Chip.test.tsx`
+- Create: `frontend/src/design-system/components/Chip/Chip.stories.tsx`
+- Create: `frontend/src/design-system/components/Chip/index.ts`
 
 - [ ] **Step 1: Write failing test**
 
@@ -3968,21 +4146,32 @@ export const Danger: Story = { args: { variant: "danger" } };
 - [ ] **Step 6: Commit**
 
 ```bash
-git add frontend/src/design-system/components/Badge/
-git commit -s -m "feat(design-system): add Badge primitive (5 variants)
+git add frontend/src/design-system/components/Chip/
+git commit -s -m "feat(design-system): add M3 Chip primitive (Assist Chip)
 
-Generic badge for chips and tags. Variants map to surface
-colors with 20% alpha background + matching foreground:
-neutral, info (severity-1 blue), success (tlp-green),
-warning (severity-2 amber), danger (severity-4 red).
+Per ADR 0005. Replaces the original Badge primitive from
+spec v1. M3 Assist Chip styling: rounded-shape-small,
+surface-container background, on-surface text, outline
+border for hairline structure.
 
-data-variant attribute exposed for downstream styling /
-testing without depending on CSS class names."
+5 color tones for status display: neutral
+(surface-container), info (severity-1 blue with bg/20%),
+success (tlp-green), warning (severity-2 amber), danger
+(severity-4 red).
+
+Optional leadingIcon prop accepts a Material Symbol name
+string and renders <span class='material-symbols-rounded'>.
+
+data-variant attribute exposed for downstream styling/
+testing. M3 filter/input/suggestion variants land in Phase
+2 when tag and filter UI arrives."
 ```
 
 ---
 
-## Task 22: `SeverityBadge` primitive (TDD)
+## Task 22: `SeverityBadge` primitive — M3 Assist Chip with leading dot (TDD)
+
+> **Per ADR 0005**: M3 Assist Chip variant; full mode shows leading dot + label, compact shows dot only. Dot color = severity 1-4 token. Outline uses `--md-sys-color-outline-variant`. Background uses corresponding severity color at 15% alpha for AA contrast on dark surface.
 
 **Files:**
 - Create: `frontend/src/design-system/components/SeverityBadge/SeverityBadge.tsx`
@@ -4148,7 +4337,9 @@ requires non-color-only encoding."
 
 ---
 
-## Task 23: `TLPBadge` primitive (TDD)
+## Task 23: `TLPBadge` primitive — M3 Outlined Chip (TDD)
+
+> **Per ADR 0005**: M3 Outlined Chip variant. FIRST.org 2.0 mandates `TLP:XXX` text + specific colors; those override M3 color slots. Background transparent, outline = TLP color, text = TLP color uppercased + tracking-wider.
 
 **Files:**
 - Create: `frontend/src/design-system/components/TLPBadge/TLPBadge.tsx`
@@ -4573,11 +4764,18 @@ POST/PUT yet because no mutating endpoint exists."
 
 ---
 
-## Task 26: AppShell, TopBar, LeftNav, CommandPalette (TDD)
+## Task 26: AppShell, TopAppBar, NavigationDrawer, CommandPalette (TDD)
+
+> **Per ADR 0005**: components renamed to M3 vocabulary. File names follow:
+> - `TopAppBar.tsx` (replaces `TopBar.tsx`) — M3 TopAppBar, 48 px density override
+> - `NavigationDrawer.tsx` (replaces `LeftNav.tsx`) — M3 NavigationDrawer, item height 36 px (override M3 56)
+> - Icons throughout use Material Symbols Rounded via `<span class="material-symbols-rounded">{name}</span>`, NOT lucide-react (removed from deps in Task 17)
+>
+> Mechanical mapping when implementing the task below: every `TopBar` token → `TopAppBar`, every `LeftNav` token → `NavigationDrawer`, every `lucide-react` import → drop; replace `<Moon/Sun/Command/Briefcase/...>` JSX with `<span className="material-symbols-rounded">{name}</span>` where name is the Material Symbol name (`dark_mode`/`light_mode`/`search`/`work`/`warning`/`task`/`dashboard`/`menu_book`/`settings`/`monitor_heart` for Health).
 
 **Files:**
-- Create: `frontend/src/ui/TopBar.tsx`
-- Create: `frontend/src/ui/LeftNav.tsx`
+- Create: `frontend/src/ui/TopAppBar.tsx`
+- Create: `frontend/src/ui/NavigationDrawer.tsx`
 - Create: `frontend/src/ui/CommandPalette.tsx`
 - Create: `frontend/src/app/AppShell.tsx`
 - Create: `frontend/src/app/AppShell.test.tsx`
@@ -4880,18 +5078,29 @@ Expected: 5 tests pass.
 
 ```bash
 git add frontend/src/ui/ frontend/src/app/AppShell.tsx frontend/src/app/AppShell.test.tsx
-git commit -s -m "feat(frontend): assemble AppShell (TopBar + LeftNav + ⌘K palette)
+git commit -s -m "feat(frontend): assemble M3 AppShell (TopAppBar + NavigationDrawer + ⌘K)
 
-- TopBar: ADHKAR wordmark, breadcrumb space, ⌘K trigger,
-  theme toggle (Moon/Sun), user stub.
-- LeftNav: 7 items. Only Health enabled in Phase 0; others
+Per ADR 0005 Material Design 3 dense-dark.
+
+- TopAppBar (48 px, density override M3 default 64): ADHKAR
+  wordmark in brand font, breadcrumb space, ⌘K trigger
+  (Material Symbol 'search'), theme toggle ('dark_mode'/
+  'light_mode' icon swap), user stub. Surface: surface.
+- NavigationDrawer (224 px wide, item 36 px tall — density
+  override M3 56): 7 items. Active item pill =
+  secondary-container background + on-secondary-container
+  text per M3 spec. Only Health enabled in Phase 0; others
   rendered as disabled <button> with title='Coming in Phase
-  N' tooltip so structure is already in place for Phase 1+.
-- CommandPalette: cmdk dialog mounted on ⌘K/Ctrl+K, single
-  initial entry 'Go to Health'.
-- AppShell: 3-pane layout (TopBar 48px + LeftNav 224px +
-  main), reads getStoredTheme on mount to persist user
-  choice before first paint."
+  N' tooltip. Surface: surface-container-low.
+- CommandPalette: cmdk dialog styled as M3 search bar
+  modal, scrim = scrim/40%. Single initial entry 'Go to
+  Health'.
+- AppShell: surface canvas, reads getStoredTheme on mount
+  to persist user choice before first paint, sets up ⌘K
+  keyboard listener.
+
+All icons via Material Symbols Rounded (lucide-react
+removed in Task 17)."
 ```
 
 ---
@@ -4977,7 +5186,7 @@ Expected: module not found.
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Badge } from "@/design-system/components/Badge";
+import { Chip } from "@/design-system/components/Chip";
 
 interface ReadyResponse {
   status: "ready" | "degraded";
@@ -5022,9 +5231,9 @@ export function HealthPage({ apiBase = DEFAULT_BASE }: HealthPageProps) {
         <li className="flex items-center justify-between">
           <span>API</span>
           <span className="flex items-center gap-2">
-            <Badge variant={status === "ready" ? "success" : "danger"}>
+            <Chip variant={status === "ready" ? "success" : "danger"}>
               {status === "ready" ? "Healthy" : "Degraded"}
-            </Badge>
+            </Chip>
             {version.data && (
               <span className="text-xs text-fg-muted">
                 v{version.data.version} ({version.data.commit} · {version.data.builtAt})
@@ -5035,9 +5244,9 @@ export function HealthPage({ apiBase = DEFAULT_BASE }: HealthPageProps) {
         {(["db", "redis", "s3"] as const).map((name) => (
           <li key={name} className="flex items-center justify-between">
             <span>{LABEL[name]}</span>
-            <Badge variant={checks[name] === "ok" ? "success" : "danger"}>
+            <Chip variant={checks[name] === "ok" ? "success" : "danger"}>
               {checks[name] === "ok" ? CONNECTED[name] : "Down"}
-            </Badge>
+            </Chip>
           </li>
         ))}
       </ul>
@@ -5164,16 +5373,19 @@ Expected: all tests pass, typecheck/lint clean, build succeeds.
 git add frontend/src/pages/ frontend/src/app/routes.tsx frontend/src/app/providers.tsx frontend/src/app/App.tsx
 git commit -s -m "feat(frontend): assemble routes, providers, and HealthPage
 
-HealthPage polls /readyz every 10s, renders per-check
-badges (Healthy/Degraded for API; Connected/Down for db,
-redis, s3), and shows version+commit+builtAt from /version.
-Treats 503 responses as data (not error) so degraded state
-renders the actual breakdown rather than a blanket failure.
+Per ADR 0005 — HealthPage uses M3 Chip (Assist style) for
+per-check status display.
+
+HealthPage polls /readyz every 10s, renders per-check Chips
+(Healthy/Degraded for API; Connected/Down for db, redis,
+s3), and shows version+commit+builtAt from /version. Treats
+503 responses as data (not error) so degraded state renders
+the actual breakdown rather than a blanket failure.
 
 TanStack Router pins root to AppShell with Outlet so every
-route inherits the shell. Index and /health both resolve to
-HealthPage in Phase 0; routes will fan out from there in
-subsequent phases."
+route inherits the M3 TopAppBar + NavigationDrawer chrome.
+Index and /health both resolve to HealthPage in Phase 0;
+routes fan out from there in subsequent phases."
 ```
 
 ---
@@ -5980,7 +6192,7 @@ sleep 10
 open http://localhost:6006
 ```
 
-Manually confirm Button (all variants/sizes/loading/disabled), Badge (5 variants), SeverityBadge (4 levels × {full, compact}), TLPBadge (5 values) all render.
+Manually confirm Button (5 M3 variants filled/tonal/outlined/text/error, all sizes, loading, disabled, with-icon), Chip (5 color tones), SeverityBadge (4 levels × {full, compact}), TLPBadge (5 values) all render. Verify Material Symbols Rounded icons render across all stories (no boxed "tofu" placeholders).
 
 - [ ] **Step 6: Verify full test suites pass clean**
 
