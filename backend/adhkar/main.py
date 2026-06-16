@@ -53,18 +53,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from adhkar.notifications.dispatcher import run_notification_dispatcher
         from adhkar.workers.analyzer_runner import run_analyzer_runner
         from adhkar.workers.embedding_indexer import run_embedding_indexer
+        from adhkar.workers.maxmind_downloader import run_maxmind_downloader
         from adhkar.workers.outbox_publisher import run_outbox_publisher
 
         outbox = asyncio.create_task(run_outbox_publisher(settings))
         analyzer = asyncio.create_task(run_analyzer_runner(settings))
         notif = asyncio.create_task(run_notification_dispatcher(settings))
         indexer = asyncio.create_task(run_embedding_indexer(settings))
+        mmdb = asyncio.create_task(run_maxmind_downloader(settings))
         try:
             yield
         finally:
-            for t in (outbox, analyzer, notif, indexer):
+            for t in (outbox, analyzer, notif, indexer, mmdb):
                 t.cancel()
-            for t in (outbox, analyzer, notif, indexer):
+            for t in (outbox, analyzer, notif, indexer, mmdb):
                 try:
                     await t
                 except (asyncio.CancelledError, Exception):  # noqa: S110

@@ -14,8 +14,9 @@ import logging
 import time
 from typing import Any
 
-from authlib.jose import JsonWebKey, JsonWebToken  # type: ignore[import-untyped]
-from authlib.jose.errors import JoseError  # type: ignore[import-untyped]
+from joserfc import jwt
+from joserfc.errors import JoseError
+from joserfc.jwk import KeySet
 
 _log = logging.getLogger(__name__)
 
@@ -44,14 +45,11 @@ def verify_id_token(
     if not jwks:
         raise IdTokenInvalidError("no_jwks_supplied")
     try:
-        keyset = JsonWebKey.import_key_set(jwks)
-        decoded = JsonWebToken(["RS256", "ES256"]).decode(
-            id_token,
-            key=keyset,
-        )
+        keyset = KeySet.import_key_set(jwks)  # type: ignore[arg-type]
+        token = jwt.decode(id_token, key=keyset, algorithms=["RS256", "ES256"])
     except JoseError as e:
         raise IdTokenInvalidError(f"signature_or_decode_failed:{type(e).__name__}") from e
-    claims: dict[str, Any] = dict(decoded)
+    claims: dict[str, Any] = dict(token.claims)
     now = now_ts if now_ts is not None else int(time.time())
     aud_claim = claims.get("aud")
     if isinstance(aud_claim, str):

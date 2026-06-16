@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
@@ -105,9 +105,23 @@ export function AlertsPage() {
               className="border-b border-md-sys-color-outline-variant/50 hover:bg-md-sys-color-surface-container"
             >
               <td className="py-2 pr-3 font-mono text-xs">
-                {a.source}/{a.source_ref}
+                <Link
+                  to="/alerts/$alertId"
+                  params={{ alertId: a.id }}
+                  className="hover:underline"
+                >
+                  {a.source}/{a.source_ref}
+                </Link>
               </td>
-              <td className="py-2 pr-3">{a.title}</td>
+              <td className="py-2 pr-3">
+                <Link
+                  to="/alerts/$alertId"
+                  params={{ alertId: a.id }}
+                  className="hover:underline"
+                >
+                  {a.title}
+                </Link>
+              </td>
               <td className="py-2 pr-3">
                 <SeverityBadge level={a.severity} compact />
               </td>

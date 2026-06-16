@@ -138,7 +138,26 @@ export function GdprPage() {
       ) : null}
       {exportData ? (
         <article className="rounded border border-md-sys-color-outline-variant p-3">
-          <p className="mb-2 text-sm font-medium">Export</p>
+          <div className="mb-2 flex items-center gap-3">
+            <p className="text-sm font-medium">Export</p>
+            <button
+              type="button"
+              className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+                  type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `adhkar-gdpr-export-${userId.trim()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Download JSON
+            </button>
+          </div>
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-md-sys-color-surface-container p-2 text-[10px]">
             {JSON.stringify(exportData, null, 2)}
           </pre>
