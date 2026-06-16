@@ -122,6 +122,59 @@ async def list_alerts(
     return [_alert_dto(a) for a in rows]
 
 
+class BulkAlertPatch(BaseModel):
+    ids: list[UUID] = Field(min_length=1, max_length=200)
+    patch: AlertPatch
+
+
+class BulkAlertResult(BaseModel):
+    updated: int
+    ids: list[UUID]
+
+
+@router.post("/bulk-patch", response_model=BulkAlertResult)
+async def bulk_patch_alerts(
+    body: BulkAlertPatch,
+    user: Annotated[CurrentUser, Depends(require_permission("manageAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> BulkAlertResult:
+    """Apply the same AlertPatch to up to 200 alerts. Rows outside the
+    caller's org are silently dropped. Emits one audit row per id."""
+    patch = body.patch.model_dump(exclude_unset=True)
+    if not patch:
+        return BulkAlertResult(updated=0, ids=[])
+    rows = (
+        (
+            await db.execute(
+                select(Alert).where(
+                    Alert.organization_id == org_id,
+                    Alert.id.in_(body.ids),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    updated_ids: list[UUID] = []
+    for a in rows:
+        for field, value in patch.items():
+            setattr(a, field, value)
+        updated_ids.append(a.id)
+    await db.flush()
+    for aid in updated_ids:
+        await audit_and_emit(
+            db,
+            actor_user_id=user.user_id,
+            organization_id=org_id,
+            action="bulk_updated",
+            entity_type="alert",
+            entity_id=aid,
+            diff={k: str(v) for k, v in patch.items()},
+        )
+    return BulkAlertResult(updated=len(updated_ids), ids=updated_ids)
+
+
 @router.post("", response_model=AlertDTO, status_code=status.HTTP_201_CREATED)
 async def ingest_alert(
     body: AlertCreate,
