@@ -8,10 +8,12 @@ import {
 
 import { AdhkarMindPage } from "@/pages/AdhkarMindPage";
 import { AlertsPage } from "@/pages/AlertsPage";
+import { DashboardPage } from "@/pages/DashboardPage";
 import { CaseDetailPage } from "@/pages/CaseDetailPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
+import { KnowledgeBasePage } from "@/pages/KnowledgeBasePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { ObservablesPage } from "@/pages/ObservablesPage";
 
@@ -85,6 +87,18 @@ const mindRoute = createRoute({
   component: AdhkarMindPage,
 });
 
+const kbRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/knowledge-base",
+  component: KnowledgeBasePage,
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/dashboard",
+  component: DashboardPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -106,6 +120,8 @@ export const router = createRouter({
       alertsRoute,
       observablesRoute,
       mindRoute,
+      kbRoute,
+      dashboardRoute,
     ]),
   ]),
 });
