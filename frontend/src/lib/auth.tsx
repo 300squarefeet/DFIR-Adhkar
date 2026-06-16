@@ -60,7 +60,7 @@ interface AuthContextValue extends AuthState {
   apiCall<T>(path: string, init?: RequestInit): Promise<T>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 const DEFAULT_BASE =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000";
