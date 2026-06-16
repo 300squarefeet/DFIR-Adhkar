@@ -8,15 +8,17 @@ This is the portable fallback; production swaps to a pgvector ANN query
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adhkar.ai.embeddings import cosine, get_embedding_router
+from adhkar.ai.embeddings import cosine, get_embedding_router, to_pgvector_text
 from adhkar.api.deps import (
     CurrentUser,
     get_db,
@@ -24,6 +26,8 @@ from adhkar.api.deps import (
     require_permission,
 )
 from adhkar.db.models import Case, CaseEmbedding
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/similarity", tags=["similarity"])
 
@@ -64,6 +68,52 @@ async def search_similar_cases(
 ) -> SimilarityResponse:
     er = get_embedding_router()
     qres = await er.embed(body.text)
+    # Production fast path: native pgvector ANN. Falls back to Python cosine
+    # if the column doesn't exist yet (migration 0014 not applied) or all
+    # rows are still text-only.
+    try:
+        ann_sql = text(
+            """
+            SELECT ce.case_id,
+                   c.number,
+                   c.title,
+                   1 - (ce.embedding <=> CAST(:qvec AS vector)) AS score
+            FROM case_embeddings ce
+            JOIN cases c ON c.id = ce.case_id
+            WHERE ce.organization_id = :org_id
+              AND ce.model_name = :model
+              AND c.deleted_at IS NULL
+              AND ce.embedding IS NOT NULL
+            ORDER BY ce.embedding <=> CAST(:qvec AS vector)
+            LIMIT :lim
+            """
+        )
+        ann_rows = (
+            await db.execute(
+                ann_sql,
+                {
+                    "qvec": to_pgvector_text(qres.vector),
+                    "org_id": org_id,
+                    "model": qres.model,
+                    "lim": body.limit,
+                },
+            )
+        ).all()
+        if ann_rows:
+            return SimilarityResponse(
+                model=qres.model,
+                hits=[
+                    SimilarityHit(
+                        case_id=r[0],
+                        case_number=int(r[1]),
+                        title=str(r[2]),
+                        score=round(float(r[3]), 4),
+                    )
+                    for r in ann_rows
+                ],
+            )
+    except DBAPIError:
+        _log.info("similarity_ann_unavailable_falling_back_to_python_cosine")
     rows = (
         await db.execute(
             select(CaseEmbedding, Case)
