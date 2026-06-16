@@ -61,4 +61,4 @@ async def live_feed(
         pass
     finally:
         await pubsub.unsubscribe(channel)
-        await pubsub.aclose()
+        await pubsub.close()
