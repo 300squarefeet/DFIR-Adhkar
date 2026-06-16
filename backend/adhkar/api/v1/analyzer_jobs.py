@@ -96,9 +96,7 @@ async def enqueue_job(
     if not analyzer:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "analyzer_not_found")
     if obs.data_type not in analyzer.supported_types:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "analyzer_does_not_support_data_type"
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "analyzer_does_not_support_data_type")
     job = AnalyzerJob(
         organization_id=org_id,
         observable_id=observable_id,
@@ -111,9 +109,7 @@ async def enqueue_job(
     return _to_dto(job)
 
 
-@router.get(
-    "/v1/observables/{observable_id}/analyzer-jobs", response_model=list[JobDTO]
-)
+@router.get("/v1/observables/{observable_id}/analyzer-jobs", response_model=list[JobDTO])
 async def list_jobs_for_observable(
     observable_id: UUID,
     _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
@@ -121,13 +117,17 @@ async def list_jobs_for_observable(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[JobDTO]:
     rows = (
-        await db.execute(
-            select(AnalyzerJob).where(
-                AnalyzerJob.observable_id == observable_id,
-                AnalyzerJob.organization_id == org_id,
+        (
+            await db.execute(
+                select(AnalyzerJob).where(
+                    AnalyzerJob.observable_id == observable_id,
+                    AnalyzerJob.organization_id == org_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_to_dto(j) for j in rows]
 
 
