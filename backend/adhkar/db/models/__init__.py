@@ -10,6 +10,11 @@ from adhkar.db.models.comment import Comment
 from adhkar.db.models.kb import CaseTemplate, KnowledgeBasePage
 from adhkar.db.models.membership import UserOrgMembership
 from adhkar.db.models.mfa_secret import MfaSecret
+from adhkar.db.models.notification import (
+    NotificationDelivery,
+    NotificationEndpoint,
+    NotificationRule,
+)
 from adhkar.db.models.observable import Observable
 from adhkar.db.models.org_sharing import OrgSharing
 from adhkar.db.models.organization import Organization
@@ -32,6 +37,9 @@ __all__ = [
     "Comment",
     "KnowledgeBasePage",
     "MfaSecret",
+    "NotificationDelivery",
+    "NotificationEndpoint",
+    "NotificationRule",
     "Observable",
     "OrgSharing",
     "Organization",

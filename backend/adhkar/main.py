@@ -20,6 +20,7 @@ from adhkar.api.v1.kb import router as kb_router
 from adhkar.api.v1.live import router as live_router
 from adhkar.api.v1.meta import router as meta_router
 from adhkar.api.v1.mfa import router as mfa_router
+from adhkar.api.v1.notifications import router as notifications_router
 from adhkar.api.v1.observables import router as observables_router
 from adhkar.api.v1.organizations import router as orgs_router
 from adhkar.api.v1.profiles import router as profiles_router
@@ -37,17 +38,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from adhkar.notifications.dispatcher import run_notification_dispatcher
         from adhkar.workers.analyzer_runner import run_analyzer_runner
         from adhkar.workers.outbox_publisher import run_outbox_publisher
 
         outbox = asyncio.create_task(run_outbox_publisher(settings))
         analyzer = asyncio.create_task(run_analyzer_runner(settings))
+        notif = asyncio.create_task(run_notification_dispatcher(settings))
         try:
             yield
         finally:
-            for t in (outbox, analyzer):
+            for t in (outbox, analyzer, notif):
                 t.cancel()
-            for t in (outbox, analyzer):
+            for t in (outbox, analyzer, notif):
                 try:
                     await t
                 except (asyncio.CancelledError, Exception):  # noqa: S110
@@ -88,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(alerts_router)
     app.include_router(ttps_router)
     app.include_router(kb_router)
+    app.include_router(notifications_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)
