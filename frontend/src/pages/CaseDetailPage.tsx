@@ -126,6 +126,15 @@ export function CaseDetailPage({ caseId }: Props) {
   const [ttps, setTtps] = useState<
     { id: string; technique_id: string; tactic: string; procedure_note: string | null }[]
   >([]);
+  const [editingTtp, setEditingTtp] = useState<string | null>(null);
+  const [ttpDraft, setTtpDraft] = useState("");
+  const [editingHeader, setEditingHeader] = useState(false);
+  const [headerDraft, setHeaderDraft] = useState({
+    title: "",
+    severity: 2 as SeverityLevel,
+    stage: "open",
+  });
+  const [headerBusy, setHeaderBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,6 +246,55 @@ export function CaseDetailPage({ caseId }: Props) {
       await refreshTtps();
     } catch (e) {
       toast.error((e as Error).message);
+    }
+  };
+
+  const saveTtpNote = async (ttpId: string) => {
+    try {
+      const updated = await apiCall<{
+        id: string;
+        technique_id: string;
+        tactic: string;
+        procedure_note: string | null;
+      }>(`/v1/case-ttps/${ttpId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ procedure_note: ttpDraft }),
+      });
+      setTtps((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setEditingTtp(null);
+      toast.success("Procedure note saved.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const startHeaderEdit = (c: CaseDetail) => {
+    setHeaderDraft({
+      title: c.title,
+      severity: c.severity,
+      stage: c.stage as "open" | "in_progress" | "closed",
+    });
+    setEditingHeader(true);
+  };
+
+  const saveHeader = async () => {
+    setHeaderBusy(true);
+    try {
+      const updated = await apiCall<CaseDetail>(`/v1/cases/${caseId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: headerDraft.title,
+          severity: headerDraft.severity,
+          stage: headerDraft.stage,
+        }),
+      });
+      setCase(updated);
+      setEditingHeader(false);
+      toast.success("Case updated.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setHeaderBusy(false);
     }
   };
 
@@ -392,17 +450,60 @@ export function CaseDetailPage({ caseId }: Props) {
       <header className="space-y-2">
         <div className="flex items-center gap-3">
           <span className="font-mono text-md-sys-color-on-surface-variant">#{c.number}</span>
-          <h1 className="text-2xl font-semibold">{c.title}</h1>
-          <button
-            type="button"
-            className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container disabled:opacity-50"
-            onClick={() => {
-              void downloadReport();
-            }}
-            disabled={reportBusy}
-          >
-            {reportBusy ? "…" : "Download report (.md)"}
-          </button>
+          {editingHeader ? (
+            <input
+              className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-lg"
+              value={headerDraft.title}
+              onChange={(e) =>
+                setHeaderDraft({ ...headerDraft, title: e.target.value })
+              }
+            />
+          ) : (
+            <h1 className="text-2xl font-semibold">{c.title}</h1>
+          )}
+          {permissions.has("manageCase") ? (
+            editingHeader ? (
+              <>
+                <button
+                  type="button"
+                  className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+                  onClick={() => {
+                    void saveHeader();
+                  }}
+                  disabled={headerBusy}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                  onClick={() => setEditingHeader(false)}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                onClick={() => startHeaderEdit(c)}
+              >
+                Edit
+              </button>
+            )
+          ) : null}
+          {!editingHeader ? (
+            <button
+              type="button"
+              className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container disabled:opacity-50"
+              onClick={() => {
+                void downloadReport();
+              }}
+              disabled={reportBusy}
+            >
+              {reportBusy ? "…" : "Download report (.md)"}
+            </button>
+          ) : null}
           <a
             href={`${(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000"}/v1/cases/${caseId}/report.html`}
             target="_blank"
@@ -413,11 +514,47 @@ export function CaseDetailPage({ caseId }: Props) {
           </a>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SeverityBadge level={c.severity} />
-          <TLPBadge tlp={c.tlp} />
-          <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs">
-            {c.stage}
-          </span>
+          {editingHeader ? (
+            <>
+              <select
+                className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+                value={headerDraft.severity}
+                onChange={(e) =>
+                  setHeaderDraft({
+                    ...headerDraft,
+                    severity: Number(e.target.value) as SeverityLevel,
+                  })
+                }
+              >
+                <option value={1}>Sev 1 Low</option>
+                <option value={2}>Sev 2 Med</option>
+                <option value={3}>Sev 3 High</option>
+                <option value={4}>Sev 4 Critical</option>
+              </select>
+              <select
+                className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+                value={headerDraft.stage}
+                onChange={(e) =>
+                  setHeaderDraft({
+                    ...headerDraft,
+                    stage: e.target.value as "open" | "in_progress" | "closed",
+                  })
+                }
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="closed">Closed</option>
+              </select>
+            </>
+          ) : (
+            <>
+              <SeverityBadge level={c.severity} />
+              <TLPBadge tlp={c.tlp} />
+              <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs">
+                {c.stage}
+              </span>
+            </>
+          )}
           <span className="text-xs text-md-sys-color-on-surface-variant">{c.status}</span>
           {c.tags.map((t) => (
             <span
@@ -720,23 +857,65 @@ export function CaseDetailPage({ caseId }: Props) {
             {ttps.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-1 rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs"
+                className="rounded border border-md-sys-color-outline-variant px-2 py-1 text-xs"
               >
-                <span className="font-mono">{t.technique_id}</span>
-                <span className="text-[10px] text-md-sys-color-on-surface-variant">
-                  {t.tactic}
-                </span>
-                {permissions.has("manageCase") ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void removeTtp(t.id);
-                    }}
-                    className="ml-1 text-[10px] text-md-sys-color-on-surface-variant hover:text-severity-4"
-                    aria-label="Remove"
-                  >
-                    ×
-                  </button>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono">{t.technique_id}</span>
+                  <span className="text-[10px] text-md-sys-color-on-surface-variant">
+                    {t.tactic}
+                  </span>
+                  {permissions.has("manageCase") ? (
+                    <>
+                      <button
+                        type="button"
+                        className="ml-2 rounded-full border border-md-sys-color-outline-variant px-2 text-[10px] hover:bg-md-sys-color-surface-container"
+                        onClick={() => {
+                          if (editingTtp === t.id) {
+                            setEditingTtp(null);
+                          } else {
+                            setEditingTtp(t.id);
+                            setTtpDraft(t.procedure_note ?? "");
+                          }
+                        }}
+                      >
+                        {editingTtp === t.id ? "Cancel" : "Note"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void removeTtp(t.id);
+                        }}
+                        className="ml-1 text-[10px] text-md-sys-color-on-surface-variant hover:text-severity-4"
+                        aria-label="Remove"
+                      >
+                        ×
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+                {editingTtp === t.id ? (
+                  <div className="mt-1 space-y-1">
+                    <textarea
+                      className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+                      rows={3}
+                      value={ttpDraft}
+                      onChange={(e) => setTtpDraft(e.target.value)}
+                      placeholder="Procedure note for this technique on this case"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-[10px] text-md-sys-color-on-primary"
+                      onClick={() => {
+                        void saveTtpNote(t.id);
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : t.procedure_note ? (
+                  <p className="mt-1 text-[10px] text-md-sys-color-on-surface-variant">
+                    {t.procedure_note}
+                  </p>
                 ) : null}
               </li>
             ))}
