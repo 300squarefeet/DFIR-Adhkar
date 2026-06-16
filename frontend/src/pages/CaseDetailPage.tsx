@@ -10,6 +10,7 @@ import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
 import { ObservablePicker } from "@/ui/ObservablePicker";
 import { useToast } from "@/ui/Toast";
+import { TtpPicker } from "@/ui/TtpPicker";
 
 interface CaseDetail {
   id: string;
@@ -122,6 +123,9 @@ export function CaseDetailPage({ caseId }: Props) {
   const [simCounts, setSimCounts] = useState<Record<string, number>>({});
   const [analyzers, setAnalyzers] = useState<AnalyzerInfo[]>([]);
   const [runningAnalyzer, setRunningAnalyzer] = useState<string | null>(null);
+  const [ttps, setTtps] = useState<
+    { id: string; technique_id: string; tactic: string; procedure_note: string | null }[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +157,13 @@ export function CaseDetailPage({ caseId }: Props) {
         apiCall<AnalyzerInfo[]>(`/v1/analyzers`)
           .then((a) => {
             if (!cancelled) setAnalyzers(a);
+          })
+          .catch(() => undefined);
+        apiCall<
+          { id: string; technique_id: string; tactic: string; procedure_note: string | null }[]
+        >(`/v1/cases/${caseId}/ttps`)
+          .then((t) => {
+            if (!cancelled) setTtps(t);
           })
           .catch(() => undefined);
       } catch (e) {
@@ -202,6 +213,39 @@ export function CaseDetailPage({ caseId }: Props) {
       setError((e as Error).message);
     } finally {
       setAttachBusy(false);
+    }
+  };
+
+  const refreshTtps = async () => {
+    try {
+      const t = await apiCall<
+        { id: string; technique_id: string; tactic: string; procedure_note: string | null }[]
+      >(`/v1/cases/${caseId}/ttps`);
+      setTtps(t);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const addTtp = async (techniqueId: string, label: string) => {
+    try {
+      await apiCall(`/v1/cases/${caseId}/ttps`, {
+        method: "POST",
+        body: JSON.stringify({ technique_id: techniqueId }),
+      });
+      toast.success(`Added ${label}.`);
+      await refreshTtps();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const removeTtp = async (ttpId: string) => {
+    try {
+      await apiCall(`/v1/case-ttps/${ttpId}`, { method: "DELETE" });
+      await refreshTtps();
+    } catch (e) {
+      toast.error((e as Error).message);
     }
   };
 
@@ -660,6 +704,50 @@ export function CaseDetailPage({ caseId }: Props) {
               </div>
             </details>
           </div>
+        ) : null}
+      </article>
+
+      <article>
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="text-lg font-medium">MITRE ATT&amp;CK ({ttps.length})</h2>
+        </div>
+        {ttps.length === 0 ? (
+          <p className="text-sm text-md-sys-color-on-surface-variant">
+            No techniques mapped to this case yet.
+          </p>
+        ) : (
+          <ul className="mb-2 flex flex-wrap gap-1">
+            {ttps.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center gap-1 rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs"
+              >
+                <span className="font-mono">{t.technique_id}</span>
+                <span className="text-[10px] text-md-sys-color-on-surface-variant">
+                  {t.tactic}
+                </span>
+                {permissions.has("manageCase") ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void removeTtp(t.id);
+                    }}
+                    className="ml-1 text-[10px] text-md-sys-color-on-surface-variant hover:text-severity-4"
+                    aria-label="Remove"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {permissions.has("manageCase") ? (
+          <TtpPicker
+            onPick={(techniqueId: string, label: string) => {
+              void addTtp(techniqueId, label);
+            }}
+          />
         ) : null}
       </article>
 

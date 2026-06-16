@@ -51,6 +51,10 @@ export function ObservableDetailPage({ observableId }: Props) {
   const [editingTags, setEditingTags] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>([]);
   const [savingTags, setSavingTags] = useState(false);
+  const [analyzers, setAnalyzers] = useState<
+    { name: string; supported_types: string[] }[]
+  >([]);
+  const [runBusy, setRunBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +69,11 @@ export function ObservableDetailPage({ observableId }: Props) {
         if (cancelled) return;
         setObs(o);
         setMatches(sim.matches);
+        apiCall<{ name: string; supported_types: string[] }[]>("/v1/analyzers")
+          .then((a) => {
+            if (!cancelled) setAnalyzers(a);
+          })
+          .catch(() => undefined);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -87,6 +96,21 @@ export function ObservableDetailPage({ observableId }: Props) {
   const startEditTags = () => {
     setDraftTags(obs.tags);
     setEditingTags(true);
+  };
+
+  const runAnalyzer = async (analyzerName: string) => {
+    setRunBusy(true);
+    try {
+      await apiCall(
+        `/v1/observables/${observableId}/analyzers/${encodeURIComponent(analyzerName)}`,
+        { method: "POST", body: "{}" },
+      );
+      toast.success(`Enqueued ${analyzerName}.`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setRunBusy(false);
+    }
   };
 
   const saveTags = async () => {
@@ -171,6 +195,31 @@ export function ObservableDetailPage({ observableId }: Props) {
           <p className="whitespace-pre-wrap text-sm">{obs.message}</p>
         ) : null}
       </header>
+
+      {permissions.has("manageObservable") &&
+      analyzers.filter((a) => a.supported_types.includes(obs.data_type)).length > 0 ? (
+        <article>
+          <h2 className="mb-2 text-sm font-medium">Run analyzer</h2>
+          <select
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs disabled:opacity-50"
+            value=""
+            disabled={runBusy}
+            onChange={(e) => {
+              const name = e.target.value;
+              if (name) void runAnalyzer(name);
+            }}
+          >
+            <option value="">{runBusy ? "Enqueuing…" : "Pick an analyzer…"}</option>
+            {analyzers
+              .filter((a) => a.supported_types.includes(obs.data_type))
+              .map((a) => (
+                <option key={a.name} value={a.name}>
+                  {a.name}
+                </option>
+              ))}
+          </select>
+        </article>
+      ) : null}
 
       <article>
         <h2 className="mb-2 text-lg font-medium">
