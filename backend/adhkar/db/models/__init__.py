@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models for Adhkar IR."""
 
+from adhkar.db.models.ai_call import AiCall
 from adhkar.db.models.alert import Alert
 from adhkar.db.models.analyzer_job import AnalyzerJob
 from adhkar.db.models.api_key import ApiKey
@@ -26,6 +27,7 @@ from adhkar.db.models.ttp import CaseTtp, TtpCatalogEntry
 from adhkar.db.models.user import User
 
 __all__ = [
+    "AiCall",
     "Alert",
     "AnalyzerJob",
     "ApiKey",

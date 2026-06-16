@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from adhkar import __version__
 from adhkar.api.errors import register_exception_handlers
+from adhkar.api.v1.ai import router as ai_router
 from adhkar.api.v1.alerts import router as alerts_router
 from adhkar.api.v1.analyzer_jobs import router as analyzer_jobs_router
 from adhkar.api.v1.api_keys import router as api_keys_router
@@ -92,6 +93,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ttps_router)
     app.include_router(kb_router)
     app.include_router(notifications_router)
+    app.include_router(ai_router)
     app.include_router(live_router)
 
     register_exception_handlers(app)
