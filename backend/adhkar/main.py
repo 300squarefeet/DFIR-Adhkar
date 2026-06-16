@@ -38,7 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             task.cancel()
             try:
                 await task
-            except (asyncio.CancelledError, Exception):
+            except (asyncio.CancelledError, Exception):  # noqa: S110
                 pass
 
     app = FastAPI(
