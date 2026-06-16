@@ -12,6 +12,7 @@ import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { AlertsPage } from "@/pages/AlertsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CaseDetailPage } from "@/pages/CaseDetailPage";
+import { CaseTemplatesPage } from "@/pages/CaseTemplatesPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
@@ -127,6 +128,12 @@ const adminProfilesRoute = createRoute({
   component: AdminProfilesPage,
 });
 
+const caseTemplatesRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/case-templates",
+  component: CaseTemplatesPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -154,6 +161,7 @@ export const router = createRouter({
       ttpsRoute,
       adminUsersRoute,
       adminProfilesRoute,
+      caseTemplatesRoute,
     ]),
   ]),
 });

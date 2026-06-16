@@ -1,49 +1,34 @@
 /**
- * Dashboard (Phase 6 stub): KPIs derived client-side from cases + alerts.
- * Phase 6b will swap to dashboard-widget engine.
+ * Dashboard (Phase 6) — widget-driven. Each WidgetSpec declares its own
+ * endpoint and how to derive its KPI; results are deduped per endpoint so
+ * we don't refetch the same list multiple times.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
-
-interface CaseRow {
-  id: string;
-  severity: 1 | 2 | 3 | 4;
-  stage: string;
-  status: string;
-}
-
-interface AlertRow {
-  id: string;
-  status: string;
-}
-
-interface Kpi {
-  label: string;
-  value: number;
-  tone?: "default" | "warn" | "alert";
-}
+import { CORE_WIDGETS, type WidgetSpec } from "@/ui/widgets";
 
 export function DashboardPage() {
   const { apiCall } = useAuth();
-  const [cases, setCases] = useState<CaseRow[]>([]);
-  const [alerts, setAlerts] = useState<AlertRow[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [responses, setResponses] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const uniquePaths = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of CORE_WIDGETS) set.add(w.path);
+    return Array.from(set);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [c, a] = await Promise.all([
-          apiCall<CaseRow[]>("/v1/cases?limit=500"),
-          apiCall<AlertRow[]>("/v1/alerts?limit=500"),
-        ]);
+        const pairs = await Promise.all(
+          uniquePaths.map(async (p) => [p, await apiCall<unknown>(p)] as const),
+        );
         if (cancelled) return;
-        setCases(c);
-        setAlerts(a);
-        setLoaded(true);
+        setResponses(Object.fromEntries(pairs));
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -51,31 +36,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall]);
-
-  const kpis: Kpi[] = [
-    { label: "Open cases", value: cases.filter((c) => c.stage !== "closed").length },
-    {
-      label: "Critical cases (sev 4)",
-      value: cases.filter((c) => c.severity === 4 && c.stage !== "closed").length,
-      tone: "alert",
-    },
-    {
-      label: "High severity (sev 3+)",
-      value: cases.filter((c) => c.severity >= 3 && c.stage !== "closed").length,
-      tone: "warn",
-    },
-    { label: "Closed cases", value: cases.filter((c) => c.stage === "closed").length },
-    {
-      label: "New alerts",
-      value: alerts.filter((a) => a.status === "New" || a.status === "Updated").length,
-      tone: "warn",
-    },
-    {
-      label: "Imported alerts",
-      value: alerts.filter((a) => a.status === "Imported").length,
-    },
-  ];
+  }, [apiCall, uniquePaths]);
 
   if (error)
     return (
@@ -86,33 +47,40 @@ export function DashboardPage() {
       </section>
     );
 
+  const loaded = uniquePaths.every((p) => p in responses);
+
   return (
     <section className="p-6">
       <h1 className="mb-4 text-2xl font-semibold">Dashboard</h1>
       {!loaded ? (
         <p className="text-md-sys-color-on-surface-variant">Loading…</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {kpis.map((k) => (
-            <div
-              key={k.label}
-              className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-4"
-            >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          {CORE_WIDGETS.map((w: WidgetSpec) => {
+            let value: number;
+            try {
+              value = w.derive(responses[w.path]);
+            } catch {
+              value = 0;
+            }
+            const toneClass =
+              w.tone === "alert"
+                ? "text-severity-4"
+                : w.tone === "warn"
+                  ? "text-severity-3"
+                  : "";
+            return (
               <div
-                className={
-                  "text-3xl font-semibold " +
-                  (k.tone === "alert"
-                    ? "text-severity-4"
-                    : k.tone === "warn"
-                      ? "text-severity-3"
-                      : "")
-                }
+                key={w.id}
+                className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-4"
               >
-                {k.value}
+                <div className={"text-3xl font-semibold " + toneClass}>{value}</div>
+                <div className="text-xs text-md-sys-color-on-surface-variant">
+                  {w.title}
+                </div>
               </div>
-              <div className="text-xs text-md-sys-color-on-surface-variant">{k.label}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
