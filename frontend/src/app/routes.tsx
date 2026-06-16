@@ -6,6 +6,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 
+import { CasesPage } from "@/pages/CasesPage";
 import { HealthPage } from "@/pages/HealthPage";
 import { LoginPage } from "@/pages/LoginPage";
 
@@ -49,10 +50,16 @@ const healthRoute = createRoute({
   component: HealthPage,
 });
 
+const casesRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/cases",
+  component: CasesPage,
+});
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     loginRoute,
-    protectedLayout.addChildren([indexRoute, healthRoute]),
+    protectedLayout.addChildren([indexRoute, healthRoute, casesRoute]),
   ]),
 });
 

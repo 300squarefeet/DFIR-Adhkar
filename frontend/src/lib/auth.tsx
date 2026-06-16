@@ -57,6 +57,7 @@ interface AuthContextValue extends AuthState {
   login(email: string, password: string, mfaCode?: string): Promise<void>;
   logout(): Promise<void>;
   refresh(): Promise<boolean>;
+  apiCall<T>(path: string, init?: RequestInit): Promise<T>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -162,6 +163,15 @@ export function AuthProvider({ apiBase = DEFAULT_BASE, children }: AuthProviderP
     setState({ user: null, accessToken: null, loading: false });
   }, [apiBase, state.accessToken]);
 
+  const apiCall = useCallback(
+    <T,>(path: string, init: RequestInit = {}): Promise<T> => {
+      const merged: RequestInit & { accessToken?: string } = { ...init };
+      if (state.accessToken) merged.accessToken = state.accessToken;
+      return callJson<T>(apiBase, path, merged);
+    },
+    [apiBase, state.accessToken],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
@@ -169,8 +179,9 @@ export function AuthProvider({ apiBase = DEFAULT_BASE, children }: AuthProviderP
       login,
       logout,
       refresh,
+      apiCall,
     }),
-    [state, login, logout, refresh],
+    [state, login, logout, refresh, apiCall],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
