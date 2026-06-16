@@ -70,6 +70,8 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # Phase 5+ extension: responders
     "/v1/responders",
     "/v1/responders/{name}/{entity_type}/{entity_id}",
+    # MCP server
+    "/v1/mcp/rpc",
 )
 
 
