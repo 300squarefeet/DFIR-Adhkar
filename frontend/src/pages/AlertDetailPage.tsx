@@ -35,6 +35,14 @@ interface Props {
   alertId: string;
 }
 
+interface TimelineEntry {
+  id: string;
+  action: string;
+  entity_type: string;
+  actor_user_id: string | null;
+  created_at: string;
+}
+
 const STATUSES = ["New", "Updated", "Ignored", "Imported"] as const;
 
 export function AlertDetailPage({ alertId }: Props) {
@@ -44,16 +52,25 @@ export function AlertDetailPage({ alertId }: Props) {
   const [alert, setAlert] = useState<AlertDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    apiCall<AlertDetail>(`/v1/alerts/${alertId}`)
-      .then((a) => {
-        if (!cancelled) setAlert(a);
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setError(e.message);
-      });
+    (async () => {
+      try {
+        const [a, tl] = await Promise.all([
+          apiCall<AlertDetail>(`/v1/alerts/${alertId}`),
+          apiCall<{ entries: TimelineEntry[] }>(
+            `/v1/alerts/${alertId}/timeline?limit=100`,
+          ).catch(() => ({ entries: [] as TimelineEntry[] })),
+        ]);
+        if (cancelled) return;
+        setAlert(a);
+        setTimeline(tl.entries);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -174,6 +191,28 @@ export function AlertDetailPage({ alertId }: Props) {
           ) : null}
         </article>
       ) : null}
+
+      <article>
+        <h2 className="mb-2 text-sm font-medium">Timeline ({timeline.length})</h2>
+        {timeline.length === 0 ? (
+          <p className="text-xs text-md-sys-color-on-surface-variant">No audit events.</p>
+        ) : (
+          <ol className="space-y-1 text-xs">
+            {timeline.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant/50 px-3 py-1"
+              >
+                <span className="font-mono uppercase">{t.entity_type}</span>
+                <span className="font-medium">{t.action}</span>
+                <span className="ml-auto text-md-sys-color-on-surface-variant">
+                  {new Date(t.created_at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </article>
 
       {Object.keys(alert.custom_fields).length > 0 ? (
         <article>

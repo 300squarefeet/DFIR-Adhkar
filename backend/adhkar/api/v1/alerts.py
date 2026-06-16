@@ -339,6 +339,78 @@ async def promote_alert(
     return {"case_id": str(case.id), "case_number": case.number, "alert_id": str(a.id)}
 
 
+class AlertTimelineEntry(BaseModel):
+    id: UUID
+    action: str
+    entity_type: str
+    actor_user_id: UUID | None
+    created_at: datetime
+    diff: dict[str, Any]
+
+
+class AlertTimelineResponse(BaseModel):
+    alert_id: UUID
+    entries: list[AlertTimelineEntry]
+
+
+@router.get("/{alert_id}/timeline", response_model=AlertTimelineResponse)
+async def alert_timeline(
+    alert_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 100,
+) -> AlertTimelineResponse:
+    """Per-alert audit feed: direct entity_type='alert' rows + any audit
+    row whose diff JSON references this alert id (covers e.g. responder
+    invocations that target the alert)."""
+    from sqlalchemy import Text, or_
+
+    a = (
+        await db.execute(select(Alert).where(Alert.id == alert_id, Alert.organization_id == org_id))
+    ).scalar_one_or_none()
+    if a is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "alert_not_found")
+    safe_limit = max(1, min(500, int(limit)))
+    aid_str = str(alert_id)
+    from sqlalchemy import desc as _desc
+
+    from adhkar.db.models import AuditLog
+
+    rows = (
+        (
+            await db.execute(
+                select(AuditLog)
+                .where(
+                    AuditLog.organization_id == org_id,
+                    or_(
+                        (AuditLog.entity_type == "alert") & (AuditLog.entity_id == alert_id),
+                        AuditLog.diff.cast(Text).contains(aid_str),
+                    ),
+                )
+                .order_by(_desc(AuditLog.created_at))
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return AlertTimelineResponse(
+        alert_id=alert_id,
+        entries=[
+            AlertTimelineEntry(
+                id=r.id,
+                action=r.action,
+                entity_type=r.entity_type,
+                actor_user_id=r.actor_user_id,
+                created_at=r.created_at,
+                diff=r.diff or {},
+            )
+            for r in rows
+        ],
+    )
+
+
 @router.post("/{alert_id}/merge/{case_id}", response_model=AlertDTO)
 async def merge_alert_into_case(
     alert_id: UUID,

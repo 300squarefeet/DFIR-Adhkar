@@ -38,6 +38,7 @@ dependencies = [
   "defusedxml>=0.7.1",
   "python-multipart>=0.0.32",
   "joserfc>=1.7.1",
+  "markdown>=3.10.2",
 ]
 
 [dependency-groups]

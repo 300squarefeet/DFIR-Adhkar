@@ -12,6 +12,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import Text, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -178,3 +179,44 @@ async def case_report(
         pages=[{"slug": p.slug, "title": p.title, "content": p.content} for p in pages],
         markdown=markdown,
     )
+
+
+@router.get(
+    "/v1/cases/{case_id}/report.html",
+    response_class=HTMLResponse,
+    responses={200: {"content": {"text/html": {}}}},
+)
+async def case_report_html(
+    case_id: UUID,
+    user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> HTMLResponse:
+    """Server-rendered HTML wrapper around the case report markdown.
+
+    Wraps the markdown in a print-friendly stylesheet so 'Save as PDF'
+    from any browser produces a clean handoff doc — no external PDF dep."""
+    import markdown as md  # type: ignore[import-untyped]
+
+    report = await case_report(case_id=case_id, _user=user, org_id=org_id, db=db)
+    body_html = md.markdown(
+        report.markdown,
+        extensions=["fenced_code", "tables"],
+    )
+    css = (
+        "body{font:14px -apple-system,Segoe UI,sans-serif;"
+        "max-width:780px;margin:2rem auto;padding:0 1rem;color:#1f2937}"
+        "h1{font-size:24px;border-bottom:1px solid #e5e7eb;padding-bottom:.5rem}"
+        "h2{font-size:18px;margin-top:1.5rem;color:#374151}"
+        "pre{background:#f3f4f6;padding:.75rem;border-radius:.25rem;overflow:auto}"
+        "code{background:#f3f4f6;padding:0 .25rem;border-radius:.125rem}"
+        "table{border-collapse:collapse;width:100%}"
+        "th,td{border:1px solid #e5e7eb;padding:.4rem .6rem;text-align:left}"
+        "@media print{body{margin:0;max-width:none}}"
+    )
+    html = (
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        f"<title>Adhkar IR · Case #{report.number}</title>"
+        f"<style>{css}</style></head><body>{body_html}</body></html>"
+    )
+    return HTMLResponse(content=html)
