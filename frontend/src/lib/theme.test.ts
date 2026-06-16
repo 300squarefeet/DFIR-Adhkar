@@ -5,7 +5,7 @@ import { applyTheme, getStoredTheme, setStoredTheme, toggleTheme, type Theme } f
 describe("theme", () => {
   beforeEach(() => {
     document.documentElement.dataset.theme = "dark";
-    localStorage.clear();
+    window.localStorage.removeItem("adhkar.theme");
   });
   afterEach(() => localStorage.clear());
 
@@ -16,7 +16,7 @@ describe("theme", () => {
 
   it("setStoredTheme persists to localStorage and applies", () => {
     setStoredTheme("light");
-    expect(localStorage.getItem("adhkar.theme")).toBe("light");
+    expect(window.localStorage.getItem("adhkar.theme")).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
   });
 
@@ -25,7 +25,7 @@ describe("theme", () => {
   });
 
   it("getStoredTheme returns the persisted value", () => {
-    localStorage.setItem("adhkar.theme", "light");
+    window.localStorage.setItem("adhkar.theme", "light");
     expect(getStoredTheme()).toBe("light");
   });
 
@@ -33,7 +33,7 @@ describe("theme", () => {
     setStoredTheme("dark");
     const next: Theme = toggleTheme();
     expect(next).toBe("light");
-    expect(localStorage.getItem("adhkar.theme")).toBe("light");
+    expect(window.localStorage.getItem("adhkar.theme")).toBe("light");
     expect(toggleTheme()).toBe("dark");
   });
 });
