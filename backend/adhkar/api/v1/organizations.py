@@ -122,7 +122,7 @@ async def list_sharings(
             id=r.id,
             source_org_id=r.source_org_id,
             target_org_id=r.target_org_id,
-            kind=r.kind,  # type: ignore[arg-type]
+            kind=r.kind,
         )
         for r in rows
     ]
@@ -154,7 +154,7 @@ async def create_sharing(
         id=row.id,
         source_org_id=row.source_org_id,
         target_org_id=row.target_org_id,
-        kind=row.kind,  # type: ignore[arg-type]
+        kind=row.kind,
     )
 
 
