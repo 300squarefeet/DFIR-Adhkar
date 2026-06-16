@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
+import { ObservablePicker } from "@/ui/ObservablePicker";
+import { useToast } from "@/ui/Toast";
 
 interface CaseDetail {
   id: string;
@@ -90,6 +92,7 @@ interface ResponderResult {
 
 export function CaseDetailPage({ caseId }: Props) {
   const { apiCall, permissions } = useAuth();
+  const toast = useToast();
   const [c, setCase] = useState<CaseDetail | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [comments, setComments] = useState<CommentRow[]>([]);
@@ -552,23 +555,45 @@ export function CaseDetailPage({ caseId }: Props) {
           </ul>
         )}
         {permissions.has("manageCase") ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            <input
-              className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
-              placeholder="Observable UUIDs (comma- or space-separated)"
-              value={attachIds}
-              onChange={(e) => setAttachIds(e.target.value)}
-            />
-            <button
-              type="button"
-              className="rounded-full bg-md-sys-color-primary px-3 py-1 text-xs text-md-sys-color-on-primary disabled:opacity-50"
-              onClick={() => {
-                void attachObservables();
+          <div className="mt-2 space-y-2">
+            <ObservablePicker
+              onPick={(id: string, label: string) => {
+                setAttachBusy(true);
+                apiCall(`/v1/cases/${caseId}/observables/attach`, {
+                  method: "POST",
+                  body: JSON.stringify({ observable_ids: [id] }),
+                })
+                  .then(async () => {
+                    toast.success(`Attached ${label}.`);
+                    await refreshObservables();
+                  })
+                  .catch((e: Error) => toast.error(e.message))
+                  .finally(() => setAttachBusy(false));
               }}
-              disabled={attachBusy || !attachIds.trim()}
-            >
-              {attachBusy ? "…" : "Attach"}
-            </button>
+            />
+            <details className="text-xs">
+              <summary className="cursor-pointer text-md-sys-color-on-surface-variant">
+                Or bulk-attach by UUID
+              </summary>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <input
+                  className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
+                  placeholder="Observable UUIDs (comma- or space-separated)"
+                  value={attachIds}
+                  onChange={(e) => setAttachIds(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rounded-full bg-md-sys-color-primary px-3 py-1 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+                  onClick={() => {
+                    void attachObservables();
+                  }}
+                  disabled={attachBusy || !attachIds.trim()}
+                >
+                  {attachBusy ? "…" : "Attach"}
+                </button>
+              </div>
+            </details>
           </div>
         ) : null}
       </article>
