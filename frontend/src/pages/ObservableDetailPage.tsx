@@ -113,6 +113,20 @@ export function ObservableDetailPage({ observableId }: Props) {
     }
   };
 
+  const toggleFlag = async (field: "is_ioc" | "sighted" | "ignore_similarity") => {
+    if (!obs) return;
+    try {
+      const updated = await apiCall<Observable>(`/v1/observables/${observableId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ [field]: !obs[field] }),
+      });
+      setObs(updated);
+      toast.success(`Toggled ${field}.`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   const saveTags = async () => {
     setSavingTags(true);
     try {
@@ -141,21 +155,73 @@ export function ObservableDetailPage({ observableId }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <TLPBadge tlp={obs.tlp} />
-          {obs.is_ioc ? (
-            <span className="rounded-full bg-severity-4/20 px-2 py-0.5 text-xs text-severity-4">
-              IOC
-            </span>
-          ) : null}
-          {obs.sighted ? (
-            <span className="rounded-full bg-severity-3/20 px-2 py-0.5 text-xs text-severity-3">
-              seen
-            </span>
-          ) : null}
-          {obs.ignore_similarity ? (
-            <span className="rounded-full bg-md-sys-color-surface-container px-2 py-0.5 text-xs">
-              similarity ignored
-            </span>
-          ) : null}
+          {permissions.has("manageObservable") ? (
+            <>
+              <button
+                type="button"
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (obs.is_ioc
+                    ? "bg-severity-4/20 text-severity-4"
+                    : "border border-md-sys-color-outline-variant text-md-sys-color-on-surface-variant")
+                }
+                onClick={() => {
+                  void toggleFlag("is_ioc");
+                }}
+                title="Click to toggle IOC flag"
+              >
+                IOC{obs.is_ioc ? " ✓" : ""}
+              </button>
+              <button
+                type="button"
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (obs.sighted
+                    ? "bg-severity-3/20 text-severity-3"
+                    : "border border-md-sys-color-outline-variant text-md-sys-color-on-surface-variant")
+                }
+                onClick={() => {
+                  void toggleFlag("sighted");
+                }}
+                title="Click to toggle sighted flag"
+              >
+                seen{obs.sighted ? " ✓" : ""}
+              </button>
+              <button
+                type="button"
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (obs.ignore_similarity
+                    ? "bg-md-sys-color-surface-container"
+                    : "border border-md-sys-color-outline-variant text-md-sys-color-on-surface-variant")
+                }
+                onClick={() => {
+                  void toggleFlag("ignore_similarity");
+                }}
+                title="Click to toggle similarity-ignore"
+              >
+                ignore-sim{obs.ignore_similarity ? " ✓" : ""}
+              </button>
+            </>
+          ) : (
+            <>
+              {obs.is_ioc ? (
+                <span className="rounded-full bg-severity-4/20 px-2 py-0.5 text-xs text-severity-4">
+                  IOC
+                </span>
+              ) : null}
+              {obs.sighted ? (
+                <span className="rounded-full bg-severity-3/20 px-2 py-0.5 text-xs text-severity-3">
+                  seen
+                </span>
+              ) : null}
+              {obs.ignore_similarity ? (
+                <span className="rounded-full bg-md-sys-color-surface-container px-2 py-0.5 text-xs">
+                  similarity ignored
+                </span>
+              ) : null}
+            </>
+          )}
           {obs.tags.map((t) => (
             <span
               key={t}

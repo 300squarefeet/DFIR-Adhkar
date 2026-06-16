@@ -11,6 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
+import { useUserNames } from "@/lib/useUserNames";
 import { useToast } from "@/ui/Toast";
 
 interface CaseRow {
@@ -76,6 +77,8 @@ export function CasesPage() {
     window.localStorage.setItem(SAVED_VIEW_KEY, JSON.stringify(view));
   }, [view]);
 
+  const assigneeNames = useUserNames(cases?.map((c) => c.assignee_id) ?? []);
+
   const filtered = useMemo(() => {
     if (!cases) return [];
     const q = view.search.trim().toLowerCase();
@@ -84,9 +87,11 @@ export function CasesPage() {
       (c) =>
         c.title.toLowerCase().includes(q) ||
         c.tags.some((t) => t.toLowerCase().includes(q)) ||
-        String(c.number).includes(q),
+        String(c.number).includes(q) ||
+        (c.assignee_id &&
+          (assigneeNames[c.assignee_id] ?? "").toLowerCase().includes(q)),
     );
-  }, [cases, view.search]);
+  }, [cases, view.search, assigneeNames]);
 
   const toggleAll = (checked: boolean) => {
     if (!checked) {
@@ -212,6 +217,7 @@ export function CasesPage() {
               <th className="py-2 pr-3">Title</th>
               <th className="py-2 pr-3">Severity</th>
               <th className="py-2 pr-3">TLP</th>
+              <th className="py-2 pr-3">Assignee</th>
               <th className="py-2 pr-3">Stage</th>
               <th className="py-2 pr-3">Updated</th>
             </tr>
@@ -253,6 +259,15 @@ export function CasesPage() {
                 </td>
                 <td className="py-2 pr-3">
                   <TLPBadge tlp={c.tlp} />
+                </td>
+                <td className="py-2 pr-3 text-xs">
+                  {c.assignee_id ? (
+                    assigneeNames[c.assignee_id] ?? c.assignee_id.slice(0, 8)
+                  ) : (
+                    <span className="text-md-sys-color-on-surface-variant">
+                      unassigned
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 pr-3">{c.stage}</td>
                 <td className="py-2 pr-3 text-md-sys-color-on-surface-variant">
