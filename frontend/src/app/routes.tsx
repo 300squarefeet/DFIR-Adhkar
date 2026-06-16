@@ -13,6 +13,8 @@ import { AlertsPage } from "@/pages/AlertsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CaseDetailPage } from "@/pages/CaseDetailPage";
 import { CaseTemplatesPage } from "@/pages/CaseTemplatesPage";
+import { GdprPage } from "@/pages/GdprPage";
+import { PortalPage } from "@/pages/PortalPage";
 import { CasesPage } from "@/pages/CasesPage";
 import { CreateCasePage } from "@/pages/CreateCasePage";
 import { HealthPage } from "@/pages/HealthPage";
@@ -134,6 +136,18 @@ const caseTemplatesRoute = createRoute({
   component: CaseTemplatesPage,
 });
 
+const gdprRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/admin/gdpr",
+  component: GdprPage,
+});
+
+const portalRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/portal",
+  component: PortalPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -162,6 +176,8 @@ export const router = createRouter({
       adminUsersRoute,
       adminProfilesRoute,
       caseTemplatesRoute,
+      gdprRoute,
+      portalRoute,
     ]),
   ]),
 });
