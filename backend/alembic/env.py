@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
+import adhkar.db.models  # noqa: F401  registers tables with Base.metadata
 from adhkar.core.settings import get_settings
 from adhkar.db.base import Base
 from adhkar.db.engine import create_engine
