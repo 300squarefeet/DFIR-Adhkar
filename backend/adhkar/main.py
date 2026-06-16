@@ -31,17 +31,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from adhkar.workers.analyzer_runner import run_analyzer_runner
         from adhkar.workers.outbox_publisher import run_outbox_publisher
 
-        task = asyncio.create_task(run_outbox_publisher(settings))
+        outbox = asyncio.create_task(run_outbox_publisher(settings))
+        analyzer = asyncio.create_task(run_analyzer_runner(settings))
         try:
             yield
         finally:
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):  # noqa: S110
-                pass
+            for t in (outbox, analyzer):
+                t.cancel()
+            for t in (outbox, analyzer):
+                try:
+                    await t
+                except (asyncio.CancelledError, Exception):  # noqa: S110
+                    pass
 
     app = FastAPI(
         title="Adhkar IR API",
