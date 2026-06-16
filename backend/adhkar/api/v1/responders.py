@@ -19,6 +19,7 @@ from adhkar.api.deps import (
 from adhkar.audit import audit_and_emit
 from adhkar.db.models import Alert, Case, Observable
 from adhkar.responders.base import Responder, get_responder_registry
+from adhkar.responders.slack_notify import SlackNotifyResponder
 from adhkar.responders.webhook_notify import WebhookNotifyResponder
 
 router = APIRouter(prefix="/v1/responders", tags=["responders"])
@@ -33,6 +34,7 @@ def _bootstrap_once() -> None:
         return
     reg = get_responder_registry()
     reg.register(WebhookNotifyResponder())
+    reg.register(SlackNotifyResponder())
     _BOOTSTRAPPED = True
 
 
