@@ -6,14 +6,15 @@ import time
 
 import pytest
 from adhkar.auth.oidc_jwt import IdTokenInvalid, verify_id_token
-from authlib.jose import JsonWebKey, JsonWebToken  # type: ignore[import-untyped]
+from joserfc import jwt  # type: ignore[import-untyped]
+from joserfc.jwk import RSAKey  # type: ignore[import-untyped]
 
 
-def _make_keypair_and_jwks() -> tuple[JsonWebKey, dict]:
+def _make_keypair_and_jwks() -> tuple[RSAKey, dict]:
     """Generate a fresh RSA keypair the test JWT will be signed with, plus
     the JWKS the verifier consumes."""
-    key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-    pub = key.as_dict(is_private=False)
+    key = RSAKey.generate_key(2048, parameters={"kid": "test-kid"})
+    pub = key.as_dict(private=False)
     pub["alg"] = "RS256"
     pub["use"] = "sig"
     pub["kid"] = "test-kid"
@@ -21,12 +22,8 @@ def _make_keypair_and_jwks() -> tuple[JsonWebKey, dict]:
     return key, jwks
 
 
-def _mint_token(key: JsonWebKey, claims: dict) -> str:
-    return (
-        JsonWebToken(["RS256"])
-        .encode({"alg": "RS256", "kid": "test-kid"}, claims, key)
-        .decode("ascii")
-    )
+def _mint_token(key: RSAKey, claims: dict) -> str:
+    return jwt.encode({"alg": "RS256", "kid": "test-kid"}, claims, key)
 
 
 def test_verifies_well_formed_token() -> None:

@@ -9,6 +9,7 @@ import {
 import { AdhkarMindPage } from "@/pages/AdhkarMindPage";
 import { AdminProfilesPage } from "@/pages/AdminProfilesPage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
+import { AlertDetailPage } from "@/pages/AlertDetailPage";
 import { AlertsPage } from "@/pages/AlertsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CaseDetailPage } from "@/pages/CaseDetailPage";
@@ -81,6 +82,15 @@ const alertsRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/alerts",
   component: AlertsPage,
+});
+
+const alertDetailRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/alerts/$alertId",
+  component: function AlertDetailRouteView() {
+    const { alertId } = alertDetailRoute.useParams();
+    return <AlertDetailPage alertId={alertId} />;
+  },
 });
 
 const observablesRoute = createRoute({
@@ -174,6 +184,7 @@ export const router = createRouter({
       createCaseRoute,
       caseDetailRoute,
       alertsRoute,
+      alertDetailRoute,
       observablesRoute,
       mindRoute,
       kbRoute,

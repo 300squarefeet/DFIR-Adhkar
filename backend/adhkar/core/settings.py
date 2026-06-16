@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # JSON map: {"<name>": {client_id, client_secret, discovery_url, scopes?, redirect_uri?}}
     oidc_providers_json: str = ""
 
+    # ----- maxmind geoip auto-download -----
+    maxmind_license_key: str = ""  # empty disables the downloader entirely
+    maxmind_db_dir: str = "/var/lib/adhkar/maxmind"
+
     # ----- saml sso -----
     # JSON map keyed by provider name; per-entry keys: idp_entity_id,
     # idp_sso_url, sp_entity_id, acs_url, idp_certificate_pem? (optional).
