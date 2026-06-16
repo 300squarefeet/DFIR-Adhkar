@@ -87,6 +87,60 @@ async def get_current_user(
     token = _extract_bearer(request)
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing_token")
+
+    # API-key Bearer (prefix "adh_") → lookup vs ApiKey table
+    if token.startswith("adh_"):
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        from argon2 import PasswordHasher
+        from argon2.exceptions import VerifyMismatchError
+        from sqlalchemy import select
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        from adhkar.auth.jwt import JwtClaims
+        from adhkar.db.engine import create_engine
+        from adhkar.db.models import ApiKey
+        from adhkar.db.models import User as UserRow
+
+        engine = create_engine(settings)
+        sf = async_sessionmaker(engine, expire_on_commit=False)
+        async with sf() as session:
+            row = (
+                await session.execute(
+                    select(ApiKey).where(ApiKey.prefix == token[:12], ApiKey.revoked_at.is_(None))
+                )
+            ).scalar_one_or_none()
+            if not row:
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "api_key_invalid")
+            if row.expires_at and row.expires_at < _dt.now(tz=UTC):
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "api_key_expired")
+            try:
+                PasswordHasher().verify(row.key_hash, token)
+            except VerifyMismatchError as e:
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "api_key_invalid") from e
+            user_row = (
+                await session.execute(select(UserRow).where(UserRow.id == row.user_id))
+            ).scalar_one()
+            row.last_used_at = _dt.now(tz=UTC)
+            await session.commit()
+        await engine.dispose()
+        synthetic_claims = JwtClaims(
+            sub=str(row.user_id),
+            org_id=None,
+            perms=tuple(row.scope_permissions),
+            jti=f"apikey:{row.id}",
+            iat=0,
+            exp=0,
+            typ="access",
+        )
+        return CurrentUser(
+            user_id=row.user_id,
+            org_id=user_row.default_org_id,
+            permissions=frozenset(row.scope_permissions),
+            claims=synthetic_claims,
+        )
+
     try:
         claims = decode_jwt(token, secret=settings.secret_key)
     except jwt.ExpiredSignatureError as e:
