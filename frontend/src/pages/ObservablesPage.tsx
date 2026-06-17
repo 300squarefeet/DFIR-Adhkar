@@ -46,6 +46,7 @@ export function ObservablesPage() {
           sighted: "" as const,
           tlp: "",
           updatedWithin: 0 as 0 | 24 | 168 | 720,
+          unattached: false,
         };
       const p = JSON.parse(raw) as {
         type?: string;
@@ -54,6 +55,7 @@ export function ObservablesPage() {
         sighted?: "" | "true" | "false";
         tlp?: string;
         updatedWithin?: number;
+        unattached?: boolean;
       };
       const uw =
         p.updatedWithin === 24 || p.updatedWithin === 168 || p.updatedWithin === 720
@@ -66,6 +68,7 @@ export function ObservablesPage() {
         sighted: (p.sighted ?? "") as "" | "true" | "false",
         tlp: p.tlp ?? "",
         updatedWithin: uw as 0 | 24 | 168 | 720,
+        unattached: p.unattached === true,
       };
     } catch {
       return {
@@ -75,6 +78,7 @@ export function ObservablesPage() {
         sighted: "" as const,
         tlp: "",
         updatedWithin: 0 as 0 | 24 | 168 | 720,
+        unattached: false,
       };
     }
   })();
@@ -88,6 +92,7 @@ export function ObservablesPage() {
       filterSighted: "" | "true" | "false";
       filterTlp: string;
       updatedWithin: 0 | 24 | 168 | 720;
+      unattached: boolean;
     }> = {};
     const dt = sp.get("data_type");
     if (dt !== null) out.filterType = dt;
@@ -112,6 +117,9 @@ export function ObservablesPage() {
       if (n === 24 || n === 168 || n === 720) out.updatedWithin = n;
       else if (n === 0) out.updatedWithin = 0;
     }
+    const un = sp.get("unattached");
+    if (un === "true") out.unattached = true;
+    else if (un === "false") out.unattached = false;
     return out;
   })();
   const [filterType, setFilterType] = useState<string>(urlOverride.filterType ?? initialView.type);
@@ -123,6 +131,9 @@ export function ObservablesPage() {
   const [filterTlp, setFilterTlp] = useState<string>(urlOverride.filterTlp ?? initialView.tlp);
   const [updatedWithin, setUpdatedWithin] = useState<0 | 24 | 168 | 720>(
     urlOverride.updatedWithin ?? initialView.updatedWithin,
+  );
+  const [unattachedOnly, setUnattachedOnly] = useState<boolean>(
+    urlOverride.unattached ?? initialView.unattached,
   );
 
   useEffect(() => {
@@ -136,12 +147,13 @@ export function ObservablesPage() {
           sighted: filterSighted,
           tlp: filterTlp,
           updatedWithin,
+          unattached: unattachedOnly,
         }),
       );
     } catch {
       /* localStorage disabled (private mode, quota) — best-effort */
     }
-  }, [filterType, filterTag, filterIoc, filterSighted, filterTlp, updatedWithin]);
+  }, [filterType, filterTag, filterIoc, filterSighted, filterTlp, updatedWithin, unattachedOnly]);
 
   const refresh = async () => {
     try {
@@ -155,6 +167,7 @@ export function ObservablesPage() {
         const since = new Date(Date.now() - updatedWithin * 3600 * 1000).toISOString();
         params.set("updated_since", since);
       }
+      if (unattachedOnly) params.set("unattached", "true");
       const r = await apiCall<ObservableRow[]>(
         `/v1/observables?${params.toString()}`,
       );
@@ -168,7 +181,7 @@ export function ObservablesPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, filterType, filterTag, filterIoc, filterSighted, filterTlp, updatedWithin]);
+  }, [apiCall, filterType, filterTag, filterIoc, filterSighted, filterTlp, updatedWithin, unattachedOnly]);
 
   const toggleOne = (id: string) => {
     setSelected((prev) => {
@@ -251,6 +264,7 @@ export function ObservablesPage() {
               if (filterSighted) p.set("sighted", filterSighted);
               if (filterTlp) p.set("tlp", filterTlp);
               if (updatedWithin >= 1) p.set("updated_within_hours", String(updatedWithin));
+              if (unattachedOnly) p.set("unattached", "true");
               const qs = p.toString();
               const url = `${window.location.origin}/observables${qs ? `?${qs}` : ""}`;
               navigator.clipboard
@@ -413,6 +427,31 @@ export function ObservablesPage() {
             </button>
           );
         })}
+        <span className="ml-2 text-md-sys-color-on-surface-variant">Case:</span>
+        <button
+          type="button"
+          aria-pressed={!unattachedOnly}
+          className={`rounded-full px-2 py-0.5 text-xs ${
+            !unattachedOnly
+              ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+              : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+          }`}
+          onClick={() => setUnattachedOnly(false)}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          aria-pressed={unattachedOnly}
+          className={`rounded-full px-2 py-0.5 text-xs ${
+            unattachedOnly
+              ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+              : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+          }`}
+          onClick={() => setUnattachedOnly(true)}
+        >
+          Unattached
+        </button>
       </div>
       {showImport && canManage ? (
         <article className="mb-4 rounded border border-md-sys-color-outline-variant p-3">
