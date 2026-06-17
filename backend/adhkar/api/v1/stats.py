@@ -477,3 +477,36 @@ async def cases_by_assignee(
         )
     buckets.sort(key=lambda b: (-b.open_count, -b.closed_count))
     return CasesByAssigneeResponse(entries=buckets)
+
+
+class AlertSourceBucket(BaseModel):
+    source: str
+    count: int
+
+
+class AlertSourcesResponse(BaseModel):
+    entries: list[AlertSourceBucket]
+
+
+@router.get("/alerts-by-source", response_model=AlertSourcesResponse)
+async def alerts_by_source(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=10, ge=1, le=50),
+) -> AlertSourcesResponse:
+    """Counts of alerts grouped by `source` (e.g. splunk, sentinel,
+    custom). Ordered count DESC, top-N. Helps spot ingest pipelines
+    that are noisier than expected."""
+    rows = (
+        await db.execute(
+            select(Alert.source, func.count().label("n"))
+            .where(Alert.organization_id == org_id)
+            .group_by(Alert.source)
+            .order_by(func.count().desc(), Alert.source)
+            .limit(limit)
+        )
+    ).all()
+    return AlertSourcesResponse(
+        entries=[AlertSourceBucket(source=str(r[0]), count=int(r[1])) for r in rows]
+    )
