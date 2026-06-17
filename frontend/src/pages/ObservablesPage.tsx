@@ -204,6 +204,27 @@ export function ObservablesPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h1 className="text-2xl font-semibold">Observables</h1>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+            onClick={() => {
+              const p = new URLSearchParams();
+              if (filterType.trim()) p.set("data_type", filterType.trim());
+              if (filterTag.trim()) p.set("tag", filterTag.trim());
+              if (filterIoc) p.set("is_ioc", filterIoc);
+              if (filterSighted) p.set("sighted", filterSighted);
+              if (filterTlp) p.set("tlp", filterTlp);
+              const qs = p.toString();
+              const url = `${window.location.origin}/observables${qs ? `?${qs}` : ""}`;
+              navigator.clipboard
+                .writeText(url)
+                .then(() => toast.success("Link copied."))
+                .catch(() => toast.error("Clipboard unavailable."));
+            }}
+            title="Copy a link to this filtered view"
+          >
+            Copy URL
+          </button>
           {canManage ? (
             <button
               type="button"
