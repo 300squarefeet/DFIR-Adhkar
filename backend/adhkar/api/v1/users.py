@@ -474,32 +474,39 @@ async def user_recent_activity(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 25,
+    days: int | None = None,
+    entity_type: str | None = None,
 ) -> list[UserActivityRow]:
     """Last N audit events authored by this user in the current org.
     Shortcut for the admin user-detail view; saves crafting an
-    /v1/audit?actor_user_id=… URL by hand."""
-    from datetime import datetime as _dt  # noqa: F401
+    /v1/audit?actor_user_id=… URL by hand. Optional `days=N` (1..365)
+    restricts the window to the last N days; `entity_type=<name>`
+    scopes to one entity family (case/alert/task/observable/etc)."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
 
     from sqlalchemy import desc as _desc
 
     from adhkar.db.models import AuditLog as _AuditLog
 
     safe_limit = max(1, min(200, int(limit)))
-    rows = (
-        (
-            await db.execute(
-                select(_AuditLog)
-                .where(
-                    _AuditLog.organization_id == org_id,
-                    _AuditLog.actor_user_id == user_id,
-                )
-                .order_by(_desc(_AuditLog.created_at))
-                .limit(safe_limit)
-            )
+    stmt = (
+        select(_AuditLog)
+        .where(
+            _AuditLog.organization_id == org_id,
+            _AuditLog.actor_user_id == user_id,
         )
-        .scalars()
-        .all()
+        .order_by(_desc(_AuditLog.created_at))
+        .limit(safe_limit)
     )
+    if days is not None:
+        bounded = max(1, min(365, int(days)))
+        cutoff = _dt.now(tz=_UTC) - _td(days=bounded)
+        stmt = stmt.where(_AuditLog.created_at >= cutoff)
+    if entity_type is not None:
+        stmt = stmt.where(_AuditLog.entity_type == entity_type)
+    rows = (await db.execute(stmt)).scalars().all()
     return [
         UserActivityRow(
             id=r.id,
