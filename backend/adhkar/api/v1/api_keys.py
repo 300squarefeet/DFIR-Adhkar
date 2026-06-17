@@ -69,16 +69,20 @@ def _to_dto(k: ApiKey) -> ApiKeyDTO:
 async def list_my_keys(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    include_revoked: bool = False,
+    unused: bool | None = None,
 ) -> list[ApiKeyDTO]:
-    rows = (
-        (
-            await db.execute(
-                select(ApiKey).where(ApiKey.user_id == user.user_id, ApiKey.revoked_at.is_(None))
-            )
-        )
-        .scalars()
-        .all()
-    )
+    """List the caller's API keys. `include_revoked=true` returns the
+    full audit set (default hides revoked); `unused=true` keeps only
+    keys whose last_used_at is null — useful for a key-cleanup nudge."""
+    stmt = select(ApiKey).where(ApiKey.user_id == user.user_id)
+    if not include_revoked:
+        stmt = stmt.where(ApiKey.revoked_at.is_(None))
+    if unused is True:
+        stmt = stmt.where(ApiKey.last_used_at.is_(None))
+    elif unused is False:
+        stmt = stmt.where(ApiKey.last_used_at.is_not(None))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(k) for k in rows]
 
 
