@@ -102,24 +102,29 @@ async def list_recent_kb_pages(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 10,
+    tag: str | None = None,
+    pinned: bool | None = None,
 ) -> list[KbPageDTO]:
     """N most-recently-updated KB pages (`updated_at` DESC, default 10,
-    cap 50). Mirrors /v1/cases/recent + /v1/alerts/recent +
-    /v1/tasks/recent + /v1/observables/recent for symmetry. Useful
-    for a "Recently edited runbooks" widget."""
+    cap 50). Optional `tag=<name>` keeps only pages whose tags array
+    contains that exact tag; `pinned=true` keeps only pinned pages.
+    Mirrors /v1/cases/recent + /v1/alerts/recent + /v1/tasks/recent +
+    /v1/observables/recent for symmetry. Useful for a "Recently edited
+    runbooks" widget."""
     safe_limit = max(1, min(50, int(limit)))
-    rows = (
-        (
-            await db.execute(
-                select(KnowledgeBasePage)
-                .where(KnowledgeBasePage.organization_id == org_id)
-                .order_by(KnowledgeBasePage.updated_at.desc())
-                .limit(safe_limit)
-            )
-        )
-        .scalars()
-        .all()
+    stmt = (
+        select(KnowledgeBasePage)
+        .where(KnowledgeBasePage.organization_id == org_id)
+        .order_by(KnowledgeBasePage.updated_at.desc())
+        .limit(safe_limit)
     )
+    if tag is not None:
+        stmt = stmt.where(KnowledgeBasePage.tags.contains([tag]))
+    if pinned is True:
+        stmt = stmt.where(KnowledgeBasePage.pinned.is_(True))
+    elif pinned is False:
+        stmt = stmt.where(KnowledgeBasePage.pinned.is_(False))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_kb_dto(p) for p in rows]
 
 
