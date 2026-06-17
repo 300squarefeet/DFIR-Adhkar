@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
 import { AuditActivityPanel } from "@/ui/AuditActivityPanel";
+import { AuditNoisePanel } from "@/ui/AuditNoisePanel";
 import { CasesByAssigneePanel } from "@/ui/CasesByAssigneePanel";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { ObservableTlpPanel } from "@/ui/ObservableTlpPanel";
@@ -308,6 +309,7 @@ export function DashboardPage() {
       <AlertStatusPanel />
       <AuditActivityPanel />
       <CasesByAssigneePanel />
+      <AuditNoisePanel />
     </section>
   );
 }
