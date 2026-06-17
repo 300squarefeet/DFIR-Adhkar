@@ -30,6 +30,7 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/case-templates", label: "Case Templates", icon: "library_books" },
   { to: "/admin/gdpr", label: "Admin · GDPR", icon: "shield_person" },
   { to: "/admin/audit", label: "Admin · Audit", icon: "history" },
+  { to: "/admin/notification-deliveries", label: "Admin · Deliveries", icon: "send" },
   { to: "/admin/taxonomies", label: "Admin · Taxonomies", icon: "category" },
   { to: "/portal", label: "Portal", icon: "groups" },
 ];
