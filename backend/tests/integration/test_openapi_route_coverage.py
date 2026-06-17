@@ -34,6 +34,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/users",
     "/v1/users/search",
     "/v1/users/invite",
+    "/v1/users/{user_id}/recent-activity",
     "/v1/organizations",
     "/v1/profiles",
     "/v1/me/api-keys",
