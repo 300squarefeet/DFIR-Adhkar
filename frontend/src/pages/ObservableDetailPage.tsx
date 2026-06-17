@@ -152,6 +152,15 @@ export function ObservableDetailPage({ observableId }: Props) {
             {obs.data_type}
           </span>
           <h1 className="break-all font-mono text-lg font-semibold">{obs.data}</h1>
+          {permissions.has("viewAudit") ? (
+            <a
+              href={`/admin/audit?entity_type=observable&entity_id=${observableId}`}
+              className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              title="Audit trail for this observable"
+            >
+              Audit trail
+            </a>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <TLPBadge tlp={obs.tlp} />

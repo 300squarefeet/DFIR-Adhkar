@@ -132,6 +132,15 @@ export function AlertDetailPage({ alertId }: Props) {
             {alert.source}/{alert.source_ref}
           </span>
           <h1 className="text-2xl font-semibold">{alert.title}</h1>
+          {permissions.has("viewAudit") ? (
+            <a
+              href={`/admin/audit?entity_type=alert&entity_id=${alertId}`}
+              className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              title="Audit trail for this alert"
+            >
+              Audit trail
+            </a>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SeverityBadge level={alert.severity} />
