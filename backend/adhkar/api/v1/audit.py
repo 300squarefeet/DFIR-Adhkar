@@ -38,7 +38,7 @@ class AuditLogDTO(BaseModel):
 
 @router.get("", response_model=list[AuditLogDTO])
 async def list_audit(
-    _user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
+    user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(100, ge=1, le=500),
@@ -47,10 +47,14 @@ async def list_audit(
     entity_id: UUID | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
+    me: bool | None = None,
     ip: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> list[AuditLogDTO]:
+    """`me=true` is a shorthand for actor_user_id=<current user>."""
+    if me is True:
+        actor_user_id = user.user_id
     stmt = (
         select(AuditLog)
         .where(AuditLog.organization_id == org_id)
