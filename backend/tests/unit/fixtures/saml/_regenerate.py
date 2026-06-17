@@ -16,7 +16,6 @@ in CI.
 
 from __future__ import annotations
 
-import base64
 import pathlib
 import subprocess
 import tempfile
@@ -141,14 +140,6 @@ def _sign_with_xmlsec1(
         pathlib.Path(out_path).unlink(missing_ok=True)
 
 
-def _cert_b64(cert_pem: bytes) -> str:
-    return base64.b64encode(
-        cert_pem.replace(b"-----BEGIN CERTIFICATE-----", b"")
-        .replace(b"-----END CERTIFICATE-----", b"")
-        .replace(b"\n", b"")
-    ).decode()
-
-
 def _build_response_xml(
     *,
     assertion_id: str,
@@ -199,7 +190,14 @@ def _build_response_xml(
 
 
 def _idp_metadata_xml(cert_pem: bytes) -> str:
-    b64_cert = _cert_b64(cert_pem)
+    # PEM body between BEGIN/END markers IS already the base64 of the DER cert.
+    # SAML metadata expects exactly that single-base64 string in <ds:X509Certificate>.
+    b64_cert = (
+        cert_pem.replace(b"-----BEGIN CERTIFICATE-----", b"")
+        .replace(b"-----END CERTIFICATE-----", b"")
+        .replace(b"\n", b"")
+        .decode()
+    )
     return f"""<?xml version="1.0"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
                      xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
