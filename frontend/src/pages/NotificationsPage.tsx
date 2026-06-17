@@ -105,8 +105,15 @@ export function NotificationsPage() {
               >
                 <span className="font-mono text-xs uppercase">{e.kind}</span>
                 <span>{e.name}</span>
+                <a
+                  href={`/admin/notification-deliveries?endpoint_id=${e.id}`}
+                  className="ml-auto text-xs text-md-sys-color-primary hover:underline"
+                  title="See dispatcher attempts for this endpoint"
+                >
+                  Deliveries →
+                </a>
                 {!e.enabled ? (
-                  <span className="ml-auto text-xs text-md-sys-color-on-surface-variant">
+                  <span className="text-xs text-md-sys-color-on-surface-variant">
                     disabled
                   </span>
                 ) : null}
@@ -160,6 +167,13 @@ export function NotificationsPage() {
                       disabled
                     </span>
                   ) : null}
+                  <a
+                    href={`/admin/notification-deliveries?rule_id=${r.id}`}
+                    className="ml-auto text-xs text-md-sys-color-primary hover:underline"
+                    title="See dispatcher attempts triggered by this rule"
+                  >
+                    Deliveries →
+                  </a>
                 </div>
                 {r.description ? (
                   <p className="text-xs text-md-sys-color-on-surface-variant">
