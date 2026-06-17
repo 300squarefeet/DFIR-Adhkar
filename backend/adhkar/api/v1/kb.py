@@ -457,3 +457,57 @@ async def apply_template(
         )
     await db.flush()
     return {"case_id": str(case.id), "case_number": case.number}
+
+
+class CaseTemplateCloneRequest(BaseModel):
+    new_name: str = Field(min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-_]*$")
+    new_display_name: str | None = Field(default=None, max_length=300)
+
+
+@router.post(
+    "/v1/case-templates/{template_id}/clone",
+    response_model=CaseTemplateDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+async def clone_case_template(
+    template_id: UUID,
+    body: CaseTemplateCloneRequest,
+    user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CaseTemplateDTO:
+    """Clone a case template under a new `new_name`. Display name defaults
+    to the source display_name + ' (copy)' when not provided. All other
+    fields (severity, TLP, tags, tasks, custom_fields, title_prefix,
+    description, summary) are copied as-is. 409 on name collision."""
+    src = (
+        await db.execute(
+            select(CaseTemplate).where(
+                CaseTemplate.id == template_id, CaseTemplate.organization_id == org_id
+            )
+        )
+    ).scalar_one_or_none()
+    if not src:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "template_not_found")
+    clone = CaseTemplate(
+        organization_id=org_id,
+        name=body.new_name,
+        display_name=body.new_display_name or f"{src.display_name} (copy)",
+        title_prefix=src.title_prefix,
+        severity=src.severity,
+        tlp=src.tlp,
+        pap=src.pap,
+        tags=list(src.tags),
+        description=src.description,
+        summary=src.summary,
+        tasks=list(src.tasks),
+        custom_fields=dict(src.custom_fields),
+        created_by=user.user_id,
+    )
+    db.add(clone)
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "template_name_taken") from e
+    return _template_dto(clone)
