@@ -9,7 +9,8 @@ IdP metadata document that lists the valid IdP cert, and seven
 SAMLResponse XML documents (signed or unsigned) covering each
 verifier rejection branch.
 
-Idempotent: produces byte-identical output for a given input. Commit
+Non-deterministic: each run mints fresh RSA keys and serial numbers
+from os.urandom, so output bytes differ between runs. Commit
 the resulting .pem and .xml files alongside this script. Do NOT run
 in CI.
 """
