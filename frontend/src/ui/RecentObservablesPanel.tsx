@@ -17,6 +17,8 @@ interface RecentObservable {
   updated_at: string;
 }
 
+const DATA_TYPES = ["ip", "domain", "url", "hash", "email", "filename"];
+
 function formatAge(deltaMs: number): string {
   const minutes = deltaMs / 60_000;
   const hours = minutes / 60;
@@ -30,11 +32,16 @@ export function RecentObservablesPanel() {
   const apiCall = ctx?.apiCall;
   const [data, setData] = useState<RecentObservable[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dataTypeFilter, setDataTypeFilter] = useState<string>("");
 
   useEffect(() => {
     if (!apiCall) return;
     let cancelled = false;
-    apiCall<RecentObservable[]>("/v1/observables/recent?limit=10&is_ioc=true")
+    const url =
+      dataTypeFilter === ""
+        ? "/v1/observables/recent?limit=10&is_ioc=true"
+        : `/v1/observables/recent?limit=10&is_ioc=true&data_type=${encodeURIComponent(dataTypeFilter)}`;
+    apiCall<RecentObservable[]>(url)
       .then((r) => {
         if (!cancelled) setData(r);
       })
@@ -44,15 +51,39 @@ export function RecentObservablesPanel() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall]);
+  }, [apiCall, dataTypeFilter]);
 
   if (!apiCall) return null;
 
+  const chipBase = "rounded-full px-2 py-0.5 text-xs";
+  const chipActive = "bg-md-sys-color-primary text-md-sys-color-on-primary";
+  const chipInactive =
+    "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container";
+
   return (
     <article className="mb-4 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-3">
-      <header className="mb-2 flex items-center gap-2 text-sm">
+      <header className="mb-2 flex flex-wrap items-center gap-2 text-sm">
         <h2 className="font-medium">Recent IOCs</h2>
         <span className="text-xs text-md-sys-color-on-surface-variant">confirmed IOCs, last updated</span>
+        <div className="ml-auto flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setDataTypeFilter("")}
+            className={`${chipBase} ${dataTypeFilter === "" ? chipActive : chipInactive}`}
+          >
+            All
+          </button>
+          {DATA_TYPES.map((dt) => (
+            <button
+              key={dt}
+              type="button"
+              onClick={() => setDataTypeFilter(dt)}
+              className={`${chipBase} ${dataTypeFilter === dt ? chipActive : chipInactive}`}
+            >
+              {dt}
+            </button>
+          ))}
+        </div>
       </header>
       {error !== null ? (
         <p className="text-xs text-md-sys-color-on-surface-variant">{error}</p>
