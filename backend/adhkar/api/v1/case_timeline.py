@@ -50,7 +50,12 @@ async def case_timeline(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 200,
+    since: datetime | None = None,
+    action: str | None = None,
 ) -> TimelineResponse:
+    """Audit-log derived timeline. `since=<ISO>` keeps only entries
+    created at or after the cursor; `action=<name>` scopes to one
+    audit action (e.g. `commented`, `task_completed`)."""
     safe_limit = max(1, min(500, int(limit)))
     case = (
         await db.execute(
@@ -80,6 +85,10 @@ async def case_timeline(
         .order_by(desc(AuditLog.created_at))
         .limit(safe_limit)
     )
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at >= since)
+    if action is not None:
+        stmt = stmt.where(AuditLog.action == action)
     rows = (await db.execute(stmt)).scalars().all()
     return TimelineResponse(
         case_id=case_id,
