@@ -8,6 +8,7 @@ in pysaml2-backed verification)."""
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 from urllib.parse import urlencode
 
@@ -17,7 +18,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adhkar.api.deps import get_db
+from adhkar.api.deps import get_db, get_redis
 from adhkar.auth.oidc import new_nonce, sign_state, verify_state
 from adhkar.auth.saml import SamlProviderConfig, load_saml_providers
 from adhkar.auth.saml_errors import (
@@ -33,6 +34,8 @@ from adhkar.core.settings import Settings, get_settings
 from adhkar.db.models import User
 
 router = APIRouter(prefix="/v1/auth/saml", tags=["auth-saml"])
+
+_log = logging.getLogger(__name__)
 
 
 def _provider_or_404(settings: Settings, name: str) -> SamlProviderConfig:
@@ -65,6 +68,7 @@ async def acs(
     provider: str,
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[redis_async.Redis, Depends(get_redis)],  # type: ignore[type-arg]
     SAMLResponse: Annotated[str, Form()],  # noqa: N803  SAML spec name
     RelayState: Annotated[str, Form()] = "",  # noqa: N803  SAML spec name
 ) -> dict[str, Any]:
@@ -81,31 +85,26 @@ async def acs(
     if verifier is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "saml_metadata_unavailable")
 
-    redis_url = str(settings.redis_url)
-    redis_client = redis_async.from_url(redis_url, decode_responses=False)
     try:
-        try:
-            claims = await verifier.verify_and_extract(SAMLResponse, redis=redis_client)
-        except SamlSignatureError as e:
-            await _audit_failed(db, provider, "signature_invalid", e.reason, request)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "signature_invalid") from e
-        except SamlTimingError as e:
-            await _audit_failed(db, provider, "assertion_expired", e.reason, request)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "assertion_expired") from e
-        except SamlAudienceError as e:
-            await _audit_failed(db, provider, "audience_mismatch", e.reason, request)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "audience_mismatch") from e
-        except SamlRecipientError as e:
-            await _audit_failed(db, provider, "recipient_mismatch", e.reason, request)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "recipient_mismatch") from e
-        except SamlReplayError as e:
-            await _audit_failed(db, provider, "assertion_replayed", e.reason, request)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "assertion_replayed") from e
-        except SamlConfigError as e:
-            await _audit_failed(db, provider, "saml_misconfigured", e.reason, request)
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "saml_misconfigured") from e
-    finally:
-        await redis_client.aclose()  # type: ignore[attr-defined]
+        claims = await verifier.verify_and_extract(SAMLResponse, redis=redis)
+    except SamlSignatureError as e:
+        await _audit_failed(db, provider, "signature_invalid", e.reason, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "signature_invalid") from e
+    except SamlTimingError as e:
+        await _audit_failed(db, provider, "assertion_expired", e.reason, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "assertion_expired") from e
+    except SamlAudienceError as e:
+        await _audit_failed(db, provider, "audience_mismatch", e.reason, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "audience_mismatch") from e
+    except SamlRecipientError as e:
+        await _audit_failed(db, provider, "recipient_mismatch", e.reason, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "recipient_mismatch") from e
+    except SamlReplayError as e:
+        await _audit_failed(db, provider, "assertion_replayed", e.reason, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "assertion_replayed") from e
+    except SamlConfigError as e:
+        await _audit_failed(db, provider, "saml_misconfigured", e.reason, request)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "saml_misconfigured") from e
 
     email = (claims.email or claims.name_id or "").strip()
     if not email:
@@ -151,17 +150,25 @@ async def _audit_failed(
 ) -> None:
     from adhkar.audit import audit_and_emit
 
-    await audit_and_emit(
-        db,
-        actor_user_id=None,
-        organization_id=None,
-        action="saml_verify_failed",
-        entity_type="user",
-        entity_id=None,
-        diff={
-            "provider": provider,
-            "code": code,
-            "reason": reason,
-            "source_ip": (request.client.host if request.client else None),
-        },
-    )
+    try:
+        await audit_and_emit(
+            db,
+            actor_user_id=None,
+            organization_id=None,
+            action="saml_verify_failed",
+            entity_type="user",
+            entity_id=None,
+            diff={
+                "provider": provider,
+                "code": code,
+                "reason": reason,
+                "source_ip": (request.client.host if request.client else None),
+            },
+        )
+    except Exception:
+        _log.exception(
+            "saml_audit_emit_failed provider=%s code=%s reason=%s",
+            provider,
+            code,
+            reason,
+        )
