@@ -545,11 +545,13 @@ async def alert_timeline(
     limit: int = 100,
     since: datetime | None = None,
     action: str | None = None,
+    entity_type: str | None = None,
 ) -> AlertTimelineResponse:
     """Per-alert audit feed: direct entity_type='alert' rows + any audit
     row whose diff JSON references this alert id (covers e.g. responder
     invocations that target the alert). Optional `since=<ISO>` and
-    `action=<name>` mirror the RC192 case-timeline filter surface."""
+    `action=<name>` mirror the RC192 case-timeline filter surface;
+    `entity_type=<name>` (RC205) scopes to one entity family."""
     from sqlalchemy import Text, or_
 
     a = (
@@ -579,6 +581,8 @@ async def alert_timeline(
         stmt = stmt.where(AuditLog.created_at >= since)
     if action is not None:
         stmt = stmt.where(AuditLog.action == action)
+    if entity_type is not None:
+        stmt = stmt.where(AuditLog.entity_type == entity_type)
     rows = (await db.execute(stmt)).scalars().all()
     return AlertTimelineResponse(
         alert_id=alert_id,
