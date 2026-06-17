@@ -1029,23 +1029,26 @@ export function CaseDetailPage({ caseId }: Props) {
                       </ul>
                     )}
                     {permissions.has("manageTask") ? (
-                      <div className="flex gap-2">
-                        <input
-                          className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
-                          placeholder="Add log entry…"
+                      <div className="flex flex-col gap-1">
+                        <MentionTextarea
                           value={logDraft}
-                          onChange={(e) => setLogDraft(e.target.value)}
+                          onChange={setLogDraft}
+                          rows={2}
+                          placeholder="Add log entry… (type @ to mention)"
+                          className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
                         />
-                        <button
-                          type="button"
-                          className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-md-sys-color-on-primary disabled:opacity-50"
-                          onClick={() => {
-                            void postTaskLog(t.id);
-                          }}
-                          disabled={postingLog || !logDraft.trim()}
-                        >
-                          {postingLog ? "…" : "Post"}
-                        </button>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-[10px] text-md-sys-color-on-primary disabled:opacity-50"
+                            onClick={() => {
+                              void postTaskLog(t.id);
+                            }}
+                            disabled={postingLog || !logDraft.trim()}
+                          >
+                            {postingLog ? "…" : "Post"}
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                   </div>

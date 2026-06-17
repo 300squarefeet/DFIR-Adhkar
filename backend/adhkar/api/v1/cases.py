@@ -546,6 +546,19 @@ async def add_task_log(
     log = TaskLog(task_id=task_id, author_id=user.user_id, content=body.content)
     db.add(log)
     await db.flush()
+    from adhkar.services.mentions import emit_mentions
+
+    await emit_mentions(
+        db,
+        org_id=org_id,
+        actor_user_id=user.user_id,
+        content=body.content,
+        extra_diff={
+            "task_id": str(task_id),
+            "case_id": str(t.case_id),
+            "task_log_id": str(log.id),
+        },
+    )
     return TaskLogDTO(
         id=log.id,
         task_id=log.task_id,
