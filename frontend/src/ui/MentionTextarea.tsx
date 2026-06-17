@@ -18,6 +18,7 @@ interface UserHit {
 interface Props {
   value: string;
   onChange: (next: string) => void;
+  onSubmit?: () => void;
   rows?: number;
   placeholder?: string;
   className?: string;
@@ -28,6 +29,7 @@ const TRIGGER_RE = /(?:^|\s)@([A-Za-z0-9_.-]{1,40})$/;
 export function MentionTextarea({
   value,
   onChange,
+  onSubmit,
   rows = 3,
   placeholder,
   className,
@@ -99,6 +101,12 @@ export function MentionTextarea({
         onChange={(e) =>
           handleChange(e.target.value, e.target.selectionStart ?? e.target.value.length)
         }
+        onKeyDown={(e) => {
+          if (onSubmit && (e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
         onKeyUp={(e) => {
           const ta = e.currentTarget;
           setCursor(ta.selectionStart ?? ta.value.length);
