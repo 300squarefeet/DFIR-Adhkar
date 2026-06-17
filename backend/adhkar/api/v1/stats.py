@@ -160,6 +160,7 @@ class MttrBucket(BaseModel):
 class MttrResponse(BaseModel):
     window_days: int
     buckets: list[MttrBucket]
+    prior_buckets: list[MttrBucket]
 
 
 @router.get("/case-mttr", response_model=MttrResponse)
@@ -170,43 +171,52 @@ async def case_mttr(
     days: int = Query(default=30, ge=1, le=365),
 ) -> MttrResponse:
     """Mean-time-to-resolution per severity bucket for cases closed in the
-    last `days` days. Hours = end_date - created_at. Median is computed
-    in Python so we stay portable across PG versions; bucket sizes stay
-    small (cap N per severity at the dialect default for percentile)."""
-    since = datetime.now(tz=UTC) - timedelta(days=days)
-    rows = (
-        await db.execute(
-            select(Case.severity, Case.created_at, Case.end_date).where(
-                Case.organization_id == org_id,
-                Case.deleted_at.is_(None),
-                Case.stage == "closed",
-                Case.end_date.is_not(None),
-                Case.end_date >= since,
+    last `days` days, plus a `prior_buckets` slice covering the equally-sized
+    previous window so the UI can render trend arrows. Hours = end_date -
+    created_at. Median is computed in Python (portable across PG versions)."""
+    now = datetime.now(tz=UTC)
+    current_since = now - timedelta(days=days)
+    prior_since = now - timedelta(days=days * 2)
+
+    async def _slice(start: datetime, end: datetime) -> list[MttrBucket]:
+        rows = (
+            await db.execute(
+                select(Case.severity, Case.created_at, Case.end_date).where(
+                    Case.organization_id == org_id,
+                    Case.deleted_at.is_(None),
+                    Case.stage == "closed",
+                    Case.end_date.is_not(None),
+                    Case.end_date >= start,
+                    Case.end_date < end,
+                )
             )
-        )
-    ).all()
-    by_sev: dict[int, list[float]] = {1: [], 2: [], 3: [], 4: []}
-    for sev, created_at, end_date in rows:
-        hrs = (end_date - created_at).total_seconds() / 3600.0
-        if hrs >= 0 and sev in by_sev:
-            by_sev[sev].append(hrs)
-    buckets: list[MttrBucket] = []
-    for sev in (1, 2, 3, 4):
-        xs = sorted(by_sev[sev])
-        n = len(xs)
-        if n == 0:
-            buckets.append(
-                MttrBucket(severity=sev, closed_count=0, median_hours=None, mean_hours=None)
+        ).all()
+        by_sev: dict[int, list[float]] = {1: [], 2: [], 3: [], 4: []}
+        for sev, created_at, end_date in rows:
+            hrs = (end_date - created_at).total_seconds() / 3600.0
+            if hrs >= 0 and sev in by_sev:
+                by_sev[sev].append(hrs)
+        out: list[MttrBucket] = []
+        for sev in (1, 2, 3, 4):
+            xs = sorted(by_sev[sev])
+            n = len(xs)
+            if n == 0:
+                out.append(
+                    MttrBucket(severity=sev, closed_count=0, median_hours=None, mean_hours=None)
+                )
+                continue
+            median = xs[n // 2] if n % 2 == 1 else (xs[n // 2 - 1] + xs[n // 2]) / 2
+            mean = sum(xs) / n
+            out.append(
+                MttrBucket(
+                    severity=sev,
+                    closed_count=n,
+                    median_hours=round(median, 2),
+                    mean_hours=round(mean, 2),
+                )
             )
-            continue
-        median = xs[n // 2] if n % 2 == 1 else (xs[n // 2 - 1] + xs[n // 2]) / 2
-        mean = sum(xs) / n
-        buckets.append(
-            MttrBucket(
-                severity=sev,
-                closed_count=n,
-                median_hours=round(median, 2),
-                mean_hours=round(mean, 2),
-            )
-        )
-    return MttrResponse(window_days=days, buckets=buckets)
+        return out
+
+    current = await _slice(current_since, now)
+    prior = await _slice(prior_since, current_since)
+    return MttrResponse(window_days=days, buckets=current, prior_buckets=prior)

@@ -17,6 +17,39 @@ interface MttrBucket {
 interface MttrResponse {
   window_days: number;
   buckets: MttrBucket[];
+  prior_buckets?: MttrBucket[];
+}
+
+interface Trend {
+  arrow: "↓" | "↑" | "→";
+  pct: string;
+  tone: string;
+  title: string;
+}
+
+function trendFor(
+  current: number | null,
+  prior: number | null,
+): Trend | null {
+  if (current === null || prior === null || prior === 0) return null;
+  const diff = current - prior;
+  if (Math.abs(diff) < 0.05) {
+    return {
+      arrow: "→",
+      pct: "0%",
+      tone: "text-md-sys-color-on-surface-variant",
+      title: `unchanged vs prior window (${prior.toFixed(1)}h)`,
+    };
+  }
+  const pct = (diff / prior) * 100;
+  // For MTTR, less is better — improvement is a downward arrow.
+  const improved = diff < 0;
+  return {
+    arrow: improved ? "↓" : "↑",
+    pct: `${Math.abs(pct).toFixed(0)}%`,
+    tone: improved ? "text-tlp-green" : "text-severity-3",
+    title: `${improved ? "down" : "up"} vs prior window (${prior.toFixed(1)}h)`,
+  };
 }
 
 const SEV_LABEL: Record<number, string> = {
@@ -84,26 +117,42 @@ export function MttrBreakdownPanel() {
         <p className="text-xs text-md-sys-color-on-surface-variant">Loading…</p>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-          {data.buckets.map((b) => (
-            <div
-              key={b.severity}
-              className="rounded border border-md-sys-color-outline-variant/60 p-2"
-            >
+          {data.buckets.map((b) => {
+            const prior =
+              data.prior_buckets?.find((p) => p.severity === b.severity) ??
+              null;
+            const trend = trendFor(b.median_hours, prior?.median_hours ?? null);
+            return (
               <div
-                className={
-                  "text-xl font-semibold " + (SEV_TONE[b.severity] ?? "")
-                }
+                key={b.severity}
+                className="rounded border border-md-sys-color-outline-variant/60 p-2"
               >
-                {formatHours(b.median_hours)}
+                <div className="flex items-baseline gap-1">
+                  <div
+                    className={
+                      "text-xl font-semibold " + (SEV_TONE[b.severity] ?? "")
+                    }
+                  >
+                    {formatHours(b.median_hours)}
+                  </div>
+                  {trend ? (
+                    <span
+                      className={"text-xs " + trend.tone}
+                      title={trend.title}
+                    >
+                      {trend.arrow} {trend.pct}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="text-xs text-md-sys-color-on-surface-variant">
+                  {SEV_LABEL[b.severity] ?? `S${b.severity}`} · median
+                </div>
+                <div className="text-[10px] text-md-sys-color-on-surface-variant">
+                  mean {formatHours(b.mean_hours)} · n={b.closed_count}
+                </div>
               </div>
-              <div className="text-xs text-md-sys-color-on-surface-variant">
-                {SEV_LABEL[b.severity] ?? `S${b.severity}`} · median
-              </div>
-              <div className="text-[10px] text-md-sys-color-on-surface-variant">
-                mean {formatHours(b.mean_hours)} · n={b.closed_count}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </article>
