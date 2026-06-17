@@ -160,6 +160,54 @@ async def patch_kb_page(
     return _kb_dto(p)
 
 
+class KbPageCloneRequest(BaseModel):
+    new_slug: str = Field(min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-_]*$")
+    new_title: str | None = Field(default=None, max_length=300)
+
+
+@router.post(
+    "/v1/kb/pages/{page_id}/clone",
+    response_model=KbPageDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+async def clone_kb_page(
+    page_id: UUID,
+    body: KbPageCloneRequest,
+    user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> KbPageDTO:
+    """Clone an existing runbook to `new_slug`. Pinned flag is reset to
+    False on the clone (analyst can re-pin if it replaces the original).
+    Title defaults to the source title + ' (copy)' when not provided."""
+    src = (
+        await db.execute(
+            select(KnowledgeBasePage).where(
+                KnowledgeBasePage.id == page_id,
+                KnowledgeBasePage.organization_id == org_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not src:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "page_not_found")
+    clone = KnowledgeBasePage(
+        organization_id=org_id,
+        slug=body.new_slug,
+        title=body.new_title or f"{src.title} (copy)",
+        content=src.content,
+        tags=list(src.tags),
+        pinned=False,
+        created_by=user.user_id,
+    )
+    db.add(clone)
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "slug_already_exists") from e
+    return _kb_dto(clone)
+
+
 @router.delete("/v1/kb/pages/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_kb_page(
     page_id: UUID,
