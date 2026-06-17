@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -100,6 +101,78 @@ def _alert_dto(a: Alert) -> AlertDTO:
         imported_at=a.imported_at,
         created_at=a.created_at,
         updated_at=a.updated_at,
+    )
+
+
+@router.get(
+    "/export-csv",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def export_alerts_csv(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    alert_status: STATUS | None = None,
+    source: str | None = None,
+    severity: int | None = None,
+    tag: str | None = None,
+    unpromoted: bool | None = None,
+) -> PlainTextResponse:
+    """CSV dump of alerts in the current org. Same filter surface as the
+    list endpoint so a saved view can be exported in place."""
+    import csv
+    import io
+
+    stmt = select(Alert).where(Alert.organization_id == org_id)
+    if alert_status:
+        stmt = stmt.where(Alert.status == alert_status)
+    if source:
+        stmt = stmt.where(Alert.source == source)
+    if severity is not None:
+        stmt = stmt.where(Alert.severity == severity)
+    if tag:
+        stmt = stmt.where(Alert.tags.contains([tag]))
+    if unpromoted is True:
+        stmt = stmt.where(Alert.case_id.is_(None))
+    elif unpromoted is False:
+        stmt = stmt.where(Alert.case_id.is_not(None))
+    rows = (await db.execute(stmt.order_by(Alert.created_at.desc()))).scalars().all()
+    buf = io.StringIO()
+    w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    w.writerow(
+        [
+            "type",
+            "source",
+            "source_ref",
+            "title",
+            "severity",
+            "tlp",
+            "status",
+            "case_id",
+            "tags",
+            "created_at",
+        ]
+    )
+    for a in rows:
+        w.writerow(
+            [
+                a.type,
+                a.source,
+                a.source_ref,
+                a.title,
+                a.severity,
+                a.tlp,
+                a.status,
+                str(a.case_id) if a.case_id else "",
+                ",".join(a.tags),
+                a.created_at.isoformat(),
+            ]
+        )
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="adhkar-alerts.csv"'},
     )
 
 

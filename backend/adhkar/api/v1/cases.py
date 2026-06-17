@@ -247,6 +247,76 @@ async def create_case(
 
 
 @router.get(
+    "/v1/tasks/export-csv",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def export_tasks_csv(
+    user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    assignee_id: UUID | None = None,
+    status_filter: TASK_STATUS | None = None,
+    mandatory: bool | None = None,
+    overdue: bool | None = None,
+    mine: bool | None = None,
+) -> PlainTextResponse:
+    """CSV dump matching GET /v1/tasks filter surface."""
+    import csv  # noqa: PLC0415
+    import io  # noqa: PLC0415
+
+    stmt = select(Task).where(Task.organization_id == org_id)
+    if mine is True:
+        stmt = stmt.where(Task.assignee_id == user.user_id)
+    elif assignee_id:
+        stmt = stmt.where(Task.assignee_id == assignee_id)
+    if status_filter:
+        stmt = stmt.where(Task.status == status_filter)
+    if mandatory is not None:
+        stmt = stmt.where(Task.mandatory == mandatory)
+    if overdue is True:
+        stmt = stmt.where(
+            Task.due_date.is_not(None),
+            Task.due_date < datetime.now(tz=UTC),
+            Task.status.notin_(("Completed", "Cancelled")),
+        )
+    stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc())
+    rows = (await db.execute(stmt)).scalars().all()
+    buf = io.StringIO()
+    w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    w.writerow(
+        [
+            "case_id",
+            "title",
+            "status",
+            "assignee_id",
+            "due_date",
+            "mandatory",
+            "group",
+            "created_at",
+        ]
+    )
+    for t in rows:
+        w.writerow(
+            [
+                str(t.case_id),
+                t.title,
+                t.status,
+                str(t.assignee_id) if t.assignee_id else "",
+                t.due_date.isoformat() if t.due_date else "",
+                "true" if t.mandatory else "false",
+                t.group or "",
+                t.created_at.isoformat(),
+            ]
+        )
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="adhkar-tasks.csv"'},
+    )
+
+
+@router.get(
     "/v1/cases/export-csv",
     response_class=PlainTextResponse,
     responses={200: {"content": {"text/csv": {}}}},
