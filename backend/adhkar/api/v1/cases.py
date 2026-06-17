@@ -302,11 +302,16 @@ async def list_related_cases(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    relation: str | None = None,
+    stage: str | None = None,
+    open_only: bool | None = None,
 ) -> list[RelatedCaseRow]:
     """Cases linked to this one via CaseLink in either direction. Returns
     the relation as recorded on the link (related/duplicate/child_of/
     caused_by/references). Excludes soft-deleted and de-duplicates if a
-    case is linked twice."""
+    case is linked twice. Optional `relation=<value>` keeps only links
+    of that type; `stage=<name>` scopes to one workflow stage and
+    `open_only=true` excludes closed peers."""
     from adhkar.db.models import CaseLink as _CaseLink
 
     # Confirm the source case is in caller's org first (404 otherwise).
@@ -321,21 +326,16 @@ async def list_related_cases(
     ).scalar_one_or_none()
     if src is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
-    rows = (
-        (
-            await db.execute(
-                select(_CaseLink).where(
-                    _CaseLink.organization_id == org_id,
-                    or_(
-                        _CaseLink.source_case_id == case_id,
-                        _CaseLink.target_case_id == case_id,
-                    ),
-                )
-            )
-        )
-        .scalars()
-        .all()
+    link_stmt = select(_CaseLink).where(
+        _CaseLink.organization_id == org_id,
+        or_(
+            _CaseLink.source_case_id == case_id,
+            _CaseLink.target_case_id == case_id,
+        ),
     )
+    if relation is not None:
+        link_stmt = link_stmt.where(_CaseLink.relation == relation)
+    rows = (await db.execute(link_stmt)).scalars().all()
     other_ids: dict[UUID, str] = {}
     for link in rows:
         peer = link.target_case_id if link.source_case_id == case_id else link.source_case_id
@@ -343,19 +343,16 @@ async def list_related_cases(
         other_ids.setdefault(peer, link.relation)
     if not other_ids:
         return []
-    peers = (
-        (
-            await db.execute(
-                select(Case).where(
-                    Case.id.in_(list(other_ids.keys())),
-                    Case.organization_id == org_id,
-                    Case.deleted_at.is_(None),
-                )
-            )
-        )
-        .scalars()
-        .all()
+    peer_stmt = select(Case).where(
+        Case.id.in_(list(other_ids.keys())),
+        Case.organization_id == org_id,
+        Case.deleted_at.is_(None),
     )
+    if stage is not None:
+        peer_stmt = peer_stmt.where(Case.stage == stage)
+    elif open_only is True:
+        peer_stmt = peer_stmt.where(Case.stage != "closed")
+    peers = (await db.execute(peer_stmt)).scalars().all()
     return [
         RelatedCaseRow(
             case_id=c.id,
