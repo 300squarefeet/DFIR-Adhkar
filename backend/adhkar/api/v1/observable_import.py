@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -242,11 +243,13 @@ async def export_observables_csv(
     sighted: bool | None = None,
     tlp: str | None = None,
     tag: str | None = None,
+    updated_since: datetime | None = None,
 ) -> PlainTextResponse:
     """Round-trip-compatible inverse of /v1/observables/import-csv.
 
     Same header order so an exported file can be re-imported without
-    reshaping. Optional filters mirror the list endpoint."""
+    reshaping. Optional filters mirror the list endpoint (including
+    RC172 updated_since)."""
     stmt = select(Observable).where(
         Observable.organization_id == org_id, Observable.deleted_at.is_(None)
     )
@@ -262,6 +265,8 @@ async def export_observables_csv(
         stmt = stmt.where(Observable.tlp == tlp)
     if tag:
         stmt = stmt.where(Observable.tags.contains([tag]))
+    if updated_since is not None:
+        stmt = stmt.where(Observable.updated_at >= updated_since)
     rows = (await db.execute(stmt.order_by(Observable.created_at))).scalars().all()
     buf = io.StringIO()
     writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
