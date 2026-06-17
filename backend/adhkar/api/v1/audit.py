@@ -104,20 +104,25 @@ def _to_dtos(rows: Sequence[AuditLog]) -> list[AuditLogDTO]:
     responses={200: {"content": {"text/csv": {}}}},
 )
 async def export_audit_csv(
-    _user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
+    user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     entity_type: str | None = None,
     entity_id: UUID | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
+    me: bool | None = None,
+    ip: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     limit: int = Query(5000, ge=1, le=50_000),
 ) -> PlainTextResponse:
     """CSV dump of audit_logs in the current org. Caps at 50k rows so a
     chatty integration can't OOM the server; pass `since`/`until` to
-    snapshot a date window."""
+    snapshot a date window. Mirrors RC114 ip + RC138 me filters from
+    the list endpoint."""
+    if me is True:
+        actor_user_id = user.user_id
     stmt = (
         select(AuditLog)
         .where(AuditLog.organization_id == org_id)
@@ -132,6 +137,8 @@ async def export_audit_csv(
         stmt = stmt.where(AuditLog.action == action)
     if actor_user_id:
         stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
+    if ip:
+        stmt = stmt.where(AuditLog.ip == ip)
     if since is not None:
         stmt = stmt.where(AuditLog.created_at >= since)
     if until is not None:
