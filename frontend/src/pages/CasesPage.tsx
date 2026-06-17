@@ -29,6 +29,8 @@ interface CaseRow {
 
 type StageFilter = "" | "open" | "in_progress" | "closed";
 
+type UpdatedWithinHours = 0 | 24 | 168 | 720;
+
 interface SavedView {
   stage: StageFilter;
   search: string;
@@ -37,6 +39,7 @@ interface SavedView {
   flagged: "" | "true" | "false";
   since: string;
   until: string;
+  updatedWithinHours: UpdatedWithinHours;
 }
 
 const SAVED_VIEW_KEY = "adhkar.cases.savedView.v1";
@@ -49,7 +52,14 @@ const EMPTY_VIEW: SavedView = {
   flagged: "",
   since: "",
   until: "",
+  updatedWithinHours: 0,
 };
+
+function coerceUpdatedWithinHours(value: unknown): UpdatedWithinHours {
+  const n = typeof value === "string" ? Number(value) : value;
+  if (n === 24 || n === 168 || n === 720) return n;
+  return 0;
+}
 
 function loadSavedView(): SavedView {
   try {
@@ -64,6 +74,7 @@ function loadSavedView(): SavedView {
       flagged: parsed.flagged ?? "",
       since: parsed.since ?? "",
       until: parsed.until ?? "",
+      updatedWithinHours: coerceUpdatedWithinHours(parsed.updatedWithinHours),
     };
   } catch {
     return EMPTY_VIEW;
@@ -96,6 +107,10 @@ export function CasesPage() {
     if (since !== null) out.since = since;
     const until = p.get("until");
     if (until !== null) out.until = until;
+    const updatedWithin = p.get("updated_within_hours");
+    if (updatedWithin !== null) {
+      out.updatedWithinHours = coerceUpdatedWithinHours(updatedWithin);
+    }
     return out;
   })();
 
@@ -112,6 +127,12 @@ export function CasesPage() {
       if (view.flagged) p.set("flagged", view.flagged);
       if (view.since) p.set("since", new Date(view.since).toISOString());
       if (view.until) p.set("until", new Date(view.until).toISOString());
+      if (view.updatedWithinHours >= 1) {
+        const cutoff = new Date(
+          Date.now() - view.updatedWithinHours * 3600 * 1000,
+        ).toISOString();
+        p.set("updated_since", cutoff);
+      }
       const rows = await apiCall<CaseRow[]>(`/v1/cases?${p.toString()}`);
       setCases(rows);
       setSelected(new Set());
@@ -132,6 +153,7 @@ export function CasesPage() {
     view.flagged,
     view.since,
     view.until,
+    view.updatedWithinHours,
   ]);
 
   useEffect(() => {
@@ -233,6 +255,8 @@ export function CasesPage() {
                 p.set("since", new Date(view.since).toISOString());
               if (view.until)
                 p.set("until", new Date(view.until).toISOString());
+              if (view.updatedWithinHours >= 1)
+                p.set("updated_within_hours", String(view.updatedWithinHours));
               const qs = p.toString();
               const url = `${window.location.origin}/cases${qs ? `?${qs}` : ""}`;
               navigator.clipboard
@@ -337,6 +361,34 @@ export function CasesPage() {
           onChange={(e) => setView({ ...view, until: e.target.value })}
           title="Created until (exclusive)"
         />
+        <div className="flex items-center gap-1" role="group" aria-label="Edited within">
+          <span className="text-xs text-md-sys-color-on-surface-variant">Edited:</span>
+          {([
+            { label: "Any", value: 0 as UpdatedWithinHours },
+            { label: "24h", value: 24 as UpdatedWithinHours },
+            { label: "7d", value: 168 as UpdatedWithinHours },
+            { label: "30d", value: 720 as UpdatedWithinHours },
+          ]).map((opt) => {
+            const active = view.updatedWithinHours === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setView({ ...view, updatedWithinHours: opt.value })
+                }
+                className={
+                  active
+                    ? "rounded-full px-2 py-0.5 text-xs bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "rounded-full px-2 py-0.5 text-xs border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+                }
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           placeholder="Filter title / tag / #number…"
