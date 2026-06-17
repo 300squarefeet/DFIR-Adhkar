@@ -13,6 +13,7 @@ interface KbPage {
   title: string;
   content: string;
   tags: string[];
+  pinned: boolean;
   updated_at: string;
 }
 
@@ -77,6 +78,21 @@ export function KnowledgeBasePage() {
   };
 
   const [draftTags, setDraftTags] = useState("");
+
+  const togglePin = async (p: KbPage) => {
+    try {
+      const updated = await apiCall<KbPage>(`/v1/kb/pages/${p.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ pinned: !p.pinned }),
+      });
+      setPages((prev) =>
+        prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev,
+      );
+      toast.success(updated.pinned ? "Pinned." : "Unpinned.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   const saveEdit = async () => {
     if (!active) return;
@@ -230,6 +246,15 @@ export function KnowledgeBasePage() {
                     (p.slug === activeSlug ? "bg-md-sys-color-surface-container" : "")
                   }
                 >
+                  {p.pinned ? (
+                    <span
+                      aria-label="pinned"
+                      title="Pinned runbook"
+                      className="mr-1 text-md-sys-color-primary"
+                    >
+                      ⚲
+                    </span>
+                  ) : null}
                   {p.title}
                 </button>
               </li>
@@ -251,6 +276,18 @@ export function KnowledgeBasePage() {
                 <button
                   type="button"
                   className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                  onClick={() => {
+                    void togglePin(active);
+                  }}
+                  title="Toggle pin"
+                >
+                  {active.pinned ? "Unpin" : "Pin"}
+                </button>
+              ) : null}
+              {canManage ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
                   onClick={() => setEditing((v) => !v)}
                 >
                   {editing ? "Cancel" : "Edit"}
