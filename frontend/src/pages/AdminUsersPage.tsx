@@ -30,11 +30,15 @@ export function AdminUsersPage() {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [lastInvite, setLastInvite] = useState<InviteResponse | null>(null);
 
+  const [sortRecent, setSortRecent] = useState(false);
+
   const canManage = permissions.has("manageUser");
 
   const refresh = async () => {
     try {
-      const rows = await apiCall<UserRow[]>("/v1/users");
+      const rows = await apiCall<UserRow[]>(
+        sortRecent ? "/v1/users/recent?limit=50" : "/v1/users",
+      );
       setUsers(rows);
     } catch (e) {
       setError((e as Error).message);
@@ -44,7 +48,7 @@ export function AdminUsersPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall]);
+  }, [apiCall, sortRecent]);
 
   const invite = async () => {
     if (!inviteEmail.trim()) return;
@@ -128,6 +132,22 @@ export function AdminUsersPage() {
           ) : null}
         </article>
       ) : null}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setSortRecent((v) => !v)}
+          className={
+            "rounded-full px-3 py-1 text-xs " +
+            (sortRecent
+              ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+              : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+          }
+          title="Toggle ordering by most-recent audit-log activity"
+        >
+          {sortRecent ? "Sorted by recent activity ✓" : "Sort by recent activity"}
+        </button>
+      </div>
 
       <table className="w-full table-auto border-collapse text-sm">
         <thead>
