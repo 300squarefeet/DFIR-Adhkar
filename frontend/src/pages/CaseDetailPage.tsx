@@ -129,6 +129,12 @@ interface PapSummary {
   by_pap: Array<{ pap: string; count: number }>;
 }
 
+interface TasksSummary {
+  case_id: string;
+  total: number;
+  by_status: Array<{ status: string; count: number }>;
+}
+
 interface CaseLinkRow {
   id: string;
   source_case_id: string;
@@ -206,6 +212,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [evidence, setEvidence] = useState<EvidenceSummary | null>(null);
   const [evidenceTags, setEvidenceTags] = useState<string[]>([]);
   const [papSummary, setPapSummary] = useState<PapSummary | null>(null);
+  const [tasksSummary, setTasksSummary] = useState<TasksSummary | null>(null);
   const [links, setLinks] = useState<CaseLinkRow[]>([]);
   const [relationFilter, setRelationFilter] = useState<string>("");
 
@@ -316,6 +323,23 @@ export function CaseDetailPage({ caseId }: Props) {
         if (!cancelled) setPapSummary(summary);
       } catch {
         if (!cancelled) setPapSummary(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const summary = await apiCall<TasksSummary>(
+          `/v1/cases/${caseId}/tasks/summary`,
+        );
+        if (!cancelled) setTasksSummary(summary);
+      } catch {
+        if (!cancelled) setTasksSummary(null);
       }
     })();
     return () => {
@@ -1661,6 +1685,50 @@ export function CaseDetailPage({ caseId }: Props) {
             })}
         </section>
       ) : null}
+
+      {tasksSummary !== null && tasksSummary.total > 0 ? (() => {
+        const total = tasksSummary.total;
+        const completed =
+          tasksSummary.by_status.find((b) => b.status === "Completed")?.count ?? 0;
+        const pct = (count: number) => `${(count / total) * 100}%`;
+        const colorFor = (status: string) =>
+          status === "Waiting"
+            ? "bg-md-sys-color-surface-variant"
+            : status === "InProgress"
+              ? "bg-md-sys-color-tertiary"
+              : status === "Completed"
+                ? "bg-severity-1/60"
+                : status === "Cancelled"
+                  ? "bg-severity-4/40"
+                  : "bg-md-sys-color-surface-container";
+        const order = ["Waiting", "InProgress", "Completed", "Cancelled"];
+        const segments = order
+          .map((s) => ({
+            status: s,
+            count: tasksSummary.by_status.find((b) => b.status === s)?.count ?? 0,
+          }))
+          .filter((b) => b.count > 0);
+        return (
+          <section className="space-y-1 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-md-sys-color-on-surface-variant">Tasks:</span>
+              <span className="text-md-sys-color-on-surface">
+                {completed}/{total} done
+              </span>
+            </div>
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-md-sys-color-surface-container">
+              {segments.map((b) => (
+                <div
+                  key={b.status}
+                  aria-label={`${b.status}: ${b.count}`}
+                  style={{ width: pct(b.count) }}
+                  className={`h-2 ${colorFor(b.status)}`}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })() : null}
 
       {links.length === 0 && relationFilter === "" ? null : (
         <article>
