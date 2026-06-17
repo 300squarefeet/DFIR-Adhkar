@@ -4,7 +4,16 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ARRAY, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID  # noqa: N811
 from sqlalchemy.orm import Mapped, mapped_column
@@ -26,6 +35,7 @@ class KnowledgeBasePage(Base, IdMixin):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     content: Mapped[str] = mapped_column(String, nullable=False, server_default="")
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, server_default="{}")
+    pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_by: Mapped[UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )

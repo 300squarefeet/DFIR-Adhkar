@@ -36,6 +36,7 @@ class KbPageDTO(BaseModel):
     title: str
     content: str
     tags: list[str]
+    pinned: bool
     created_by: UUID | None
     created_at: datetime
     updated_at: datetime
@@ -46,12 +47,14 @@ class KbPageCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     content: str = ""
     tags: list[str] = []
+    pinned: bool = False
 
 
 class KbPagePatch(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     content: str | None = None
     tags: list[str] | None = None
+    pinned: bool | None = None
 
 
 def _kb_dto(p: KnowledgeBasePage) -> KbPageDTO:
@@ -61,6 +64,7 @@ def _kb_dto(p: KnowledgeBasePage) -> KbPageDTO:
         title=p.title,
         content=p.content,
         tags=list(p.tags),
+        pinned=p.pinned,
         created_by=p.created_by,
         created_at=p.created_at,
         updated_at=p.updated_at,
@@ -81,7 +85,7 @@ async def list_kb_pages(
         stmt = stmt.where(
             (KnowledgeBasePage.title.ilike(like)) | (KnowledgeBasePage.slug.ilike(like))
         )
-    stmt = stmt.order_by(KnowledgeBasePage.title).limit(limit)
+    stmt = stmt.order_by(KnowledgeBasePage.pinned.desc(), KnowledgeBasePage.title).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_kb_dto(p) for p in rows]
 
@@ -99,6 +103,7 @@ async def create_kb_page(
         title=body.title,
         content=body.content,
         tags=body.tags,
+        pinned=body.pinned,
         created_by=user.user_id,
     )
     db.add(p)
