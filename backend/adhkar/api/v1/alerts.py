@@ -217,6 +217,43 @@ async def list_alerts(
     return [_alert_dto(a) for a in rows]
 
 
+@router.get("/{alert_id}/similar", response_model=list[AlertDTO])
+async def list_similar_alerts(
+    alert_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+) -> list[AlertDTO]:
+    """Alerts in the current org sharing (source, source_ref) with this one,
+    excluding the source alert itself. Useful when a SIEM re-fires or when
+    cross-referencing investigations. Ordered by created_at DESC, cap 200."""
+    safe_limit = max(1, min(200, int(limit)))
+    src = (
+        await db.execute(select(Alert).where(Alert.id == alert_id, Alert.organization_id == org_id))
+    ).scalar_one_or_none()
+    if src is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "alert_not_found")
+    rows = (
+        (
+            await db.execute(
+                select(Alert)
+                .where(
+                    Alert.organization_id == org_id,
+                    Alert.source == src.source,
+                    Alert.source_ref == src.source_ref,
+                    Alert.id != alert_id,
+                )
+                .order_by(Alert.created_at.desc())
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_alert_dto(a) for a in rows]
+
+
 class BulkAlertPatch(BaseModel):
     ids: list[UUID] = Field(min_length=1, max_length=200)
     patch: AlertPatch
