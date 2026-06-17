@@ -16,6 +16,7 @@ import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { ObservableTlpPanel } from "@/ui/ObservableTlpPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
+import { RecentCasesPanel } from "@/ui/RecentCasesPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
 import { StageDistributionPanel } from "@/ui/StageDistributionPanel";
@@ -310,6 +311,7 @@ export function DashboardPage() {
       <AuditActivityPanel />
       <CasesByAssigneePanel />
       <AuditNoisePanel />
+      <RecentCasesPanel />
     </section>
   );
 }
