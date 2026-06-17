@@ -198,6 +198,26 @@ export function TasksPage() {
     <section className="space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Tasks</h1>
+        <button
+          type="button"
+          className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+          onClick={() => {
+            const p = new URLSearchParams();
+            if (status) p.set("status_filter", status);
+            if (mine) p.set("mine", "true");
+            if (overdue) p.set("overdue", "true");
+            if (mandatory) p.set("mandatory", mandatory);
+            const qs = p.toString();
+            const url = `${window.location.origin}/tasks${qs ? `?${qs}` : ""}`;
+            navigator.clipboard
+              .writeText(url)
+              .then(() => toast.success("Link copied."))
+              .catch(() => toast.error("Clipboard unavailable."));
+          }}
+          title="Copy a link to this filtered view"
+        >
+          Copy URL
+        </button>
         <a
           href={(() => {
             const base =
@@ -213,7 +233,7 @@ export function TasksPage() {
           })()}
           target="_blank"
           rel="noreferrer"
-          className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+          className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
         >
           Export CSV
         </a>
