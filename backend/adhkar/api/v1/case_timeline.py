@@ -43,6 +43,17 @@ class TimelineResponse(BaseModel):
     entries: list[TimelineEntry]
 
 
+class TimelineSummaryBucket(BaseModel):
+    action: str
+    count: int
+
+
+class TimelineSummaryResponse(BaseModel):
+    case_id: UUID
+    total: int
+    by_action: list[TimelineSummaryBucket]
+
+
 @router.get("/v1/cases/{case_id}/timeline", response_model=TimelineResponse)
 async def case_timeline(
     case_id: UUID,
@@ -113,6 +124,58 @@ async def case_timeline(
             )
             for r in rows
         ],
+    )
+
+
+@router.get(
+    "/v1/cases/{case_id}/timeline/summary",
+    response_model=TimelineSummaryResponse,
+)
+async def case_timeline_summary(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    since: datetime | None = None,
+) -> TimelineSummaryResponse:
+    """Per-action count over this case's timeline (same source rows as
+    /v1/cases/{id}/timeline). Optional `since=<ISO>` scopes the window.
+    Drives a "what kind of activity" badge row on the case detail
+    page without paging the full timeline."""
+    from sqlalchemy import func as _f
+
+    case = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+    case_id_str = str(case_id)
+    stmt = (
+        select(AuditLog.action, _f.count().label("n"))
+        .where(
+            AuditLog.organization_id == org_id,
+            or_(
+                (AuditLog.entity_type == "case") & (AuditLog.entity_id == case_id),
+                AuditLog.diff.cast(Text).contains(case_id_str),
+            ),
+        )
+        .group_by(AuditLog.action)
+    )
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at >= since)
+    rows = (await db.execute(stmt)).all()
+    buckets = [TimelineSummaryBucket(action=str(r[0]), count=int(r[1])) for r in rows]
+    buckets.sort(key=lambda b: (-b.count, b.action))
+    return TimelineSummaryResponse(
+        case_id=case_id,
+        total=sum(b.count for b in buckets),
+        by_action=buckets,
     )
 
 
