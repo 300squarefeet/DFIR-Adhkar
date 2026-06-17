@@ -47,6 +47,7 @@ async def list_audit(
     entity_id: UUID | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
+    ip: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> list[AuditLogDTO]:
@@ -57,6 +58,8 @@ async def list_audit(
         .offset(offset)
         .limit(limit)
     )
+    if ip:
+        stmt = stmt.where(AuditLog.ip == ip)
     if entity_type:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
     if entity_id is not None:
