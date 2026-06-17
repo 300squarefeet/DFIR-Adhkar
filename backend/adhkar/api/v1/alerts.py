@@ -181,6 +181,33 @@ async def export_alerts_csv(
     )
 
 
+@router.get("/recent", response_model=list[AlertDTO])
+async def list_recent_alerts(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+    unpromoted: bool | None = None,
+) -> list[AlertDTO]:
+    """N most-recently-updated alerts (`updated_at` DESC) for the current
+    org, default 10, cap 50. Optional `unpromoted=true` to filter to
+    alerts not yet promoted to a case (`case_id IS NULL`). Same DTO
+    shape as the list endpoint."""
+    safe_limit = max(1, min(50, int(limit)))
+    stmt = (
+        select(Alert)
+        .where(Alert.organization_id == org_id)
+        .order_by(Alert.updated_at.desc())
+        .limit(safe_limit)
+    )
+    if unpromoted is True:
+        stmt = stmt.where(Alert.case_id.is_(None))
+    elif unpromoted is False:
+        stmt = stmt.where(Alert.case_id.is_not(None))
+    rows = (await db.execute(stmt)).scalars().all()
+    return [_alert_dto(a) for a in rows]
+
+
 @router.get("", response_model=list[AlertDTO])
 async def list_alerts(
     _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
