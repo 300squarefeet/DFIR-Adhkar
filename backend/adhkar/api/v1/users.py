@@ -110,37 +110,46 @@ async def list_recent_users(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 10,
+    active_within_days: int | None = None,
 ) -> list[UserDTO]:
     """N org members ordered by their most-recent audit-log timestamp,
     DESC. Falls back to display_name for users that have never authored
-    an audit event. Default 10, cap 50."""
+    an audit event. Default 10, cap 50. Optional `active_within_days=N`
+    (1..365) restricts the audit-noise window AND drops members whose
+    last_seen is older than that cutoff — useful for an "active this
+    week" widget."""
+    from datetime import UTC, datetime, timedelta
+
     from sqlalchemy import desc, func
 
     from adhkar.db.models import AuditLog as _AuditLog
 
     safe_limit = max(1, min(50, int(limit)))
-    last_seen = (
-        select(_AuditLog.actor_user_id, func.max(_AuditLog.created_at).label("last_seen"))
-        .where(
-            _AuditLog.organization_id == org_id,
-            _AuditLog.actor_user_id.is_not(None),
-        )
-        .group_by(_AuditLog.actor_user_id)
-        .subquery()
+    last_seen_stmt = select(
+        _AuditLog.actor_user_id, func.max(_AuditLog.created_at).label("last_seen")
+    ).where(
+        _AuditLog.organization_id == org_id,
+        _AuditLog.actor_user_id.is_not(None),
     )
-    rows = (
-        await db.execute(
-            select(User, last_seen.c.last_seen)
-            .join(UserOrgMembership, UserOrgMembership.user_id == User.id)
-            .outerjoin(last_seen, last_seen.c.actor_user_id == User.id)
-            .where(
-                UserOrgMembership.organization_id == org_id,
-                User.deleted_at.is_(None),
-            )
-            .order_by(desc(last_seen.c.last_seen).nulls_last(), User.display_name)
-            .limit(safe_limit)
+    if active_within_days is not None:
+        bounded = max(1, min(365, int(active_within_days)))
+        cutoff = datetime.now(tz=UTC) - timedelta(days=bounded)
+        last_seen_stmt = last_seen_stmt.where(_AuditLog.created_at >= cutoff)
+    last_seen = last_seen_stmt.group_by(_AuditLog.actor_user_id).subquery()
+    stmt = (
+        select(User, last_seen.c.last_seen)
+        .join(UserOrgMembership, UserOrgMembership.user_id == User.id)
+        .outerjoin(last_seen, last_seen.c.actor_user_id == User.id)
+        .where(
+            UserOrgMembership.organization_id == org_id,
+            User.deleted_at.is_(None),
         )
-    ).all()
+        .order_by(desc(last_seen.c.last_seen).nulls_last(), User.display_name)
+        .limit(safe_limit)
+    )
+    if active_within_days is not None:
+        stmt = stmt.where(last_seen.c.last_seen.is_not(None))
+    rows = (await db.execute(stmt)).all()
     return [
         UserDTO(id=u.id, email=u.email, display_name=u.display_name, status=u.status)
         for u, _ in rows
