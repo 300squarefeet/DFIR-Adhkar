@@ -42,6 +42,7 @@ async def list_audit(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0, le=100_000),
     entity_type: str | None = None,
     entity_id: UUID | None = None,
     action: str | None = None,
@@ -53,6 +54,7 @@ async def list_audit(
         select(AuditLog)
         .where(AuditLog.organization_id == org_id)
         .order_by(desc(AuditLog.created_at))
+        .offset(offset)
         .limit(limit)
     )
     if entity_type:
