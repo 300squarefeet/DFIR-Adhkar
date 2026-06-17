@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import (
@@ -188,11 +188,13 @@ async def list_recent_alerts(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 10,
     unpromoted: bool | None = None,
+    source: str | None = None,
 ) -> list[AlertDTO]:
     """N most-recently-updated alerts (`updated_at` DESC) for the current
     org, default 10, cap 50. Optional `unpromoted=true` to filter to
-    alerts not yet promoted to a case (`case_id IS NULL`). Same DTO
-    shape as the list endpoint."""
+    alerts not yet promoted to a case (`case_id IS NULL`). Optional
+    `source=<name>` exact-match filter to scope to one ingestion source
+    (case-insensitive). Same DTO shape as the list endpoint."""
     safe_limit = max(1, min(50, int(limit)))
     stmt = (
         select(Alert)
@@ -204,6 +206,8 @@ async def list_recent_alerts(
         stmt = stmt.where(Alert.case_id.is_(None))
     elif unpromoted is False:
         stmt = stmt.where(Alert.case_id.is_not(None))
+    if source is not None:
+        stmt = stmt.where(func.lower(Alert.source) == source.lower())
     rows = (await db.execute(stmt)).scalars().all()
     return [_alert_dto(a) for a in rows]
 
