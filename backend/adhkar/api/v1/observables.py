@@ -117,6 +117,10 @@ async def list_observables(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     data_type: str | None = None,
+    is_ioc: bool | None = None,
+    sighted: bool | None = None,
+    tlp: Literal["white", "green", "amber", "amber-strict", "red"] | None = None,
+    tag: str | None = None,
     limit: int = 100,
 ) -> list[ObservableDTO]:
     stmt = select(Observable).where(
@@ -124,7 +128,16 @@ async def list_observables(
     )
     if data_type:
         stmt = stmt.where(Observable.data_type == data_type)
-    stmt = stmt.limit(limit)
+    if is_ioc is not None:
+        stmt = stmt.where(Observable.is_ioc == is_ioc)
+    if sighted is not None:
+        stmt = stmt.where(Observable.sighted == sighted)
+    if tlp:
+        stmt = stmt.where(Observable.tlp == tlp)
+    if tag:
+        # JSONB array contains — works on text[] columns via overlap when not JSONB.
+        stmt = stmt.where(Observable.tags.contains([tag]))
+    stmt = stmt.order_by(Observable.created_at.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(o) for o in rows]
 
