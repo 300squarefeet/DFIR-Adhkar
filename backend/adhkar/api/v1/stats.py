@@ -510,3 +510,36 @@ async def alerts_by_source(
     return AlertSourcesResponse(
         entries=[AlertSourceBucket(source=str(r[0]), count=int(r[1])) for r in rows]
     )
+
+
+class TaskStatusBucket(BaseModel):
+    status: str
+    count: int
+
+
+class TasksByStatusResponse(BaseModel):
+    entries: list[TaskStatusBucket]
+
+
+@router.get("/tasks-by-status", response_model=TasksByStatusResponse)
+async def tasks_by_status(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TasksByStatusResponse:
+    """Counts tasks grouped by status, zero-filled across the four
+    canonical statuses (Waiting/InProgress/Completed/Cancelled)."""
+    from adhkar.db.models import Task as _Task
+
+    rows = (
+        await db.execute(
+            select(_Task.status, func.count().label("n"))
+            .where(_Task.organization_id == org_id)
+            .group_by(_Task.status)
+        )
+    ).all()
+    by_status: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("Waiting", "InProgress", "Completed", "Cancelled")
+    return TasksByStatusResponse(
+        entries=[TaskStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
+    )
