@@ -390,10 +390,13 @@ async def export_deliveries_csv(
     status_filter: Literal["pending", "succeeded", "failed"] | None = None,
     rule_id: UUID | None = None,
     endpoint_id: UUID | None = None,
+    event_type: str | None = None,
+    since: datetime | None = None,
     limit: int = Query(default=5000, ge=1, le=50_000),
 ) -> PlainTextResponse:
     """CSV dump of dispatcher attempt history. Mirrors the list-endpoint
-    filter surface; useful for compliance bundles and post-incident review."""
+    filter surface (including RC181 event_type + since); useful for
+    compliance bundles and post-incident review."""
     import csv
     import io
     import json as _json
@@ -410,6 +413,10 @@ async def export_deliveries_csv(
         stmt = stmt.where(NotificationDelivery.rule_id == rule_id)
     if endpoint_id:
         stmt = stmt.where(NotificationDelivery.endpoint_id == endpoint_id)
+    if event_type is not None:
+        stmt = stmt.where(NotificationDelivery.event_type == event_type)
+    if since is not None:
+        stmt = stmt.where(NotificationDelivery.created_at >= since)
     rows = (await db.execute(stmt)).scalars().all()
     buf = io.StringIO()
     w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
