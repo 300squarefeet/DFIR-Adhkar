@@ -8,13 +8,13 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
-import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
-import { StageDistributionPanel } from "@/ui/StageDistributionPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
+import { StageDistributionPanel } from "@/ui/StageDistributionPanel";
 import { CORE_WIDGETS, type WidgetSpec } from "@/ui/widgets";
 
 interface TimeSeriesPoint {
