@@ -32,6 +32,9 @@ type StageFilter = "" | "open" | "in_progress" | "closed";
 interface SavedView {
   stage: StageFilter;
   search: string;
+  severity: "" | "1" | "2" | "3" | "4";
+  tag: string;
+  flagged: "" | "true" | "false";
 }
 
 const SAVED_VIEW_KEY = "adhkar.cases.savedView.v1";
@@ -39,11 +42,18 @@ const SAVED_VIEW_KEY = "adhkar.cases.savedView.v1";
 function loadSavedView(): SavedView {
   try {
     const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
-    if (!raw) return { stage: "", search: "" };
+    if (!raw)
+      return { stage: "", search: "", severity: "", tag: "", flagged: "" };
     const parsed = JSON.parse(raw) as Partial<SavedView>;
-    return { stage: parsed.stage ?? "", search: parsed.search ?? "" };
+    return {
+      stage: parsed.stage ?? "",
+      search: parsed.search ?? "",
+      severity: parsed.severity ?? "",
+      tag: parsed.tag ?? "",
+      flagged: parsed.flagged ?? "",
+    };
   } catch {
-    return { stage: "", search: "" };
+    return { stage: "", search: "", severity: "", tag: "", flagged: "" };
   }
 }
 
@@ -58,8 +68,12 @@ export function CasesPage() {
 
   const refresh = async () => {
     try {
-      const qs = view.stage ? `?stage=${encodeURIComponent(view.stage)}&limit=200` : "?limit=200";
-      const rows = await apiCall<CaseRow[]>(`/v1/cases${qs}`);
+      const p = new URLSearchParams({ limit: "200" });
+      if (view.stage) p.set("stage", view.stage);
+      if (view.severity) p.set("severity", view.severity);
+      if (view.tag.trim()) p.set("tag", view.tag.trim());
+      if (view.flagged) p.set("flagged", view.flagged);
+      const rows = await apiCall<CaseRow[]>(`/v1/cases?${p.toString()}`);
       setCases(rows);
       setSelected(new Set());
     } catch (e) {
@@ -71,7 +85,7 @@ export function CasesPage() {
     void refresh();
     // refresh dependency captured below
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, view.stage]);
+  }, [apiCall, view.stage, view.severity, view.tag, view.flagged]);
 
   useEffect(() => {
     window.localStorage.setItem(SAVED_VIEW_KEY, JSON.stringify(view));
@@ -179,6 +193,42 @@ export function CasesPage() {
           <option value="in_progress">In progress</option>
           <option value="closed">Closed</option>
         </select>
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.severity}
+          onChange={(e) =>
+            setView({
+              ...view,
+              severity: e.target.value as SavedView["severity"],
+            })
+          }
+        >
+          <option value="">All severities</option>
+          <option value="1">S1 (info)</option>
+          <option value="2">S2 (low)</option>
+          <option value="3">S3 (med)</option>
+          <option value="4">S4 (high)</option>
+        </select>
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.flagged}
+          onChange={(e) =>
+            setView({
+              ...view,
+              flagged: e.target.value as SavedView["flagged"],
+            })
+          }
+        >
+          <option value="">All flags</option>
+          <option value="true">Flagged</option>
+          <option value="false">Unflagged</option>
+        </select>
+        <input
+          className="w-32 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          placeholder="Tag…"
+          value={view.tag}
+          onChange={(e) => setView({ ...view, tag: e.target.value })}
+        />
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           placeholder="Filter title / tag / #number…"
