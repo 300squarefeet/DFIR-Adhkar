@@ -97,7 +97,26 @@ export function TasksPage() {
     <section className="space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Tasks</h1>
-        <label className="ml-auto flex items-center gap-1 text-sm">
+        <a
+          href={(() => {
+            const base =
+              (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+              "http://localhost:8000";
+            const p = new URLSearchParams();
+            if (status) p.set("status_filter", status);
+            if (mine) p.set("mine", "true");
+            if (overdue) p.set("overdue", "true");
+            if (mandatory) p.set("mandatory", mandatory);
+            const qs = p.toString();
+            return `${base}/v1/tasks/export-csv${qs ? `?${qs}` : ""}`;
+          })()}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+        >
+          Export CSV
+        </a>
+        <label className="flex items-center gap-1 text-sm">
           <input
             type="checkbox"
             checked={mine}

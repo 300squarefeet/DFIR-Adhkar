@@ -198,20 +198,42 @@ export function AlertsPage() {
 
   return (
     <section className="p-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Alerts</h1>
-        {canManage && selected.size > 0 ? (
-          <button
-            type="button"
-            className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
-            onClick={() => {
-              void bulkIgnore();
-            }}
-            disabled={bulkBusy}
+        <div className="ml-auto flex items-center gap-2">
+          <a
+            href={(() => {
+              const base =
+                (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+                "http://localhost:8000";
+              const p = new URLSearchParams();
+              if (view.status) p.set("alert_status", view.status);
+              if (view.source) p.set("source", view.source);
+              if (view.severity) p.set("severity", view.severity);
+              if (view.tag.trim()) p.set("tag", view.tag.trim());
+              if (view.unpromoted) p.set("unpromoted", view.unpromoted);
+              const qs = p.toString();
+              return `${base}/v1/alerts/export-csv${qs ? `?${qs}` : ""}`;
+            })()}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
           >
-            {bulkBusy ? "…" : `Ignore ${selected.size}`}
-          </button>
-        ) : null}
+            Export CSV
+          </a>
+          {canManage && selected.size > 0 ? (
+            <button
+              type="button"
+              className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
+              onClick={() => {
+                void bulkIgnore();
+              }}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? "…" : `Ignore ${selected.size}`}
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="mb-3 flex flex-wrap gap-2">
         <select
