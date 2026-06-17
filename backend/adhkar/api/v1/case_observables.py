@@ -14,7 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import Integer, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import (
@@ -115,6 +115,74 @@ class SimilarityCount(BaseModel):
 
 class SimilarityCountsResponse(BaseModel):
     counts: list[SimilarityCount]
+
+
+class ObservableSummaryBucket(BaseModel):
+    data_type: str
+    count: int
+    ioc_count: int
+
+
+class ObservableSummaryResponse(BaseModel):
+    case_id: UUID
+    total: int
+    ioc_total: int
+    by_type: list[ObservableSummaryBucket]
+
+
+@router.get(
+    "/v1/cases/{case_id}/observables/summary",
+    response_model=ObservableSummaryResponse,
+)
+async def case_observable_summary(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ObservableSummaryResponse:
+    """Per-data_type count of observables attached to this case, with
+    IOC subtotals per bucket. 404 when the case isn't in caller's org."""
+    case = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+    rows = (
+        await db.execute(
+            select(
+                Observable.data_type,
+                func.count().label("total"),
+                func.sum(func.cast(Observable.is_ioc, type_=Integer)).label("ioc_n"),
+            )
+            .where(
+                Observable.case_id == case_id,
+                Observable.organization_id == org_id,
+                Observable.deleted_at.is_(None),
+            )
+            .group_by(Observable.data_type)
+            .order_by(func.count().desc(), Observable.data_type)
+        )
+    ).all()
+    buckets = [
+        ObservableSummaryBucket(
+            data_type=str(r[0]),
+            count=int(r[1]),
+            ioc_count=int(r[2] or 0),
+        )
+        for r in rows
+    ]
+    return ObservableSummaryResponse(
+        case_id=case_id,
+        total=sum(b.count for b in buckets),
+        ioc_total=sum(b.ioc_count for b in buckets),
+        by_type=buckets,
+    )
 
 
 @router.get(
