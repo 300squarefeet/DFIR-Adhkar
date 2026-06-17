@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
 import { AuditActivityPanel } from "@/ui/AuditActivityPanel";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
+import { ObservableTlpPanel } from "@/ui/ObservableTlpPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
@@ -301,6 +302,7 @@ export function DashboardPage() {
       <SlowestOpenCasesPanel />
       <PinnedRunbooksPanel />
       <ObservableTypesPanel />
+      <ObservableTlpPanel />
       <StageDistributionPanel />
       <AlertStatusPanel />
       <AuditActivityPanel />
