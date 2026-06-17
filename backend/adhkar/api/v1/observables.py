@@ -232,11 +232,14 @@ async def observable_case_refs(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 50,
+    stage: str | None = None,
+    open_only: bool | None = None,
 ) -> list[CaseRef]:
     """Cases that contain an observable with the same (data_type, data) as
     this one. Joins through Observable.case_id ignoring soft-deleted cases
     and the source observable itself. Useful for cross-case pivot when an
-    IOC reappears."""
+    IOC reappears. `stage=<name>` scopes to one workflow stage;
+    `open_only=true` excludes stage=closed."""
     from adhkar.db.models import Case as _Case
 
     safe_limit = max(1, min(200, int(limit)))
@@ -251,27 +254,25 @@ async def observable_case_refs(
     ).scalar_one_or_none()
     if src is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "observable_not_found")
-    rows = (
-        (
-            await db.execute(
-                select(_Case)
-                .join(Observable, Observable.case_id == _Case.id)
-                .where(
-                    _Case.organization_id == org_id,
-                    _Case.deleted_at.is_(None),
-                    Observable.data_type == src.data_type,
-                    Observable.data == src.data,
-                    Observable.id != observable_id,
-                    Observable.deleted_at.is_(None),
-                )
-                .order_by(_Case.number.desc())
-                .limit(safe_limit)
-            )
+    stmt = (
+        select(_Case)
+        .join(Observable, Observable.case_id == _Case.id)
+        .where(
+            _Case.organization_id == org_id,
+            _Case.deleted_at.is_(None),
+            Observable.data_type == src.data_type,
+            Observable.data == src.data,
+            Observable.id != observable_id,
+            Observable.deleted_at.is_(None),
         )
-        .scalars()
-        .unique()
-        .all()
+        .order_by(_Case.number.desc())
+        .limit(safe_limit)
     )
+    if stage is not None:
+        stmt = stmt.where(_Case.stage == stage)
+    elif open_only is True:
+        stmt = stmt.where(_Case.stage != "closed")
+    rows = (await db.execute(stmt)).scalars().unique().all()
     return [
         CaseRef(
             case_id=c.id,
