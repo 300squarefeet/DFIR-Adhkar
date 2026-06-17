@@ -156,6 +156,7 @@ export function CaseDetailPage({ caseId }: Props) {
   >({});
   const [logDraft, setLogDraft] = useState("");
   const [postingLog, setPostingLog] = useState(false);
+  const [showMention, setShowMention] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -515,11 +516,15 @@ export function CaseDetailPage({ caseId }: Props) {
 
   const activePage = pages.find((p) => p.id === activePageId) ?? null;
 
-  // Resolve assignee + comment author ids → display names through the
-  // shared session cache.
+  // Resolve assignee + comment author + task assignee + log author ids →
+  // display names through the shared session cache.
   const idsToResolve: (string | null | undefined)[] = [
     c?.assignee_id,
     ...comments.map((cm) => cm.author_id),
+    ...tasks.map((t) => t.assignee_id),
+    ...Object.values(taskLogs)
+      .flat()
+      .map((l) => l.author_id),
   ];
   const userNames = useUserNames(idsToResolve);
 
@@ -903,6 +908,11 @@ export function CaseDetailPage({ caseId }: Props) {
                   {t.mandatory ? (
                     <span className="text-xs text-severity-3">required</span>
                   ) : null}
+                  {t.assignee_id ? (
+                    <span className="text-xs text-md-sys-color-on-surface-variant">
+                      @{userNames[t.assignee_id] ?? t.assignee_id.slice(0, 8)}
+                    </span>
+                  ) : null}
                   {t.due_date ? (
                     <span className="text-xs text-md-sys-color-on-surface-variant">
                       due {new Date(t.due_date).toLocaleDateString()}
@@ -1008,7 +1018,11 @@ export function CaseDetailPage({ caseId }: Props) {
                           >
                             <p className="whitespace-pre-wrap">{log.content}</p>
                             <p className="text-[10px] text-md-sys-color-on-surface-variant">
-                              {new Date(log.created_at).toLocaleString()}
+                              {log.author_id
+                                ? (userNames[log.author_id] ??
+                                  log.author_id.slice(0, 8))
+                                : "system"}{" "}
+                              · {new Date(log.created_at).toLocaleString()}
                             </p>
                           </li>
                         ))}
@@ -1395,20 +1409,40 @@ export function CaseDetailPage({ caseId }: Props) {
             <textarea
               className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
               rows={3}
-              placeholder="Add a comment…"
+              placeholder="Add a comment… (use @ to mention an org member)"
               value={commentDraft}
               onChange={(e) => setCommentDraft(e.target.value)}
             />
-            <button
-              type="button"
-              className="self-end rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
-              onClick={() => {
-                void submitComment();
-              }}
-              disabled={postBusy || !commentDraft.trim()}
-            >
-              Comment
-            </button>
+            {showMention ? (
+              <UserPicker
+                onPick={(_id, label) => {
+                  setCommentDraft(
+                    (prev) => (prev ? prev + " " : "") + `@${label}`,
+                  );
+                  setShowMention(false);
+                }}
+                placeholder="Mention a user…"
+              />
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+                onClick={() => setShowMention((v) => !v)}
+              >
+                {showMention ? "Cancel @" : "Mention…"}
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
+                onClick={() => {
+                  void submitComment();
+                }}
+                disabled={postBusy || !commentDraft.trim()}
+              >
+                Comment
+              </button>
+            </div>
           </div>
         ) : null}
       </article>
