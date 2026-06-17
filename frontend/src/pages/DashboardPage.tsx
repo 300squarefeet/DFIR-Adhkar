@@ -20,6 +20,7 @@ import { ObservablePapPanel } from "@/ui/ObservablePapPanel";
 import { ObservableTlpPanel } from "@/ui/ObservableTlpPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
+import { RecentActiveUsersPanel } from "@/ui/RecentActiveUsersPanel";
 import { RecentAlertsPanel } from "@/ui/RecentAlertsPanel";
 import { RecentCasesPanel } from "@/ui/RecentCasesPanel";
 import { RecentKbPanel } from "@/ui/RecentKbPanel";
@@ -406,6 +407,7 @@ export function DashboardPage() {
       <AuditActivityPanel />
       <FailedDeliveriesPanel />
       <CasesByAssigneePanel />
+      <RecentActiveUsersPanel />
       <AuditNoisePanel />
       <RecentCasesPanel />
       <MyRecentCasesPanel />
