@@ -123,6 +123,12 @@ interface ObservableTagsResponse {
   tags: string[];
 }
 
+interface PapSummary {
+  case_id: string;
+  total: number;
+  by_pap: Array<{ pap: string; count: number }>;
+}
+
 interface CaseLinkRow {
   id: string;
   source_case_id: string;
@@ -199,6 +205,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [relatedCases, setRelatedCases] = useState<RelatedCaseRow[] | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSummary | null>(null);
   const [evidenceTags, setEvidenceTags] = useState<string[]>([]);
+  const [papSummary, setPapSummary] = useState<PapSummary | null>(null);
   const [links, setLinks] = useState<CaseLinkRow[]>([]);
   const [relationFilter, setRelationFilter] = useState<string>("");
 
@@ -292,6 +299,23 @@ export function CaseDetailPage({ caseId }: Props) {
         if (!cancelled) setEvidenceTags(resp.tags);
       } catch {
         if (!cancelled) setEvidenceTags([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const summary = await apiCall<PapSummary>(
+          `/v1/cases/${caseId}/observables/pap-summary`,
+        );
+        if (!cancelled) setPapSummary(summary);
+      } catch {
+        if (!cancelled) setPapSummary(null);
       }
     })();
     return () => {
@@ -1609,6 +1633,34 @@ export function CaseDetailPage({ caseId }: Props) {
           </article>
         );
       })() : null}
+
+      {papSummary !== null && papSummary.total > 0 ? (
+        <section className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-md-sys-color-on-surface-variant">PAP:</span>
+          {papSummary.by_pap
+            .filter((b) => b.count > 0)
+            .map((b) => {
+              const cls =
+                b.pap === "white"
+                  ? "bg-md-sys-color-surface-container text-md-sys-color-on-surface"
+                  : b.pap === "green"
+                    ? "bg-severity-1/20 text-md-sys-color-on-surface"
+                    : b.pap === "amber"
+                      ? "bg-severity-3/20 text-md-sys-color-on-surface"
+                      : b.pap === "red"
+                        ? "bg-severity-4/20 text-md-sys-color-on-surface"
+                        : "bg-md-sys-color-surface-container text-md-sys-color-on-surface";
+              return (
+                <span
+                  key={b.pap}
+                  className={`rounded-full px-2 py-0.5 font-mono ${cls}`}
+                >
+                  {b.pap} · {b.count}
+                </span>
+              );
+            })}
+        </section>
+      ) : null}
 
       {links.length === 0 && relationFilter === "" ? null : (
         <article>
