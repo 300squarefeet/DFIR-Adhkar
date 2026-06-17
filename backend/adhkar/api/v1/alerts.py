@@ -189,12 +189,16 @@ async def list_recent_alerts(
     limit: int = 10,
     unpromoted: bool | None = None,
     source: str | None = None,
+    tag: str | None = None,
+    severity_gte: int | None = None,
 ) -> list[AlertDTO]:
     """N most-recently-updated alerts (`updated_at` DESC) for the current
     org, default 10, cap 50. Optional `unpromoted=true` to filter to
     alerts not yet promoted to a case (`case_id IS NULL`). Optional
     `source=<name>` exact-match filter to scope to one ingestion source
-    (case-insensitive). Same DTO shape as the list endpoint."""
+    (case-insensitive). Optional `tag=<name>` exact-match (ARRAY.contains).
+    Optional `severity_gte=N` keeps only alerts at or above that severity
+    (1..4). Same DTO shape as the list endpoint."""
     safe_limit = max(1, min(50, int(limit)))
     stmt = (
         select(Alert)
@@ -208,6 +212,10 @@ async def list_recent_alerts(
         stmt = stmt.where(Alert.case_id.is_not(None))
     if source is not None:
         stmt = stmt.where(func.lower(Alert.source) == source.lower())
+    if tag is not None:
+        stmt = stmt.where(Alert.tags.contains([tag]))
+    if severity_gte is not None:
+        stmt = stmt.where(Alert.severity >= max(1, min(4, severity_gte)))
     rows = (await db.execute(stmt)).scalars().all()
     return [_alert_dto(a) for a in rows]
 
