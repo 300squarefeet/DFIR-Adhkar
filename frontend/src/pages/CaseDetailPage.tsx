@@ -1033,8 +1033,11 @@ export function CaseDetailPage({ caseId }: Props) {
                         <MentionTextarea
                           value={logDraft}
                           onChange={setLogDraft}
+                          onSubmit={() => {
+                            void postTaskLog(t.id);
+                          }}
                           rows={2}
-                          placeholder="Add log entry… (type @ to mention)"
+                          placeholder="Add log entry… (@mention; ⌘/Ctrl+Enter)"
                           className="w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-xs"
                         />
                         <div className="flex justify-end">
@@ -1412,8 +1415,11 @@ export function CaseDetailPage({ caseId }: Props) {
             <MentionTextarea
               value={commentDraft}
               onChange={setCommentDraft}
+              onSubmit={() => {
+                void submitComment();
+              }}
               rows={3}
-              placeholder="Add a comment… (type @ to mention an org member)"
+              placeholder="Add a comment… (type @ to mention; ⌘/Ctrl+Enter to send)"
             />
             <div className="flex justify-end gap-2">
               <button
