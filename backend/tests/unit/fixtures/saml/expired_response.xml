@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="response-assertion-expired" IssueInstant="2026-06-17T12:00:00+00:00" Version="2.0" Destination="https://adhkar.test/v1/auth/saml/test/acs">
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="response-assertion-expired" IssueInstant="2026-06-17T12:00:00Z" Version="2.0" Destination="https://adhkar.test/v1/auth/saml/test/acs">
   <saml:Issuer>https://idp.test/saml/metadata</saml:Issuer>
   <samlp:Status>
     <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
   </samlp:Status>
-  <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="assertion-expired" IssueInstant="2026-06-17T12:00:00+00:00" Version="2.0">
+  <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="assertion-expired" IssueInstant="2026-06-17T12:00:00Z" Version="2.0">
     <saml:Issuer>https://idp.test/saml/metadata</saml:Issuer>
     <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
       <ds:SignedInfo>
@@ -16,32 +16,32 @@
             <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
           </ds:Transforms>
           <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-          <ds:DigestValue>/1HGc+TsHOqtopqciq2t5+6bf777Sv5SzROxhGCxUEo=</ds:DigestValue>
+          <ds:DigestValue>oqv84zfVgocD6KD7cBRvZNolzb0KSvvTuxEwnyGgcRQ=</ds:DigestValue>
         </ds:Reference>
       </ds:SignedInfo>
-      <ds:SignatureValue>B9oT/YPFZag6biGEpuq4sRifZ/8x/aPrKHel0Mi2R71+2Ghaq62kE7hVfj5svzVB
-NydnfJ2+ZnwdHBatKFsV4d/JbcfxkFtVTiaUc92l15QOUEO1wI7cjwiEIMAUxOYw
-5RYPgDE0GOqnNX0HRYXOQq8oZrnbOdpM71g4aLcZpXComTy8TtPQJUuNdLXBP3+6
-Yf1VvPo1mL10lFwlFXymjA52V1OLDG0FGZ+J++pePsXIr4o4VkXzTkfnjSCQ5Yt+
-Xwj8QLx/pxnsAtBMuDuNKzz2XDrC0heKkQEKgdGK9IsVtP1kMWNMZehLIkg1Dpt1
-UjwkhEMGSmMUxGPomnPlLg==</ds:SignatureValue>
+      <ds:SignatureValue>WHfv1zIfLOESD6ly0j74W6mG49vh2cO5F+ioNeBr3zbQi0z6lOO/M6PKL4yXVQ3i
+xpPMCOdgbRU/fH4bsxWd01jxZ1UtpOkAQIgXC7rU0lg0DeZGo7+bxExlnxZjwlcB
+C+NMrazQhXsKiBfEZtOqtrfIa3Q+IG2Dkn9/obdwO9hu6murosZwQnh9BAQgvfcP
+6tg8GG0bRQ3gTIBRe4gP7waltLxHAK3o7Nep/UyqqclyB6vLXk7o+NQiqGKkPm0m
+Cu+UAGreTAoXpn54/IzlWzM7i5L2uOMDHpIwrGJt1vBOdobIrYixufL/lhpL63P3
+1CiTtEo5Pm+LVGBvL4hPfQ==</ds:SignatureValue>
       <ds:KeyInfo>
         <ds:X509Data>
-          <ds:X509Certificate>MIICsjCCAZqgAwIBAgIUHyE7T5cqO2vtCT497Jol5Kz7xA0wDQYJKoZIhvcNAQEL
+          <ds:X509Certificate>MIICsjCCAZqgAwIBAgIUXSUKGgmnqpCUhCbtis7uhQ8TidIwDQYJKoZIhvcNAQEL
 BQAwEzERMA8GA1UEAwwIdGVzdC1pZHAwHhcNMjUwNjE3MTIwMDAwWhcNMzYwNjE0
 MTIwMDAwWjATMREwDwYDVQQDDAh0ZXN0LWlkcDCCASIwDQYJKoZIhvcNAQEBBQAD
-ggEPADCCAQoCggEBAOI5mNrCkqv37wyjAtnFXZfrttxqFHqo3mUhLP3vZmzywTn5
-u6Ug0pJ4Kx0JAeu5Ag3QJdQketp0TocWTbubWM3dTRWL4GQ/43WEwsP6BKKvKl1Z
-bJ1fHefqJHvZDCzhUyGeaz7OscGMQs1PZ5HoKN3Aqw9sKCwvqwsGiiqXpGogiV9y
-xg6FvrxjKO+hppjpuQIguQI6M4eGyQEEYCJcmdEjiTaenXFr0uyNyITdx5oUcgIK
-FMsHBvNmZgB5EG0UIXKBJ+oSyRRfc/0DdUzW2aWf+It3M+azKUosahz4du6u9YYi
-aG+F+LaSFmurqCejsX0SbWZ3xy2jgw/5dm/14ZECAwEAATANBgkqhkiG9w0BAQsF
-AAOCAQEAynT+IpjC7ww9bUpNHii5MinqcRZVBdr7H1BdyIJUy6UV+EDn4TwcQPiX
-pYpj3sukPityVpY6Mflcz+lCYQLXuorscdFMupjYwIZZ29JKco3XodTpLusPTa+e
-sQ7k4qEqa9rsXmxbp21CbE3JE2Qo2HidM+011dU+p4nMVsCmVwEakYmRADglX6kX
-SF+SYvnbNtIw7z375lGkSlQESIN8YKb1hx7zRQ9G+ZIENyTwiYckPZc96aPUZMfX
-kN6VpPN2QBkgNps1855LBIq6MgqCeyHlYKt8vXnjoYTWFSGK0205Pv7kwA1sWdlL
-kWSlqaIG54lBQg/nNcLJP4NPt7S6OQ==
+ggEPADCCAQoCggEBANTRdfUxsGOyUif8TIw8wpclwll7SN+s7FQ1sohIqsqNIy5F
+Djegri93v8eRDWYU9aXYxCM30GP5HnfURlTsBFc9I2MOZxIb9iBOukGyuWcM3IP3
+ilTmI8Qar7fYqgjRnI/NBVg0WiNoCtprREGCQ3Q0eqmFUmKaqCv53roH7ONa6HkU
+D8/yp574H58vihSmkPPJZCJUVO+L11DLeLLGx7S+SS9VkA6IMZfCWhorcIZF4PM9
+wm8UBKJngxZ+gfdY19CYu3JmriTqwu2PQynyI3V5LoHBE9bpDQX1lxWxtSapUCb1
+TmHhS1xdKy0Do8PvIYiSMoYfDp0QTcy5/RudxJsCAwEAATANBgkqhkiG9w0BAQsF
+AAOCAQEAHxHks9I5ieJbO3kpcowMeHRa+Nn+Gp5kNP3mVkwoq9tjw49oA3xVM0C9
+lNGfQ96Xtho0bqPI8zpxZHNqcbBhM2vQGzyvHAoUY7DrvoaPIQ+YCq7kZuf9ZDv3
+LoZY/jFKM1aXRrkS4M2eqG3LP9f67gcHRLAH5U0a366jsujDWDVzJCcd0JilfeoY
+pGBIEyzhLwSdxhrc2bdUhsKJcNn60M2HdcZx59AKSUiCd9Hp4bt4vArEL7iGctQ9
+qVdRtZMbeAvTTunoQ+LeQqNe9GbowzwXl5kGpXGL3FD6gu/qCPCuqB4q7CcqOOZ6
+e7CG93L8l0LvixCTae4dSgGxAT2j3w==
 </ds:X509Certificate>
         </ds:X509Data>
       </ds:KeyInfo>
@@ -49,14 +49,19 @@ kWSlqaIG54lBQg/nNcLJP4NPt7S6OQ==
     <saml:Subject>
       <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">soc@example.test</saml:NameID>
       <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-        <saml:SubjectConfirmationData Recipient="https://adhkar.test/v1/auth/saml/test/acs" NotOnOrAfter="1970-01-02T00:00:00+00:00"/>
+        <saml:SubjectConfirmationData Recipient="https://adhkar.test/v1/auth/saml/test/acs" NotOnOrAfter="1970-01-02T00:00:00Z"/>
       </saml:SubjectConfirmation>
     </saml:Subject>
-    <saml:Conditions NotBefore="1970-01-01T00:00:00+00:00" NotOnOrAfter="1970-01-02T00:00:00+00:00">
+    <saml:Conditions NotBefore="1970-01-01T00:00:00Z" NotOnOrAfter="1970-01-02T00:00:00Z">
       <saml:AudienceRestriction>
         <saml:Audience>https://adhkar.test/api/v1/auth/saml/test/metadata</saml:Audience>
       </saml:AudienceRestriction>
     </saml:Conditions>
+    <saml:AuthnStatement AuthnInstant="2026-06-17T12:00:00Z" SessionIndex="session-assertion-expired">
+      <saml:AuthnContext>
+        <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>
+      </saml:AuthnContext>
+    </saml:AuthnStatement>
     <saml:AttributeStatement>
       <saml:Attribute Name="mail">
         <saml:AttributeValue>soc@example.test</saml:AttributeValue>

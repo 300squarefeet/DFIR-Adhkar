@@ -38,6 +38,11 @@ NOW = datetime(2026, 6, 17, 12, 0, 0, tzinfo=UTC)
 WINDOW = timedelta(minutes=5)
 
 
+def _xs_dt(dt: datetime) -> str:
+    """XML Schema dateTime - pysaml2 only accepts the 'Z' suffix form."""
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _generate_keypair(common_name: str) -> tuple[bytes, bytes]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
@@ -156,27 +161,32 @@ def _build_response_xml(
 <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                 xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
                 ID="response-{assertion_id}"
-                IssueInstant="{NOW.isoformat()}"
+                IssueInstant="{_xs_dt(NOW)}"
                 Version="2.0"
                 Destination="{recipient}">
   <saml:Issuer>{IDP_ENTITY_ID}</saml:Issuer>
   <samlp:Status>
     <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
   </samlp:Status>
-  <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{assertion_id}" IssueInstant="{NOW.isoformat()}" Version="2.0">
+  <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{assertion_id}" IssueInstant="{_xs_dt(NOW)}" Version="2.0">
     <saml:Issuer>{IDP_ENTITY_ID}</saml:Issuer>
     {signature_block}
     <saml:Subject>
       <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">{name_id}</saml:NameID>
       <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-        <saml:SubjectConfirmationData Recipient="{recipient}" NotOnOrAfter="{not_on_or_after.isoformat()}"/>
+        <saml:SubjectConfirmationData Recipient="{recipient}" NotOnOrAfter="{_xs_dt(not_on_or_after)}"/>
       </saml:SubjectConfirmation>
     </saml:Subject>
-    <saml:Conditions NotBefore="{not_before.isoformat()}" NotOnOrAfter="{not_on_or_after.isoformat()}">
+    <saml:Conditions NotBefore="{_xs_dt(not_before)}" NotOnOrAfter="{_xs_dt(not_on_or_after)}">
       <saml:AudienceRestriction>
         <saml:Audience>{audience}</saml:Audience>
       </saml:AudienceRestriction>
     </saml:Conditions>
+    <saml:AuthnStatement AuthnInstant="{_xs_dt(NOW)}" SessionIndex="session-{assertion_id}">
+      <saml:AuthnContext>
+        <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>
+      </saml:AuthnContext>
+    </saml:AuthnStatement>
     <saml:AttributeStatement>
       <saml:Attribute Name="mail">
         <saml:AttributeValue>{name_id}</saml:AttributeValue>
