@@ -234,6 +234,7 @@ async def list_alerts(
     severity: int | None = None,
     tag: str | None = None,
     unpromoted: bool | None = None,
+    case_id: UUID | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     updated_since: datetime | None = None,
@@ -251,7 +252,9 @@ async def list_alerts(
         stmt = stmt.where(Alert.severity == severity)
     if tag:
         stmt = stmt.where(Alert.tags.contains([tag]))
-    if unpromoted is True:
+    if case_id is not None:
+        stmt = stmt.where(Alert.case_id == case_id)
+    elif unpromoted is True:
         stmt = stmt.where(Alert.case_id.is_(None))
     elif unpromoted is False:
         stmt = stmt.where(Alert.case_id.is_not(None))
