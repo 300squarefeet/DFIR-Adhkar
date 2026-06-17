@@ -262,8 +262,8 @@ async def export_tasks_csv(
     mine: bool | None = None,
 ) -> PlainTextResponse:
     """CSV dump matching GET /v1/tasks filter surface."""
-    import csv  # noqa: PLC0415
-    import io  # noqa: PLC0415
+    import csv
+    import io
 
     stmt = select(Task).where(Task.organization_id == org_id)
     if mine is True:

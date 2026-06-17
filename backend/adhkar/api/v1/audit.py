@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json as _json
 from datetime import datetime
+from collections.abc import Sequence
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +58,10 @@ async def list_audit(
     if actor_user_id:
         stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
     rows = (await db.execute(stmt)).scalars().all()
+    return _to_dtos(rows)
+
+
+def _to_dtos(rows: Sequence[AuditLog]) -> list[AuditLogDTO]:
     return [
         AuditLogDTO(
             id=r.id,
@@ -68,3 +77,67 @@ async def list_audit(
         )
         for r in rows
     ]
+
+
+@router.get(
+    "/export-csv",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def export_audit_csv(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    entity_type: str | None = None,
+    action: str | None = None,
+    actor_user_id: UUID | None = None,
+    limit: int = Query(5000, ge=1, le=50_000),
+) -> PlainTextResponse:
+    """CSV dump of audit_logs in the current org. Caps at 50k rows so a
+    chatty integration can't OOM the server; tighten via `limit` to
+    snapshot a date window."""
+    stmt = (
+        select(AuditLog)
+        .where(AuditLog.organization_id == org_id)
+        .order_by(desc(AuditLog.created_at))
+        .limit(limit)
+    )
+    if entity_type:
+        stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
+    if actor_user_id:
+        stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
+    rows = (await db.execute(stmt)).scalars().all()
+    buf = io.StringIO()
+    w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    w.writerow(
+        [
+            "created_at",
+            "actor_user_id",
+            "action",
+            "entity_type",
+            "entity_id",
+            "diff",
+            "request_id",
+            "ip",
+        ]
+    )
+    for r in rows:
+        w.writerow(
+            [
+                r.created_at.isoformat(),
+                str(r.actor_user_id) if r.actor_user_id else "",
+                r.action,
+                r.entity_type,
+                str(r.entity_id) if r.entity_id else "",
+                _json.dumps(r.diff, separators=(",", ":"), sort_keys=True),
+                r.request_id or "",
+                str(r.ip) if r.ip else "",
+            ]
+        )
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="adhkar-audit.csv"'},
+    )

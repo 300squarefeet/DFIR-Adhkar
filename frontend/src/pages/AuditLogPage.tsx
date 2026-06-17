@@ -84,7 +84,26 @@ export function AuditLogPage() {
   return (
     <section className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[1fr_24rem]">
       <article>
-        <h1 className="mb-2 text-2xl font-semibold">Audit Log</h1>
+        <div className="mb-2 flex items-center gap-2">
+          <h1 className="text-2xl font-semibold">Audit Log</h1>
+          <a
+            href={(() => {
+              const base =
+                (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+                "http://localhost:8000";
+              const p = new URLSearchParams();
+              if (entityType) p.set("entity_type", entityType);
+              if (actionFilter) p.set("action", actionFilter);
+              const qs = p.toString();
+              return `${base}/v1/audit/export-csv${qs ? `?${qs}` : ""}`;
+            })()}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+          >
+            Export CSV
+          </a>
+        </div>
         <div className="mb-3 flex flex-wrap gap-2">
           <input
             className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
