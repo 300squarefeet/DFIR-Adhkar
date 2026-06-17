@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="response-assertion-valid" IssueInstant="2026-06-17T12:00:00+00:00" Version="2.0" Destination="https://adhkar.test/v1/auth/saml/test/acs">
+  <saml:Issuer>https://idp.test/saml/metadata</saml:Issuer>
+  <samlp:Status>
+    <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+  </samlp:Status>
+  <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="assertion-valid" IssueInstant="2026-06-17T12:00:00+00:00" Version="2.0">
+    <saml:Issuer>https://idp.test/saml/metadata</saml:Issuer>
+    <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+      <ds:SignedInfo>
+        <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+        <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+        <ds:Reference URI="#assertion-valid">
+          <ds:Transforms>
+            <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+            <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+          </ds:Transforms>
+          <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+          <ds:DigestValue>Z7dZyJxnecFGKWexyNLGX5AGVZNgW7RhiIig9tpslfk=</ds:DigestValue>
+        </ds:Reference>
+      </ds:SignedInfo>
+      <ds:SignatureValue>cQYna9vajKj6sH6yKA09R7EVd+2FHtPTCDIpN0emZImjJjCzVO7uNsMvfkQ14/Zg
+3RxkX7y/Yw1+RowQbVuqmSZB0UrGc8XcEUNo9NdoAaPVH84LThZmK01g6nx0WHB6
+gTmVis5uOBI49IL6yelTZtM60mdmr+tvKSdYWMdJO4DvzITy1juSsYo3oz/yYe60
+UDkhQDxpxWEcYSbtKflmTfSH+zuLCp65/gPXVs9znnjAgnFGAUa2ebvP/9uJvTUC
+ZZR+QZAhzsl3R68YyBQKhX6HSel0yvOgksbjq09Si5+yNjQrSnxokNT2ubhy9fVs
+mnZIhf9bSM009/wAiBj52A==</ds:SignatureValue>
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>MIICsjCCAZqgAwIBAgIUHyE7T5cqO2vtCT497Jol5Kz7xA0wDQYJKoZIhvcNAQEL
+BQAwEzERMA8GA1UEAwwIdGVzdC1pZHAwHhcNMjUwNjE3MTIwMDAwWhcNMzYwNjE0
+MTIwMDAwWjATMREwDwYDVQQDDAh0ZXN0LWlkcDCCASIwDQYJKoZIhvcNAQEBBQAD
+ggEPADCCAQoCggEBAOI5mNrCkqv37wyjAtnFXZfrttxqFHqo3mUhLP3vZmzywTn5
+u6Ug0pJ4Kx0JAeu5Ag3QJdQketp0TocWTbubWM3dTRWL4GQ/43WEwsP6BKKvKl1Z
+bJ1fHefqJHvZDCzhUyGeaz7OscGMQs1PZ5HoKN3Aqw9sKCwvqwsGiiqXpGogiV9y
+xg6FvrxjKO+hppjpuQIguQI6M4eGyQEEYCJcmdEjiTaenXFr0uyNyITdx5oUcgIK
+FMsHBvNmZgB5EG0UIXKBJ+oSyRRfc/0DdUzW2aWf+It3M+azKUosahz4du6u9YYi
+aG+F+LaSFmurqCejsX0SbWZ3xy2jgw/5dm/14ZECAwEAATANBgkqhkiG9w0BAQsF
+AAOCAQEAynT+IpjC7ww9bUpNHii5MinqcRZVBdr7H1BdyIJUy6UV+EDn4TwcQPiX
+pYpj3sukPityVpY6Mflcz+lCYQLXuorscdFMupjYwIZZ29JKco3XodTpLusPTa+e
+sQ7k4qEqa9rsXmxbp21CbE3JE2Qo2HidM+011dU+p4nMVsCmVwEakYmRADglX6kX
+SF+SYvnbNtIw7z375lGkSlQESIN8YKb1hx7zRQ9G+ZIENyTwiYckPZc96aPUZMfX
+kN6VpPN2QBkgNps1855LBIq6MgqCeyHlYKt8vXnjoYTWFSGK0205Pv7kwA1sWdlL
+kWSlqaIG54lBQg/nNcLJP4NPt7S6OQ==
+</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </ds:Signature>
+    <saml:Subject>
+      <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">soc@example.test</saml:NameID>
+      <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+        <saml:SubjectConfirmationData Recipient="https://adhkar.test/v1/auth/saml/test/acs" NotOnOrAfter="2026-06-17T12:05:00+00:00"/>
+      </saml:SubjectConfirmation>
+    </saml:Subject>
+    <saml:Conditions NotBefore="2026-06-17T11:55:00+00:00" NotOnOrAfter="2026-06-17T12:05:00+00:00">
+      <saml:AudienceRestriction>
+        <saml:Audience>https://adhkar.test/api/v1/auth/saml/test/metadata</saml:Audience>
+      </saml:AudienceRestriction>
+    </saml:Conditions>
+    <saml:AttributeStatement>
+      <saml:Attribute Name="mail">
+        <saml:AttributeValue>soc@example.test</saml:AttributeValue>
+      </saml:Attribute>
+      <saml:Attribute Name="displayName">
+        <saml:AttributeValue>SOC Bot</saml:AttributeValue>
+      </saml:Attribute>
+    </saml:AttributeStatement>
+  </saml:Assertion>
+</samlp:Response>

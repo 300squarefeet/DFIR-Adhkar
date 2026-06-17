@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                     entityID="https://idp.test/saml/metadata">
+  <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>TUlJQ3NqQ0NBWnFnQXdJQkFnSVVIeUU3VDVjcU8ydnRDVDQ5N0pvbDVLejd4QTB3RFFZSktvWklodmNOQVFFTEJRQXdFekVSTUE4R0ExVUVBd3dJZEdWemRDMXBaSEF3SGhjTk1qVXdOakUzTVRJd01EQXdXaGNOTXpZd05qRTBNVEl3TURBd1dqQVRNUkV3RHdZRFZRUUREQWgwWlhOMExXbGtjRENDQVNJd0RRWUpLb1pJaHZjTkFRRUJCUUFEZ2dFUEFEQ0NBUW9DZ2dFQkFPSTVtTnJDa3F2Mzd3eWpBdG5GWFpmcnR0eHFGSHFvM21VaExQM3ZabXp5d1RuNXU2VWcwcEo0S3gwSkFldTVBZzNRSmRRa2V0cDBUb2NXVGJ1YldNM2RUUldMNEdRLzQzV0V3c1A2QktLdktsMVpiSjFmSGVmcUpIdlpEQ3poVXlHZWF6N09zY0dNUXMxUFo1SG9LTjNBcXc5c0tDd3Zxd3NHaWlxWHBHb2dpVjl5eGc2RnZyeGpLTytocHBqcHVRSWd1UUk2TTRlR3lRRUVZQ0pjbWRFamlUYWVuWEZyMHV5TnlJVGR4NW9VY2dJS0ZNc0hCdk5tWmdCNUVHMFVJWEtCSitvU3lSUmZjLzBEZFV6VzJhV2YrSXQzTSthektVb3NhaHo0ZHU2dTlZWWlhRytGK0xhU0ZtdXJxQ2Vqc1gwU2JXWjN4eTJqZ3cvNWRtLzE0WkVDQXdFQUFUQU5CZ2txaGtpRzl3MEJBUXNGQUFPQ0FRRUF5blQrSXBqQzd3dzliVXBOSGlpNU1pbnFjUlpWQmRyN0gxQmR5SUpVeTZVVitFRG40VHdjUVBpWHBZcGozc3VrUGl0eVZwWTZNZmxjeitsQ1lRTFh1b3JzY2RGTXVwall3SVpaMjlKS2NvM1hvZFRwTHVzUFRhK2VzUTdrNHFFcWE5cnNYbXhicDIxQ2JFM0pFMlFvMkhpZE0rMDExZFUrcDRuTVZzQ21Wd0Vha1ltUkFEZ2xYNmtYU0YrU1l2bmJOdEl3N3ozNzVsR2tTbFFFU0lOOFlLYjFoeDd6UlE5RytaSUVOeVR3aVlja1BaYzk2YVBVWk1mWGtONlZwUE4yUUJrZ05wczE4NTVMQklxNk1ncUNleUhsWUt0OHZYbmpvWVRXRlNHSzAyMDVQdjdrd0Exc1dkbExrV1NscWFJRzU0bEJRZy9uTmNMSlA0TlB0N1M2T1E9PQ==</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                            Location="https://idp.test/saml/sso"/>
+  </md:IDPSSODescriptor>
+</md:EntityDescriptor>
