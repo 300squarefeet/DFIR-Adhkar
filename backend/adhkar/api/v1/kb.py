@@ -77,6 +77,7 @@ async def list_kb_pages(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     query: str | None = None,
+    pinned_only: bool = False,
     limit: int = 100,
 ) -> list[KbPageDTO]:
     stmt = select(KnowledgeBasePage).where(KnowledgeBasePage.organization_id == org_id)
@@ -85,6 +86,8 @@ async def list_kb_pages(
         stmt = stmt.where(
             (KnowledgeBasePage.title.ilike(like)) | (KnowledgeBasePage.slug.ilike(like))
         )
+    if pinned_only:
+        stmt = stmt.where(KnowledgeBasePage.pinned.is_(True))
     stmt = stmt.order_by(KnowledgeBasePage.pinned.desc(), KnowledgeBasePage.title).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_kb_dto(p) for p in rows]

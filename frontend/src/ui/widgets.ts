@@ -140,6 +140,13 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     link: "/observables",
   },
   {
+    id: "pinned-kb",
+    title: "Pinned runbooks",
+    path: "/v1/kb/pages?pinned_only=true&limit=200",
+    derive: (r) => asArray<unknown>(r).length,
+    link: "/knowledge-base",
+  },
+  {
     id: "mttr-30d-hours",
     title: "Median MTTR 30d (h)",
     path: "/v1/stats/case-mttr?days=30",
