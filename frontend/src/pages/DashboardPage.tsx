@@ -18,6 +18,7 @@ import { MyRecentCasesPanel } from "@/ui/MyRecentCasesPanel";
 import { ObservableTlpPanel } from "@/ui/ObservableTlpPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
+import { RecentAlertsPanel } from "@/ui/RecentAlertsPanel";
 import { RecentCasesPanel } from "@/ui/RecentCasesPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
@@ -315,6 +316,7 @@ export function DashboardPage() {
       <AuditNoisePanel />
       <RecentCasesPanel />
       <MyRecentCasesPanel />
+      <RecentAlertsPanel />
       <AlertSourcePanel />
     </section>
   );
