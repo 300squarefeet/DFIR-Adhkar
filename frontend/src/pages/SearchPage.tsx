@@ -44,6 +44,8 @@ export function SearchPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
+  const [entityType, setEntityType] = useState<"" | "case" | "alert">("");
+  const [minSev, setMinSev] = useState<"" | "1" | "2" | "3" | "4">("");
 
   useEffect(() => {
     try {
@@ -59,8 +61,11 @@ export function SearchPage() {
     setBusy(true);
     setError(null);
     try {
+      const params = new URLSearchParams({ q: term, limit: "25" });
+      if (entityType) params.set("entity_type", entityType);
+      if (minSev) params.set("min_severity", minSev);
       const r = await apiCall<SearchResponse>(
-        `/v1/search?q=${encodeURIComponent(term)}&limit=25`,
+        `/v1/search?${params.toString()}`,
       );
       setResults(r);
       setRecent((prev) =>
@@ -96,6 +101,44 @@ export function SearchPage() {
         >
           {busy ? "Searching…" : "Search"}
         </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-md-sys-color-on-surface-variant">Scope:</span>
+        {[
+          { v: "", label: "All" },
+          { v: "case", label: "Cases" },
+          { v: "alert", label: "Alerts" },
+        ].map((opt) => (
+          <button
+            key={opt.v}
+            type="button"
+            className={
+              "rounded-full border px-2 py-0.5 " +
+              (entityType === opt.v
+                ? "border-md-sys-color-primary bg-md-sys-color-primary text-md-sys-color-on-primary"
+                : "border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+            }
+            onClick={() => setEntityType(opt.v as "" | "case" | "alert")}
+          >
+            {opt.label}
+          </button>
+        ))}
+        <span className="ml-2 text-md-sys-color-on-surface-variant">
+          Min severity:
+        </span>
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-0.5"
+          value={minSev}
+          onChange={(e) =>
+            setMinSev(e.target.value as "" | "1" | "2" | "3" | "4")
+          }
+        >
+          <option value="">any</option>
+          <option value="1">S1+</option>
+          <option value="2">S2+</option>
+          <option value="3">S3+</option>
+          <option value="4">S4</option>
+        </select>
       </div>
       {recent.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 text-xs">
