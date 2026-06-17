@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -257,6 +257,88 @@ async def list_case_contributors(
     ]
     out.sort(key=lambda r: -(r.comment_count + r.task_log_count + r.audit_count))
     return out
+
+
+class RelatedCaseRow(BaseModel):
+    case_id: UUID
+    number: int
+    title: str
+    severity: int
+    stage: str
+    relation: str
+
+
+@router.get("/v1/cases/{case_id}/related", response_model=list[RelatedCaseRow])
+async def list_related_cases(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[RelatedCaseRow]:
+    """Cases linked to this one via CaseLink in either direction. Returns
+    the relation as recorded on the link (related/duplicate/child_of/
+    caused_by/references). Excludes soft-deleted and de-duplicates if a
+    case is linked twice."""
+    from adhkar.db.models import CaseLink as _CaseLink
+
+    # Confirm the source case is in caller's org first (404 otherwise).
+    src = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if src is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+    rows = (
+        (
+            await db.execute(
+                select(_CaseLink).where(
+                    _CaseLink.organization_id == org_id,
+                    or_(
+                        _CaseLink.source_case_id == case_id,
+                        _CaseLink.target_case_id == case_id,
+                    ),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    other_ids: dict[UUID, str] = {}
+    for link in rows:
+        peer = link.target_case_id if link.source_case_id == case_id else link.source_case_id
+        # First-seen relation wins if a case is linked twice.
+        other_ids.setdefault(peer, link.relation)
+    if not other_ids:
+        return []
+    peers = (
+        (
+            await db.execute(
+                select(Case).where(
+                    Case.id.in_(list(other_ids.keys())),
+                    Case.organization_id == org_id,
+                    Case.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        RelatedCaseRow(
+            case_id=c.id,
+            number=c.number,
+            title=c.title,
+            severity=c.severity,
+            stage=c.stage,
+            relation=other_ids[c.id],
+        )
+        for c in peers
+    ]
 
 
 class BulkPatchPayload(BaseModel):
