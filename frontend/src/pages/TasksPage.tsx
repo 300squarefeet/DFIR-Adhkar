@@ -33,6 +33,30 @@ export function TasksPage() {
   const toast = useToast();
   const [rows, setRows] = useState<TaskRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const urlOverride = (() => {
+    if (typeof window === "undefined")
+      return {} as {
+        status?: TaskStatus | "";
+        mine?: boolean;
+        overdue?: boolean;
+        mandatory?: "" | "true" | "false";
+      };
+    const p = new URLSearchParams(window.location.search);
+    const out: {
+      status?: TaskStatus | "";
+      mine?: boolean;
+      overdue?: boolean;
+      mandatory?: "" | "true" | "false";
+    } = {};
+    const s = p.get("status_filter");
+    if (s === "Waiting" || s === "InProgress" || s === "Completed" || s === "Cancelled")
+      out.status = s;
+    if (p.get("mine") === "true") out.mine = true;
+    if (p.get("overdue") === "true") out.overdue = true;
+    const m = p.get("mandatory");
+    if (m === "true" || m === "false") out.mandatory = m;
+    return out;
+  })();
   const initialView = (() => {
     try {
       const raw = window.localStorage.getItem("adhkar.tasks.savedView.v1");
@@ -64,11 +88,15 @@ export function TasksPage() {
       };
     }
   })();
-  const [status, setStatus] = useState<TaskStatus | "">(initialView.status);
-  const [mine, setMine] = useState(initialView.mine);
-  const [overdue, setOverdue] = useState(initialView.overdue);
+  const [status, setStatus] = useState<TaskStatus | "">(
+    urlOverride.status ?? initialView.status,
+  );
+  const [mine, setMine] = useState(urlOverride.mine ?? initialView.mine);
+  const [overdue, setOverdue] = useState(
+    urlOverride.overdue ?? initialView.overdue,
+  );
   const [mandatory, setMandatory] = useState<"" | "true" | "false">(
-    initialView.mandatory,
+    urlOverride.mandatory ?? initialView.mandatory,
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
