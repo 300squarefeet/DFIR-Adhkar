@@ -220,6 +220,30 @@ export function CasesPage() {
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Cases</h1>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
+            onClick={() => {
+              const p = new URLSearchParams();
+              if (view.stage) p.set("stage", view.stage);
+              if (view.severity) p.set("severity", view.severity);
+              if (view.flagged) p.set("flagged", view.flagged);
+              if (view.tag.trim()) p.set("tag", view.tag.trim());
+              if (view.since)
+                p.set("since", new Date(view.since).toISOString());
+              if (view.until)
+                p.set("until", new Date(view.until).toISOString());
+              const qs = p.toString();
+              const url = `${window.location.origin}/cases${qs ? `?${qs}` : ""}`;
+              navigator.clipboard
+                .writeText(url)
+                .then(() => toast.success("Link copied."))
+                .catch(() => toast.error("Clipboard unavailable."));
+            }}
+            title="Copy a link to this filtered view"
+          >
+            Copy URL
+          </button>
           <a
             href={(() => {
               const base =
