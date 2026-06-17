@@ -57,13 +57,42 @@ export function ObservablesPage() {
       return { type: "", tag: "", ioc: "" as const, sighted: "" as const, tlp: "" };
     }
   })();
-  const [filterType, setFilterType] = useState(initialView.type);
-  const [filterTag, setFilterTag] = useState(initialView.tag);
-  const [filterIoc, setFilterIoc] = useState<"" | "true" | "false">(initialView.ioc);
+  const urlOverride = (() => {
+    if (typeof window === "undefined") return {};
+    const sp = new URLSearchParams(window.location.search);
+    const out: Partial<{
+      filterType: string;
+      filterTag: string;
+      filterIoc: "" | "true" | "false";
+      filterSighted: "" | "true" | "false";
+      filterTlp: string;
+    }> = {};
+    const dt = sp.get("data_type");
+    if (dt !== null) out.filterType = dt;
+    const tag = sp.get("tag");
+    if (tag !== null) out.filterTag = tag;
+    const ioc = sp.get("is_ioc");
+    if (ioc === "true" || ioc === "false") out.filterIoc = ioc;
+    const sighted = sp.get("sighted");
+    if (sighted === "true" || sighted === "false") out.filterSighted = sighted;
+    const tlp = sp.get("tlp");
+    if (
+      tlp === "white" ||
+      tlp === "green" ||
+      tlp === "amber" ||
+      tlp === "amber-strict" ||
+      tlp === "red"
+    )
+      out.filterTlp = tlp;
+    return out;
+  })();
+  const [filterType, setFilterType] = useState<string>(urlOverride.filterType ?? initialView.type);
+  const [filterTag, setFilterTag] = useState<string>(urlOverride.filterTag ?? initialView.tag);
+  const [filterIoc, setFilterIoc] = useState<"" | "true" | "false">(urlOverride.filterIoc ?? initialView.ioc);
   const [filterSighted, setFilterSighted] = useState<"" | "true" | "false">(
-    initialView.sighted,
+    urlOverride.filterSighted ?? initialView.sighted,
   );
-  const [filterTlp, setFilterTlp] = useState(initialView.tlp);
+  const [filterTlp, setFilterTlp] = useState<string>(urlOverride.filterTlp ?? initialView.tlp);
 
   useEffect(() => {
     try {
