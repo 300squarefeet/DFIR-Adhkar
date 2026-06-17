@@ -481,8 +481,11 @@ async def export_tasks_csv(
     mandatory: bool | None = None,
     overdue: bool | None = None,
     mine: bool | None = None,
+    due_within_days: int | None = None,
+    updated_since: datetime | None = None,
 ) -> PlainTextResponse:
-    """CSV dump matching GET /v1/tasks filter surface."""
+    """CSV dump matching GET /v1/tasks filter surface (including RC166
+    due_within_days and RC176 updated_since)."""
     import csv
     import io
 
@@ -501,6 +504,18 @@ async def export_tasks_csv(
             Task.due_date < datetime.now(tz=UTC),
             Task.status.notin_(("Completed", "Cancelled")),
         )
+    if due_within_days is not None:
+        bounded = max(1, min(90, int(due_within_days)))
+        now = datetime.now(tz=UTC)
+        horizon = now + timedelta(days=bounded)
+        stmt = stmt.where(
+            Task.due_date.is_not(None),
+            Task.due_date >= now,
+            Task.due_date <= horizon,
+            Task.status.notin_(("Completed", "Cancelled")),
+        )
+    if updated_since is not None:
+        stmt = stmt.where(Task.updated_at >= updated_since)
     stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc())
     rows = (await db.execute(stmt)).scalars().all()
     buf = io.StringIO()
