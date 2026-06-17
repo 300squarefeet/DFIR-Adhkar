@@ -48,6 +48,14 @@ export function CreateCasePage() {
       .catch(() => setTemplates([]));
   }, [apiCall]);
 
+  useEffect(() => {
+    if (!templateId) return;
+    const t = templates.find((x) => x.id === templateId);
+    if (!t) return;
+    setSeverity(t.severity as SeverityLevel);
+    setTlp(t.tlp as TLPValue);
+  }, [templateId, templates]);
+
   const submit = async () => {
     if (!title.trim()) return;
     setBusy(true);
@@ -177,11 +185,19 @@ export function CreateCasePage() {
       </label>
       <div className="flex gap-4">
         <label className="block">
-          <span className="text-sm">Severity</span>
+          <span className="text-sm">
+            Severity
+            {templateId ? (
+              <span className="ml-1 text-xs text-md-sys-color-on-surface-variant">
+                (from template)
+              </span>
+            ) : null}
+          </span>
           <select
-            className="mt-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
+            className="mt-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm disabled:opacity-60"
             value={severity}
             onChange={(e) => setSeverity(Number(e.target.value) as SeverityLevel)}
+            disabled={Boolean(templateId)}
           >
             <option value={1}>1 — Low</option>
             <option value={2}>2 — Medium</option>
@@ -190,11 +206,19 @@ export function CreateCasePage() {
           </select>
         </label>
         <label className="block">
-          <span className="text-sm">TLP</span>
+          <span className="text-sm">
+            TLP
+            {templateId ? (
+              <span className="ml-1 text-xs text-md-sys-color-on-surface-variant">
+                (from template)
+              </span>
+            ) : null}
+          </span>
           <select
-            className="mt-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
+            className="mt-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm disabled:opacity-60"
             value={tlp}
             onChange={(e) => setTlp(e.target.value as TLPValue)}
+            disabled={Boolean(templateId)}
           >
             <option value="white">White</option>
             <option value="green">Green</option>
