@@ -42,10 +42,17 @@ export function KnowledgeBasePage() {
   const [newSlug, setNewSlug] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editedWithin, setEditedWithin] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
-    apiCall<KbPage[]>("/v1/kb/pages")
+    const url =
+      editedWithin >= 1
+        ? `/v1/kb/pages?updated_since=${encodeURIComponent(
+            new Date(Date.now() - editedWithin * 3600 * 1000).toISOString(),
+          )}`
+        : "/v1/kb/pages";
+    apiCall<KbPage[]>(url)
       .then((p) => {
         if (!cancelled) setPages(p);
       })
@@ -55,7 +62,7 @@ export function KnowledgeBasePage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall]);
+  }, [apiCall, editedWithin]);
 
   const allTags = useMemo(() => {
     if (!pages) return [] as string[];
@@ -208,6 +215,35 @@ export function KnowledgeBasePage() {
             </button>
           </div>
         ) : null}
+        <div className="mb-3 flex flex-wrap items-center gap-1">
+          <span className="text-xs text-md-sys-color-on-surface-variant">Edited:</span>
+          {(
+            [
+              { label: "Any", value: 0 },
+              { label: "24h", value: 24 },
+              { label: "7d", value: 168 },
+              { label: "30d", value: 720 },
+            ] as const
+          ).map((opt) => {
+            const active = editedWithin === opt.value;
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                aria-pressed={active}
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (active
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                }
+                onClick={() => setEditedWithin(opt.value)}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
         <input
           className="mb-3 w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           placeholder="Filter…"
