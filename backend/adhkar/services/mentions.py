@@ -47,7 +47,12 @@ async def emit_mentions(
         .scalars()
         .all()
     )
+    dispatched = 0
     for u in rows:
+        # Don't notify the author for their own self-mention — annoying
+        # and floods the unread badge for power users.
+        if u.id == actor_user_id:
+            continue
         await audit_and_emit(
             db,
             actor_user_id=actor_user_id,
@@ -57,4 +62,5 @@ async def emit_mentions(
             entity_id=u.id,
             diff={**extra_diff, "mentioned_display_name": u.display_name},
         )
-    return len(rows)
+        dispatched += 1
+    return dispatched

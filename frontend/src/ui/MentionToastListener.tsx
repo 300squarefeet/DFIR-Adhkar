@@ -11,6 +11,28 @@ import { AuthContext } from "@/lib/auth";
 import { useLiveFeed } from "@/lib/useLiveFeed";
 import { useToast } from "@/ui/Toast";
 
+function notifyDesktop(body: string, title: string): void {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  const N = window.Notification;
+  if (N.permission === "granted") {
+    try {
+      new N(title, { body, tag: "adhkar-mention", silent: false });
+    } catch {
+      /* ignore: e.g. iOS Safari rejects */
+    }
+  } else if (N.permission !== "denied") {
+    void N.requestPermission().then((p) => {
+      if (p === "granted") {
+        try {
+          new N(title, { body, tag: "adhkar-mention", silent: false });
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }
+}
+
 export function MentionToastListener() {
   const ctx = useContext(AuthContext);
   const accessToken = ctx?.accessToken ?? null;
@@ -39,6 +61,11 @@ export function MentionToastListener() {
           ? "a comment"
           : "a discussion";
       toast.info(`You were mentioned in ${where}.`);
+      // If the tab is in the background, escalate to a desktop notification
+      // (best-effort: requires browser permission, which we request lazily).
+      if (typeof document !== "undefined" && document.hidden) {
+        notifyDesktop(`Mentioned in ${where}`, "Adhkar IR");
+      }
     }
   }, [events, myId, toast]);
 
