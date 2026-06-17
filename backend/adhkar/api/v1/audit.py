@@ -197,13 +197,15 @@ async def audit_summary(
     days: int = Query(default=14, ge=1, le=90),
     actor_user_id: UUID | None = None,
     entity_type: str | None = None,
+    action: str | None = None,
 ) -> AuditSummaryResponse:
     """Audit row counts grouped by (entity_type, action) over the last N days.
     Sorted by count DESC then entity_type then action so the most-noisy
     surfaces sort first. Useful for spotting noisy automation or a sudden
     spike of mutations on one entity family. Optional `actor_user_id`
     scopes to one actor's noise; optional `entity_type` scopes to one
-    entity family."""
+    entity family; optional `action` scopes to one verb (e.g. `commented`,
+    `deleted`)."""
     since = datetime.now(tz=UTC) - timedelta(days=days)
     stmt = (
         select(
@@ -218,6 +220,8 @@ async def audit_summary(
         stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
     if entity_type is not None:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if action is not None:
+        stmt = stmt.where(AuditLog.action == action)
     rows = (await db.execute(stmt)).all()
     out = [AuditSummaryRow(entity_type=str(r[0]), action=str(r[1]), count=int(r[2])) for r in rows]
     out.sort(key=lambda r: (-r.count, r.entity_type, r.action))
