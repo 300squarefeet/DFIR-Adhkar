@@ -97,7 +97,7 @@ no_implicit_reexport = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "respx.*", "zxcvbn", "qrcode", "qrcode.*"]
+module = ["qrcode", "qrcode.*", "respx.*", "saml2", "saml2.*", "testcontainers.*", "zxcvbn"]
 ignore_missing_imports = true
 
 # ----- pytest -----

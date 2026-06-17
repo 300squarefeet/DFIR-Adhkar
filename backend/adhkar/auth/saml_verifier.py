@@ -11,11 +11,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import redis.asyncio as redis_async
-from saml2 import BINDING_HTTP_POST  # type: ignore[import-untyped]
-from saml2.client import Saml2Client  # type: ignore[import-untyped]
-from saml2.config import SPConfig  # type: ignore[import-untyped]
-from saml2.mdstore import MetadataStore  # type: ignore[import-untyped]
-from saml2.response import StatusError  # type: ignore[import-untyped]
+from saml2 import BINDING_HTTP_POST
+from saml2.client import Saml2Client
+from saml2.config import SPConfig
+from saml2.response import StatusError
 
 from adhkar.auth.saml import SamlProviderConfig
 from adhkar.auth.saml_errors import (
@@ -139,7 +138,4 @@ def build_verifier_from_metadata_xml(
             "metadata": {"inline": [metadata_xml]},
         }
     )
-    mds = MetadataStore(None, sp_config, None)
-    mds.load("inline", metadata_xml)
-    sp_config.metadata = mds
     return SamlVerifier(cfg, Saml2Client(config=sp_config))
