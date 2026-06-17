@@ -118,6 +118,23 @@ interface EvidenceSummary {
   by_type: { data_type: string; count: number; ioc_count: number }[];
 }
 
+interface CaseLinkRow {
+  id: string;
+  source_case_id: string;
+  target_case_id: string;
+  relation: string;
+  note: string | null;
+  created_at: string;
+}
+
+const LINK_RELATIONS = [
+  "related",
+  "duplicate",
+  "child_of",
+  "caused_by",
+  "references",
+] as const;
+
 export function CaseDetailPage({ caseId }: Props) {
   const { apiCall, permissions } = useAuth();
   const toast = useToast();
@@ -176,6 +193,8 @@ export function CaseDetailPage({ caseId }: Props) {
   const [postingLog, setPostingLog] = useState(false);
   const [relatedCases, setRelatedCases] = useState<RelatedCaseRow[] | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSummary | null>(null);
+  const [links, setLinks] = useState<CaseLinkRow[]>([]);
+  const [relationFilter, setRelationFilter] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -256,6 +275,23 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiCall<CaseLinkRow[]>(
+          `/v1/cases/${caseId}/links${relationFilter ? `?relation=${relationFilter}` : ""}`,
+        );
+        if (!cancelled) setLinks(rows);
+      } catch {
+        if (!cancelled) setLinks([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId, relationFilter]);
 
   const createTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -1532,6 +1568,69 @@ export function CaseDetailPage({ caseId }: Props) {
           </article>
         );
       })() : null}
+
+      {links.length === 0 && relationFilter === "" ? null : (
+        <article>
+          <h2 className="mb-2 text-lg font-medium">Links ({links.length})</h2>
+          <div className="mb-2 flex flex-wrap gap-1">
+            <button
+              type="button"
+              className={
+                "rounded-full px-3 py-0.5 text-xs " +
+                (relationFilter === ""
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant")
+              }
+              onClick={() => setRelationFilter("")}
+            >
+              All
+            </button>
+            {LINK_RELATIONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={
+                  "rounded-full px-3 py-0.5 text-xs " +
+                  (relationFilter === r
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant")
+                }
+                onClick={() => setRelationFilter(r)}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          {links.length === 0 ? (
+            <p className="text-xs text-md-sys-color-on-surface-variant">No linked cases.</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {links.map((l) => {
+                const otherId =
+                  l.source_case_id === caseId ? l.target_case_id : l.source_case_id;
+                return (
+                  <li
+                    key={l.id}
+                    className="rounded border border-md-sys-color-outline-variant px-3 py-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] uppercase">
+                        {l.relation}
+                      </span>
+                      <span className="font-mono text-xs">{otherId.slice(0, 8)}</span>
+                    </div>
+                    {l.note ? (
+                      <p className="mt-1 text-xs text-md-sys-color-on-surface-variant">
+                        {l.note}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </article>
+      )}
 
       <article>
         <h2 className="text-lg font-medium">
