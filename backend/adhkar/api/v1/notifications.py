@@ -400,25 +400,32 @@ async def deliveries_summary(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = Query(default=7, ge=1, le=90),
+    endpoint_id: UUID | None = None,
+    rule_id: UUID | None = None,
 ) -> DeliveriesSummaryResponse:
     """Per-status delivery counts over the last N days, zero-filled
     across pending/succeeded/failed so a "dispatcher health" widget can
-    render without empty-bucket quirks."""
+    render without empty-bucket quirks. Optional `endpoint_id` or
+    `rule_id` scope the summary so per-endpoint/per-rule health badges
+    can render."""
     from datetime import UTC, datetime, timedelta
 
     from sqlalchemy import func as _f
 
     since = datetime.now(tz=UTC) - timedelta(days=days)
-    rows = (
-        await db.execute(
-            select(NotificationDelivery.status, _f.count().label("n"))
-            .where(
-                NotificationDelivery.organization_id == org_id,
-                NotificationDelivery.created_at >= since,
-            )
-            .group_by(NotificationDelivery.status)
+    stmt = (
+        select(NotificationDelivery.status, _f.count().label("n"))
+        .where(
+            NotificationDelivery.organization_id == org_id,
+            NotificationDelivery.created_at >= since,
         )
-    ).all()
+        .group_by(NotificationDelivery.status)
+    )
+    if endpoint_id is not None:
+        stmt = stmt.where(NotificationDelivery.endpoint_id == endpoint_id)
+    if rule_id is not None:
+        stmt = stmt.where(NotificationDelivery.rule_id == rule_id)
+    rows = (await db.execute(stmt)).all()
     by_status: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
     canonical = ("pending", "succeeded", "failed")
     buckets = [DeliveryStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
