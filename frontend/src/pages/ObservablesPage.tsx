@@ -185,7 +185,19 @@ export function ObservablesPage() {
             </button>
           ) : null}
           <a
-            href={`${(import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000"}/v1/observables/export-csv`}
+            href={(() => {
+              const base =
+                (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+                "http://localhost:8000";
+              const p = new URLSearchParams();
+              if (filterType.trim()) p.set("data_type", filterType.trim());
+              if (filterTag.trim()) p.set("tag", filterTag.trim());
+              if (filterIoc) p.set("is_ioc", filterIoc);
+              if (filterSighted) p.set("sighted", filterSighted);
+              if (filterTlp) p.set("tlp", filterTlp);
+              const qs = p.toString();
+              return `${base}/v1/observables/export-csv${qs ? `?${qs}` : ""}`;
+            })()}
             target="_blank"
             rel="noreferrer"
             className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"

@@ -5,8 +5,8 @@ from __future__ import annotations
 import csv
 import io
 import json as _json
-from datetime import datetime
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 

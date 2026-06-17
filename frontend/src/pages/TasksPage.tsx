@@ -33,10 +33,53 @@ export function TasksPage() {
   const toast = useToast();
   const [rows, setRows] = useState<TaskRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<TaskStatus | "">("");
-  const [mine, setMine] = useState(false);
-  const [overdue, setOverdue] = useState(false);
-  const [mandatory, setMandatory] = useState<"" | "true" | "false">("");
+  const initialView = (() => {
+    try {
+      const raw = window.localStorage.getItem("adhkar.tasks.savedView.v1");
+      if (!raw)
+        return {
+          status: "" as TaskStatus | "",
+          mine: false,
+          overdue: false,
+          mandatory: "" as "" | "true" | "false",
+        };
+      const p = JSON.parse(raw) as {
+        status?: TaskStatus | "";
+        mine?: boolean;
+        overdue?: boolean;
+        mandatory?: "" | "true" | "false";
+      };
+      return {
+        status: (p.status ?? "") as TaskStatus | "",
+        mine: Boolean(p.mine),
+        overdue: Boolean(p.overdue),
+        mandatory: (p.mandatory ?? "") as "" | "true" | "false",
+      };
+    } catch {
+      return {
+        status: "" as TaskStatus | "",
+        mine: false,
+        overdue: false,
+        mandatory: "" as "" | "true" | "false",
+      };
+    }
+  })();
+  const [status, setStatus] = useState<TaskStatus | "">(initialView.status);
+  const [mine, setMine] = useState(initialView.mine);
+  const [overdue, setOverdue] = useState(initialView.overdue);
+  const [mandatory, setMandatory] = useState<"" | "true" | "false">(
+    initialView.mandatory,
+  );
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "adhkar.tasks.savedView.v1",
+        JSON.stringify({ status, mine, overdue, mandatory }),
+      );
+    } catch {
+      /* private mode — best-effort */
+    }
+  }, [status, mine, overdue, mandatory]);
 
   const refresh = async () => {
     try {
