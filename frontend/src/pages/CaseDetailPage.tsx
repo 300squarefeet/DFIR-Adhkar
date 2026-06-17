@@ -5,6 +5,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Link } from "@tanstack/react-router";
+
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
@@ -101,6 +103,15 @@ interface ResponderResult {
   summary: string;
 }
 
+interface RelatedCaseRow {
+  case_id: string;
+  number: number;
+  title: string;
+  severity: number;
+  stage: string;
+  relation: string;
+}
+
 export function CaseDetailPage({ caseId }: Props) {
   const { apiCall, permissions } = useAuth();
   const toast = useToast();
@@ -157,6 +168,7 @@ export function CaseDetailPage({ caseId }: Props) {
   >({});
   const [logDraft, setLogDraft] = useState("");
   const [postingLog, setPostingLog] = useState(false);
+  const [relatedCases, setRelatedCases] = useState<RelatedCaseRow[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +211,21 @@ export function CaseDetailPage({ caseId }: Props) {
           .catch(() => undefined);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiCall<RelatedCaseRow[]>(`/v1/cases/${caseId}/related`);
+        if (!cancelled) setRelatedCases(rows);
+      } catch {
+        if (!cancelled) setRelatedCases([]);
       }
     })();
     return () => {
@@ -1445,6 +1472,46 @@ export function CaseDetailPage({ caseId }: Props) {
               </li>
             ))}
           </ol>
+        )}
+      </article>
+
+      <article>
+        <h2 className="text-lg font-medium">
+          Related cases ({relatedCases?.length ?? "…"})
+        </h2>
+        {relatedCases === null ? (
+          <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">Loading…</p>
+        ) : relatedCases.length === 0 ? (
+          <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">
+            No related cases.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {relatedCases.map((r) => (
+              <li
+                key={r.case_id}
+                className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant px-3 py-1"
+              >
+                <Link
+                  to="/cases/$caseId"
+                  params={{ caseId: r.case_id }}
+                  className="hover:underline"
+                >
+                  <span className="font-mono mr-2">#{r.number}</span>
+                  <span>{r.title}</span>
+                </Link>
+                <span className="ml-auto flex items-center gap-2">
+                  <SeverityBadge level={r.severity as SeverityLevel} />
+                  <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] uppercase">
+                    {r.relation}
+                  </span>
+                  <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] uppercase">
+                    {r.stage}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </article>
 
