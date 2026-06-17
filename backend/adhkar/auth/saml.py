@@ -15,7 +15,7 @@ already need exhaustive tests:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from xml.etree import ElementTree as ET
 
 from defusedxml import ElementTree as DefusedET  # type: ignore[import-untyped]
@@ -31,6 +31,8 @@ class SamlProviderConfig:
     sp_entity_id: str
     acs_url: str
     idp_certificate_pem: str = ""
+    metadata_url: str = ""
+    wanted_attributes: dict[str, str] = field(default_factory=dict)
 
 
 _SAML_NS = {
@@ -62,6 +64,12 @@ def load_saml_providers(settings: Settings) -> dict[str, SamlProviderConfig]:
                 sp_entity_id=str(cfg["sp_entity_id"]),
                 acs_url=str(cfg["acs_url"]),
                 idp_certificate_pem=str(cfg.get("idp_certificate_pem", "")),
+                metadata_url=str(cfg.get("metadata_url", "")),
+                wanted_attributes={
+                    str(k): str(v)
+                    for k, v in (cfg.get("wanted_attributes") or {}).items()
+                    if isinstance(k, str) and isinstance(v, str)
+                },
             )
         except (KeyError, TypeError):
             continue

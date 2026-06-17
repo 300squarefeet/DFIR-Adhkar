@@ -101,3 +101,61 @@ def test_extract_assertion_picks_up_nameid_when_email_missing() -> None:
     )
     attrs = extract_assertion_attributes(no_email)
     assert attrs.get("NameID") == "soc@example.test"
+
+
+import json as _json  # noqa: E402
+
+from adhkar.auth.saml import load_saml_providers as _load_saml_providers  # noqa: E402
+
+
+def test_load_saml_providers_reads_metadata_url(monkeypatch) -> None:
+    monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
+    monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
+    monkeypatch.setenv(
+        "ADHKAR_SAML_PROVIDERS_JSON",
+        _json.dumps(
+            {
+                "okta": {
+                    "idp_entity_id": "http://www.okta.com/exk-x",
+                    "idp_sso_url": "https://acme.okta.com/app/sso/saml",
+                    "sp_entity_id": "https://adhkar/api/v1/auth/saml/okta/metadata",
+                    "acs_url": "https://adhkar/v1/auth/saml/okta/acs",
+                    "metadata_url": "https://acme.okta.com/app/sso/saml/metadata",
+                    "wanted_attributes": {"email": "mail", "display_name": "displayName"},
+                }
+            }
+        ),
+    )
+    from adhkar.core.settings import Settings, get_settings
+
+    get_settings.cache_clear()
+    providers = _load_saml_providers(Settings())
+    cfg = providers["okta"]
+    assert cfg.metadata_url == "https://acme.okta.com/app/sso/saml/metadata"
+    assert cfg.wanted_attributes == {"email": "mail", "display_name": "displayName"}
+
+
+def test_load_saml_providers_defaults_new_fields(monkeypatch) -> None:
+    monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
+    monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
+    monkeypatch.setenv(
+        "ADHKAR_SAML_PROVIDERS_JSON",
+        _json.dumps(
+            {
+                "minimal": {
+                    "idp_entity_id": "a",
+                    "idp_sso_url": "b",
+                    "sp_entity_id": "c",
+                    "acs_url": "d",
+                }
+            }
+        ),
+    )
+    from adhkar.core.settings import Settings, get_settings
+
+    get_settings.cache_clear()
+    cfg = _load_saml_providers(Settings())["minimal"]
+    assert cfg.metadata_url == ""
+    assert cfg.wanted_attributes == {}
