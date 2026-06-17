@@ -25,6 +25,7 @@ import { RecentTasksPanel } from "@/ui/RecentTasksPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
 import { StageDistributionPanel } from "@/ui/StageDistributionPanel";
+import { TaskStatusPanel } from "@/ui/TaskStatusPanel";
 import { CORE_WIDGETS, type WidgetSpec } from "@/ui/widgets";
 
 interface TimeSeriesPoint {
@@ -313,6 +314,7 @@ export function DashboardPage() {
       <ObservableTlpPanel />
       <StageDistributionPanel />
       <AlertStatusPanel />
+      <TaskStatusPanel />
       <AuditActivityPanel />
       <CasesByAssigneePanel />
       <AuditNoisePanel />
