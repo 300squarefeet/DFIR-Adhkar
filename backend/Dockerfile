@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH"
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl libpq-dev \
+ && apt-get install -y --no-install-recommends curl libpq-dev xmlsec1 libxmlsec1-dev \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.4.30 /uv /usr/local/bin/uv

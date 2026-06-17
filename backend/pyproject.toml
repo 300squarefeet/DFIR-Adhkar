@@ -36,6 +36,10 @@ dependencies = [
   "itsdangerous>=2.2",
   "email-validator>=2.2",
   "defusedxml>=0.7.1",
+  "pysaml2>=7.5",
+  # pysaml2 leaves pyopenssl unpinned; force a modern version compatible
+  # with the cryptography pulled in by other deps (49+).
+  "pyopenssl>=24.2",
   "python-multipart>=0.0.32",
   "joserfc>=1.7.1",
   "markdown>=3.10.2",
@@ -54,6 +58,7 @@ dev = [
   "polyfactory>=2.18",
   "freezegun>=1.5",
   "openapi-spec-validator>=0.7",
+  "fakeredis>=2.27",
   "types-redis>=4.6",
 ]
 

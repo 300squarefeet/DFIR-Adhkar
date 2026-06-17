@@ -39,6 +39,8 @@ jobs:
         with:
           version: "0.4.30"
           enable-cache: true
+      - name: Install xmlsec1 (required by pysaml2)
+        run: sudo apt-get update && sudo apt-get install -y xmlsec1 libxmlsec1-dev
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -114,6 +116,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
         with: { version: "0.4.30", enable-cache: true }
+      - name: Install xmlsec1 (required by pysaml2)
+        run: sudo apt-get update && sudo apt-get install -y xmlsec1 libxmlsec1-dev
       - run: uv sync --frozen
       - name: create minio bucket
         run: |
