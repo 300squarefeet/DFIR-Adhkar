@@ -380,6 +380,55 @@ async def list_deliveries(
     ]
 
 
+class DeliveryStatusBucket(BaseModel):
+    status: str
+    count: int
+
+
+class DeliveriesSummaryResponse(BaseModel):
+    days: int
+    total: int
+    by_status: list[DeliveryStatusBucket]
+
+
+@router.get(
+    "/v1/notification-deliveries/summary",
+    response_model=DeliveriesSummaryResponse,
+)
+async def deliveries_summary(
+    _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = Query(default=7, ge=1, le=90),
+) -> DeliveriesSummaryResponse:
+    """Per-status delivery counts over the last N days, zero-filled
+    across pending/succeeded/failed so a "dispatcher health" widget can
+    render without empty-bucket quirks."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import func as _f
+
+    since = datetime.now(tz=UTC) - timedelta(days=days)
+    rows = (
+        await db.execute(
+            select(NotificationDelivery.status, _f.count().label("n"))
+            .where(
+                NotificationDelivery.organization_id == org_id,
+                NotificationDelivery.created_at >= since,
+            )
+            .group_by(NotificationDelivery.status)
+        )
+    ).all()
+    by_status: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("pending", "succeeded", "failed")
+    buckets = [DeliveryStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
+    return DeliveriesSummaryResponse(
+        days=days,
+        total=sum(b.count for b in buckets),
+        by_status=buckets,
+    )
+
+
 @router.get(
     "/v1/notification-deliveries/export-csv",
     response_class=PlainTextResponse,
