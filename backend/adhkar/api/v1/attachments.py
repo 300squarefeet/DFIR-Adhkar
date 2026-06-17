@@ -360,18 +360,17 @@ async def list_shares(
     _user: Annotated[CurrentUser, Depends(require_permission("manageCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    active_only: bool | None = None,
 ) -> list[CaseShareDTO]:
-    rows = (
-        (
-            await db.execute(
-                select(CaseShare).where(
-                    CaseShare.case_id == case_id, CaseShare.organization_id == org_id
-                )
-            )
-        )
-        .scalars()
-        .all()
+    """Portal shares for this case. `active_only=true` excludes revoked
+    grants — the common analyst view; pass false (or omit) to see the
+    full audit trail including revoked rows."""
+    stmt = select(CaseShare).where(
+        CaseShare.case_id == case_id, CaseShare.organization_id == org_id
     )
+    if active_only is True:
+        stmt = stmt.where(CaseShare.revoked_at.is_(None))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_share_dto(s) for s in rows]
 
 
