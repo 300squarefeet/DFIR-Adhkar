@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
+import { AuditActivityPanel } from "@/ui/AuditActivityPanel";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
@@ -302,6 +303,7 @@ export function DashboardPage() {
       <ObservableTypesPanel />
       <StageDistributionPanel />
       <AlertStatusPanel />
+      <AuditActivityPanel />
     </section>
   );
 }
