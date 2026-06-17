@@ -205,9 +205,11 @@ export function CasesPage() {
               if (view.stage) p.set("stage", view.stage);
               if (view.severity) p.set("severity", view.severity);
               if (view.flagged) p.set("flagged", view.flagged);
+              if (view.tag.trim()) p.set("tag", view.tag.trim());
+              if (view.since) p.set("since", new Date(view.since).toISOString());
+              if (view.until) p.set("until", new Date(view.until).toISOString());
               const qs = p.toString();
               return `${base}/v1/cases/export-csv${qs ? `?${qs}` : ""}`;
-              // Note: export-csv doesn't yet accept since/until; rc62 task.
             })()}
             target="_blank"
             rel="noreferrer"

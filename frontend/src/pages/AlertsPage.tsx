@@ -222,6 +222,8 @@ export function AlertsPage() {
               if (view.severity) p.set("severity", view.severity);
               if (view.tag.trim()) p.set("tag", view.tag.trim());
               if (view.unpromoted) p.set("unpromoted", view.unpromoted);
+              if (view.since) p.set("since", new Date(view.since).toISOString());
+              if (view.until) p.set("until", new Date(view.until).toISOString());
               const qs = p.toString();
               return `${base}/v1/alerts/export-csv${qs ? `?${qs}` : ""}`;
             })()}

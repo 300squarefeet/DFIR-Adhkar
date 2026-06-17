@@ -118,9 +118,10 @@ async def export_alerts_csv(
     severity: int | None = None,
     tag: str | None = None,
     unpromoted: bool | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> PlainTextResponse:
-    """CSV dump of alerts in the current org. Same filter surface as the
-    list endpoint so a saved view can be exported in place."""
+    """CSV dump of alerts. Same filter surface as the list endpoint."""
     import csv
     import io
 
@@ -137,6 +138,10 @@ async def export_alerts_csv(
         stmt = stmt.where(Alert.case_id.is_(None))
     elif unpromoted is False:
         stmt = stmt.where(Alert.case_id.is_not(None))
+    if since is not None:
+        stmt = stmt.where(Alert.created_at >= since)
+    if until is not None:
+        stmt = stmt.where(Alert.created_at < until)
     rows = (await db.execute(stmt.order_by(Alert.created_at.desc()))).scalars().all()
     buf = io.StringIO()
     w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
