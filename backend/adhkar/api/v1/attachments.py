@@ -258,12 +258,14 @@ async def list_case_attachments(
     db: Annotated[AsyncSession, Depends(get_db)],
     av_scan_status: str | None = None,
     content_type_prefix: str | None = None,
+    since: datetime | None = None,
 ) -> list[AttachmentDTO]:
     """Per-case attachments newest first. Optional `av_scan_status=
     <value>` scopes to one scan state (pending/clean/infected/error);
     `content_type_prefix=image/` does a LIKE prefix match so the
     case detail page can render "images only" without filtering
-    client-side."""
+    client-side. `since=<ISO>` enables delta polling for a "new
+    uploads since I last looked" indicator."""
     stmt = (
         select(Attachment)
         .where(Attachment.organization_id == org_id, Attachment.case_id == case_id)
@@ -273,6 +275,8 @@ async def list_case_attachments(
         stmt = stmt.where(Attachment.av_scan_status == av_scan_status)
     if content_type_prefix is not None:
         stmt = stmt.where(Attachment.content_type.like(f"{content_type_prefix}%"))
+    if since is not None:
+        stmt = stmt.where(Attachment.created_at >= since)
     rows = (await db.execute(stmt)).scalars().all()
     return [_att_dto(a) for a in rows]
 
