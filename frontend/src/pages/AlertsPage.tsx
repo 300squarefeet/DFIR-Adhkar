@@ -38,6 +38,8 @@ interface SavedView {
   severity: "" | "1" | "2" | "3" | "4";
   tag: string;
   unpromoted: "" | "true" | "false";
+  since: string;
+  until: string;
 }
 
 function loadView(): SavedView {
@@ -48,6 +50,8 @@ function loadView(): SavedView {
     severity: "",
     tag: "",
     unpromoted: "",
+    since: "",
+    until: "",
   };
   try {
     const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
@@ -60,6 +64,8 @@ function loadView(): SavedView {
       severity: p.severity ?? "",
       tag: p.tag ?? "",
       unpromoted: p.unpromoted ?? "",
+      since: p.since ?? "",
+      until: p.until ?? "",
     };
   } catch {
     return empty;
@@ -85,6 +91,8 @@ export function AlertsPage() {
       if (view.severity) params.set("severity", view.severity);
       if (view.tag.trim()) params.set("tag", view.tag.trim());
       if (view.unpromoted) params.set("unpromoted", view.unpromoted);
+      if (view.since) params.set("since", new Date(view.since).toISOString());
+      if (view.until) params.set("until", new Date(view.until).toISOString());
       const rows = await apiCall<AlertRow[]>(`/v1/alerts?${params.toString()}`);
       setAlerts(rows);
       setSelected(new Set());
@@ -103,6 +111,8 @@ export function AlertsPage() {
     view.severity,
     view.tag,
     view.unpromoted,
+    view.since,
+    view.until,
   ]);
 
   useEffect(() => {
@@ -289,6 +299,20 @@ export function AlertsPage() {
           placeholder="Tag…"
           value={view.tag}
           onChange={(e) => setView({ ...view, tag: e.target.value })}
+        />
+        <input
+          type="date"
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.since}
+          onChange={(e) => setView({ ...view, since: e.target.value })}
+          title="Created since"
+        />
+        <input
+          type="date"
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.until}
+          onChange={(e) => setView({ ...view, until: e.target.value })}
+          title="Created until (exclusive)"
         />
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
