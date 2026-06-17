@@ -14,6 +14,8 @@ export interface LiveEvent {
   event_type: string;
   entity_id?: string | null;
   diff?: Record<string, unknown>;
+  payload?: { entity_id?: string | null; diff?: Record<string, unknown> };
+  organization_id?: string | null;
   receivedAt: number;
 }
 
@@ -23,7 +25,7 @@ const DEFAULT_BASE =
 function wsUrl(base: string, accessToken: string | null): string {
   const trimmed = base.replace(/\/$/, "");
   const u = new URL(trimmed.replace(/^http/, "ws") + "/v1/live");
-  if (accessToken) u.searchParams.set("access_token", accessToken);
+  if (accessToken) u.searchParams.set("token", accessToken);
   return u.toString();
 }
 
@@ -46,7 +48,16 @@ export function useLiveFeed(accessToken: string | null, max = 50): LiveEvent[] {
       ws.addEventListener("message", (e) => {
         try {
           const parsed = JSON.parse(String(e.data)) as Omit<LiveEvent, "receivedAt">;
-          const event: LiveEvent = { ...parsed, receivedAt: Date.now() };
+          // Backend serialises {event_type, payload: {entity_id, diff}, ...}.
+          // Surface entity_id at top level so consumers don't have to dig.
+          const flatId = parsed.entity_id ?? parsed.payload?.entity_id ?? null;
+          const flatDiff = parsed.diff ?? parsed.payload?.diff;
+          const event: LiveEvent = {
+            ...parsed,
+            entity_id: flatId,
+            ...(flatDiff !== undefined ? { diff: flatDiff } : {}),
+            receivedAt: Date.now(),
+          };
           setEvents((prev) => [event, ...prev].slice(0, max));
         } catch {
           // ignore malformed frames
