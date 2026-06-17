@@ -55,6 +55,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/taxonomies/import-misp",
     # Phase 3
     "/v1/cases",
+    "/v1/cases/export-csv",
     "/v1/cases/{case_id}/tasks",
     "/v1/cases/{case_id}/tasks/reorder",
     "/v1/mentions/me",
