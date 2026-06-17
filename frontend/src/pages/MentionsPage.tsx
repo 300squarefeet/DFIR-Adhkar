@@ -4,7 +4,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { useUserNames } from "@/lib/useUserNames";
@@ -22,12 +22,16 @@ export function MentionsPage() {
   const toast = useToast();
   const [rows, setRows] = useState<MentionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
   const userNames = useUserNames(rows.map((r) => r.actor_user_id ?? ""));
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiCall<MentionRow[]>("/v1/mentions/me")
+    const url = unreadOnly
+      ? "/v1/mentions/me?unread_only=true"
+      : "/v1/mentions/me";
+    apiCall<MentionRow[]>(url)
       .then((r) => {
         if (!cancelled) setRows(r);
       })
@@ -35,12 +39,31 @@ export function MentionsPage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    // Opening this page marks everything seen.
-    apiCall("/v1/mentions/me/seen", { method: "POST" }).catch(() => undefined);
+    // Opening this page marks everything seen, but only when the user is
+    // viewing the full list. When the unread toggle is on, we leave the
+    // unread marker alone so the user can review without losing the cue;
+    // they can explicitly clear it via the "Mark all read" button.
+    if (!unreadOnly) {
+      apiCall("/v1/mentions/me/seen", { method: "POST" }).catch(
+        () => undefined,
+      );
+    }
     return () => {
       cancelled = true;
     };
-  }, [apiCall, toast]);
+  }, [apiCall, toast, unreadOnly]);
+
+  const markAllRead = useCallback(() => {
+    apiCall("/v1/mentions/me/seen", { method: "POST" })
+      .then(() => {
+        const url = unreadOnly
+          ? "/v1/mentions/me?unread_only=true"
+          : "/v1/mentions/me";
+        return apiCall<MentionRow[]>(url);
+      })
+      .then((r) => setRows(r))
+      .catch((e) => toast.error((e as Error).message));
+  }, [apiCall, toast, unreadOnly]);
 
   return (
     <section className="p-4">
@@ -49,6 +72,40 @@ export function MentionsPage() {
         Comments and task logs across this organization that include{" "}
         <code>@{"<your display name>"}</code>.
       </p>
+
+      <div className="mb-3 flex items-center gap-2">
+        <button
+          type="button"
+          aria-pressed={!unreadOnly}
+          onClick={() => setUnreadOnly(false)}
+          className={
+            !unreadOnly
+              ? "rounded-full px-2 py-0.5 text-xs bg-md-sys-color-primary text-md-sys-color-on-primary"
+              : "rounded-full px-2 py-0.5 text-xs border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+          }
+        >
+          All
+        </button>
+        <button
+          type="button"
+          aria-pressed={unreadOnly}
+          onClick={() => setUnreadOnly(true)}
+          className={
+            unreadOnly
+              ? "rounded-full px-2 py-0.5 text-xs bg-md-sys-color-primary text-md-sys-color-on-primary"
+              : "rounded-full px-2 py-0.5 text-xs border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+          }
+        >
+          Unread
+        </button>
+        <button
+          type="button"
+          onClick={markAllRead}
+          className="rounded-full px-2 py-0.5 text-xs border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+        >
+          Mark all read
+        </button>
+      </div>
 
       {loading ? (
         <p className="text-sm text-md-sys-color-on-surface-variant">Loading…</p>
