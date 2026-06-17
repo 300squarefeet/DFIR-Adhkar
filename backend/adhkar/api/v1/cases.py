@@ -384,20 +384,37 @@ async def _load_case_or_404(db: AsyncSession, org_id: UUID, case_id: UUID) -> Ca
 
 @router.get("/v1/tasks", response_model=list[TaskDTO])
 async def list_all_tasks(
-    _user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
+    user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     assignee_id: UUID | None = None,
     status_filter: TASK_STATUS | None = None,
+    mandatory: bool | None = None,
+    overdue: bool | None = None,
+    mine: bool | None = None,
     limit: int = 200,
 ) -> list[TaskDTO]:
-    """Cross-case task list. Used by the analyst's 'my queue' view."""
+    """Cross-case task list. Used by the analyst's 'my queue' view.
+
+    `mine=true` is shorthand for assignee_id=<current user>. `overdue=true`
+    keeps only rows whose due_date is in the past AND whose status is not
+    Completed/Cancelled."""
     safe_limit = max(1, min(500, int(limit)))
     stmt = select(Task).where(Task.organization_id == org_id)
-    if assignee_id:
+    if mine is True:
+        stmt = stmt.where(Task.assignee_id == user.user_id)
+    elif assignee_id:
         stmt = stmt.where(Task.assignee_id == assignee_id)
     if status_filter:
         stmt = stmt.where(Task.status == status_filter)
+    if mandatory is not None:
+        stmt = stmt.where(Task.mandatory == mandatory)
+    if overdue is True:
+        stmt = stmt.where(
+            Task.due_date.is_not(None),
+            Task.due_date < datetime.now(tz=UTC),
+            Task.status.notin_(("Completed", "Cancelled")),
+        )
     stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc()).limit(safe_limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_task_to_dto(t) for t in rows]

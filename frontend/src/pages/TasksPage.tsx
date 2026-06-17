@@ -34,11 +34,17 @@ export function TasksPage() {
   const [rows, setRows] = useState<TaskRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<TaskStatus | "">("");
+  const [mine, setMine] = useState(false);
+  const [overdue, setOverdue] = useState(false);
+  const [mandatory, setMandatory] = useState<"" | "true" | "false">("");
 
   const refresh = async () => {
     try {
       const params = new URLSearchParams({ limit: "200" });
       if (status) params.set("status_filter", status);
+      if (mine) params.set("mine", "true");
+      if (overdue) params.set("overdue", "true");
+      if (mandatory) params.set("mandatory", mandatory);
       const r = await apiCall<TaskRow[]>(`/v1/tasks?${params.toString()}`);
       setRows(r);
     } catch (e) {
@@ -49,7 +55,7 @@ export function TasksPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, status]);
+  }, [apiCall, status, mine, overdue, mandatory]);
 
   const userNames = useUserNames(rows?.map((r) => r.assignee_id) ?? []);
 
@@ -89,10 +95,38 @@ export function TasksPage() {
 
   return (
     <section className="space-y-4 p-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Tasks</h1>
+        <label className="ml-auto flex items-center gap-1 text-sm">
+          <input
+            type="checkbox"
+            checked={mine}
+            onChange={(e) => setMine(e.target.checked)}
+          />
+          Mine
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input
+            type="checkbox"
+            checked={overdue}
+            onChange={(e) => setOverdue(e.target.checked)}
+          />
+          Overdue
+        </label>
         <select
-          className="ml-auto rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={mandatory}
+          onChange={(e) =>
+            setMandatory(e.target.value as "" | "true" | "false")
+          }
+          title="Mandatory-task filter"
+        >
+          <option value="">All tasks</option>
+          <option value="true">Mandatory</option>
+          <option value="false">Optional</option>
+        </select>
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           value={status}
           onChange={(e) => setStatus(e.target.value as TaskStatus | "")}
         >
