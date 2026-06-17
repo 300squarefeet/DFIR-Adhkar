@@ -14,14 +14,27 @@ interface ProfileRow {
   is_default: boolean;
 }
 
+const PERMISSION_FILTERS = [
+  "manageCase",
+  "manageUser",
+  "manageConfig",
+  "viewAudit",
+  "auditExport",
+  "gdprAccess",
+] as const;
+
 export function AdminProfilesPage() {
   const { apiCall } = useAuth();
   const [profiles, setProfiles] = useState<ProfileRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [permFilter, setPermFilter] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
-    apiCall<ProfileRow[]>("/v1/profiles")
+    const url = permFilter
+      ? `/v1/profiles?with_permission=${permFilter}`
+      : "/v1/profiles";
+    apiCall<ProfileRow[]>(url)
       .then((p) => {
         if (!cancelled) setProfiles(p);
       })
@@ -31,7 +44,7 @@ export function AdminProfilesPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall]);
+  }, [apiCall, permFilter]);
 
   if (error)
     return (
@@ -43,9 +56,41 @@ export function AdminProfilesPage() {
     );
   if (profiles === null) return <section className="p-6">Loading…</section>;
 
+  const chipBase = "rounded-full px-2 py-0.5 text-xs";
+  const chipActive = "bg-md-sys-color-primary text-md-sys-color-on-primary";
+  const chipInactive =
+    "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container";
+
   return (
     <section className="space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Profiles (RBAC)</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-md-sys-color-on-surface-variant">
+          Has permission:
+        </span>
+        <button
+          type="button"
+          aria-pressed={permFilter === ""}
+          onClick={() => setPermFilter("")}
+          className={`${chipBase} ${permFilter === "" ? chipActive : chipInactive}`}
+        >
+          Any
+        </button>
+        {PERMISSION_FILTERS.map((key) => {
+          const active = permFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setPermFilter(key)}
+              className={`${chipBase} ${active ? chipActive : chipInactive}`}
+            >
+              {key}
+            </button>
+          );
+        })}
+      </div>
       {profiles.length === 0 ? (
         <p className="text-sm text-md-sys-color-on-surface-variant">No profiles.</p>
       ) : (
