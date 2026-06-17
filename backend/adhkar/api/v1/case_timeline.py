@@ -137,11 +137,14 @@ async def case_timeline_summary(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     since: datetime | None = None,
+    action_prefix: str | None = None,
 ) -> TimelineSummaryResponse:
     """Per-action count over this case's timeline (same source rows as
     /v1/cases/{id}/timeline). Optional `since=<ISO>` scopes the window.
-    Drives a "what kind of activity" badge row on the case detail
-    page without paging the full timeline."""
+    `action_prefix=<str>` keeps only actions starting with the string
+    (e.g. `task_` to count all task lifecycle events as a single
+    badge). Drives a "what kind of activity" badge row on the case
+    detail page without paging the full timeline."""
     from sqlalchemy import func as _f
 
     case = (
@@ -169,6 +172,8 @@ async def case_timeline_summary(
     )
     if since is not None:
         stmt = stmt.where(AuditLog.created_at >= since)
+    if action_prefix is not None:
+        stmt = stmt.where(AuditLog.action.like(f"{action_prefix}%"))
     rows = (await db.execute(stmt)).all()
     buckets = [TimelineSummaryBucket(action=str(r[0]), count=int(r[1])) for r in rows]
     buckets.sort(key=lambda b: (-b.count, b.action))
