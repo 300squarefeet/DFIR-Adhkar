@@ -144,6 +144,16 @@ interface CaseLinkRow {
   created_at: string;
 }
 
+interface AttachmentRow {
+  id: string;
+  case_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  av_scan_status: string;
+  created_at: string;
+}
+
 const LINK_RELATIONS = [
   "related",
   "duplicate",
@@ -215,6 +225,8 @@ export function CaseDetailPage({ caseId }: Props) {
   const [tasksSummary, setTasksSummary] = useState<TasksSummary | null>(null);
   const [links, setLinks] = useState<CaseLinkRow[]>([]);
   const [relationFilter, setRelationFilter] = useState<string>("");
+  const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
+  const [avFilter, setAvFilter] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -363,6 +375,23 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId, relationFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiCall<AttachmentRow[]>(
+          `/v1/cases/${caseId}/attachments${avFilter ? `?av_scan_status=${avFilter}` : ""}`,
+        );
+        if (!cancelled) setAttachments(rows);
+      } catch {
+        if (!cancelled) setAttachments([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId, avFilter]);
 
   const createTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -1785,6 +1814,82 @@ export function CaseDetailPage({ caseId }: Props) {
                         {l.note}
                       </p>
                     ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </article>
+      )}
+
+      {attachments.length === 0 && avFilter === "" ? null : (
+        <article>
+          <h2 className="text-lg font-medium">Attachments ({attachments.length})</h2>
+          <div className="mt-2 mb-2 flex flex-wrap gap-1">
+            {(
+              [
+                { key: "", label: "All" },
+                { key: "pending", label: "pending" },
+                { key: "clean", label: "clean" },
+                { key: "infected", label: "infected" },
+                { key: "error", label: "error" },
+              ] as const
+            ).map((chip) => {
+              const active = avFilter === chip.key;
+              return (
+                <button
+                  key={chip.key || "all"}
+                  type="button"
+                  aria-pressed={active}
+                  className={
+                    "rounded-full px-2 py-0.5 text-xs " +
+                    (active
+                      ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                      : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                  }
+                  onClick={() => setAvFilter(chip.key)}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+          {attachments.length === 0 ? (
+            <p className="text-xs text-md-sys-color-on-surface-variant">
+              No attachments matching filter.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {attachments.map((a) => {
+                const fmtSize = (b: number) =>
+                  b >= 1024 * 1024
+                    ? `${(b / (1024 * 1024)).toFixed(1)} MB`
+                    : `${(b / 1024).toFixed(1)} KB`;
+                const avCls =
+                  a.av_scan_status === "clean"
+                    ? "bg-severity-1/20 text-md-sys-color-on-surface"
+                    : a.av_scan_status === "infected"
+                      ? "bg-severity-4/20 text-severity-4"
+                      : a.av_scan_status === "error"
+                        ? "bg-severity-3/20 text-severity-3"
+                        : "bg-md-sys-color-surface-container text-md-sys-color-on-surface";
+                return (
+                  <li
+                    key={a.id}
+                    className="flex flex-wrap items-center gap-2 rounded border border-md-sys-color-outline-variant px-3 py-1.5"
+                  >
+                    <span className="text-sm">{a.filename}</span>
+                    <span className="text-xs text-md-sys-color-on-surface-variant">
+                      {a.content_type}
+                    </span>
+                    <span className="text-xs text-md-sys-color-on-surface-variant">
+                      {fmtSize(a.size_bytes)}
+                    </span>
+                    <span
+                      className={`ml-auto rounded-full px-2 py-0.5 text-[10px] ${avCls}`}
+                    >
+                      {a.av_scan_status}
+                    </span>
                   </li>
                 );
               })}
