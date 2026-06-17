@@ -334,9 +334,11 @@ async def export_cases_csv(
     stage: STAGE | None = None,
     severity: int | None = None,
     flagged: bool | None = None,
+    tag: str | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> PlainTextResponse:
-    """CSV dump of cases in the current org. Same filter surface as the
-    list endpoint (stage/severity/flagged) so a saved view can be exported."""
+    """CSV dump of cases. Same filter surface as the list endpoint."""
     import csv
     import io
 
@@ -347,6 +349,12 @@ async def export_cases_csv(
         stmt = stmt.where(Case.severity == severity)
     if flagged is not None:
         stmt = stmt.where(Case.flagged == flagged)
+    if tag:
+        stmt = stmt.where(Case.tags.contains([tag]))
+    if since is not None:
+        stmt = stmt.where(Case.created_at >= since)
+    if until is not None:
+        stmt = stmt.where(Case.created_at < until)
     rows = (await db.execute(stmt.order_by(Case.number.desc()))).scalars().all()
     buf = io.StringIO()
     w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
