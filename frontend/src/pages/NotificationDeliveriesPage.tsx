@@ -50,9 +50,25 @@ export function NotificationDeliveriesPage() {
   const [rows, setRows] = useState<DeliveryDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState<"" | "pending" | "succeeded" | "failed">("");
-  const [ruleId, setRuleId] = useState("");
-  const [endpointId, setEndpointId] = useState("");
+  const initialQuery = (() => {
+    if (typeof window === "undefined")
+      return { statusFilter: "" as "" | "pending" | "succeeded" | "failed", ruleId: "", endpointId: "" };
+    const p = new URLSearchParams(window.location.search);
+    const rawStatus = p.get("status_filter") ?? "";
+    const statusFilter: "" | "pending" | "succeeded" | "failed" =
+      rawStatus === "pending" || rawStatus === "succeeded" || rawStatus === "failed"
+        ? rawStatus
+        : "";
+    return {
+      statusFilter,
+      ruleId: p.get("rule_id") ?? "",
+      endpointId: p.get("endpoint_id") ?? "",
+    };
+  })();
+
+  const [statusFilter, setStatusFilter] = useState<"" | "pending" | "succeeded" | "failed">(initialQuery.statusFilter);
+  const [ruleId, setRuleId] = useState(initialQuery.ruleId);
+  const [endpointId, setEndpointId] = useState(initialQuery.endpointId);
 
   const hasFilters = statusFilter !== "" || ruleId.trim() !== "" || endpointId.trim() !== "";
 
