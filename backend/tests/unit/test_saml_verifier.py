@@ -10,6 +10,13 @@ import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 from adhkar.auth.saml import SamlProviderConfig
+from adhkar.auth.saml_errors import (
+    SamlAudienceError,
+    SamlRecipientError,
+    SamlReplayError,
+    SamlSignatureError,
+    SamlTimingError,
+)
 from adhkar.auth.saml_verifier import SamlVerifier, build_verifier_from_metadata_xml
 from freezegun import freeze_time
 
@@ -61,15 +68,6 @@ async def test_valid_response_returns_claims(
     assert claims.name_id == "soc@example.test"
     assert claims.assertion_id == "assertion-valid"
     assert claims.not_on_or_after > FROZEN_NOW
-
-
-from adhkar.auth.saml_errors import (  # noqa: E402
-    SamlAudienceError,
-    SamlRecipientError,
-    SamlReplayError,
-    SamlSignatureError,
-    SamlTimingError,
-)
 
 
 @pytest.mark.asyncio
