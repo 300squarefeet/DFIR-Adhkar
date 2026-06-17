@@ -72,8 +72,19 @@ class InvokeResult(BaseModel):
 @router.get("", response_model=list[ResponderDTO])
 async def list_responders(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    entity_type: str | None = None,
+    confirm_required: bool | None = None,
 ) -> list[ResponderDTO]:
-    return [_to_dto(r) for r in get_responder_registry().all()]
+    """List registered responders. Optional `entity_type=<name>` keeps
+    only responders whose supported_entity_types contains the value
+    (case/alert/observable); `confirm_required=true|false` filters by
+    whether the responder needs an explicit confirm step."""
+    out = [_to_dto(r) for r in get_responder_registry().all()]
+    if entity_type is not None:
+        out = [r for r in out if entity_type in r.supported_entity_types]
+    if confirm_required is not None:
+        out = [r for r in out if r.confirm_required is confirm_required]
+    return out
 
 
 async def _entity_exists(db: AsyncSession, org_id: UUID, entity_type: str, entity_id: UUID) -> bool:
