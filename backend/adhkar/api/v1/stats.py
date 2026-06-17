@@ -543,3 +543,31 @@ async def tasks_by_status(
     return TasksByStatusResponse(
         entries=[TaskStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
     )
+
+
+class PapBucket(BaseModel):
+    pap: str
+    count: int
+
+
+class PapResponse(BaseModel):
+    entries: list[PapBucket]
+
+
+@router.get("/observables-by-pap", response_model=PapResponse)
+async def observables_by_pap(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PapResponse:
+    """Counts grouped by PAP (white/green/amber/red), zero-filled."""
+    rows = (
+        await db.execute(
+            select(Observable.pap, func.count().label("n"))
+            .where(Observable.organization_id == org_id, Observable.deleted_at.is_(None))
+            .group_by(Observable.pap)
+        )
+    ).all()
+    by_pap: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("white", "green", "amber", "red")
+    return PapResponse(entries=[PapBucket(pap=p, count=by_pap.get(p, 0)) for p in canonical])
