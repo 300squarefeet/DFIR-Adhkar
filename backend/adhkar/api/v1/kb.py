@@ -358,23 +358,26 @@ async def list_recent_case_templates(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 10,
+    tag: str | None = None,
+    severity: int | None = None,
 ) -> list[CaseTemplateDTO]:
     """N most-recently-updated case templates (`updated_at` DESC, default
     10, cap 50). Foundation for a "Recently used templates" picker on
-    the CreateCasePage."""
+    the CreateCasePage. Optional `tag=<name>` ARRAY.contains match;
+    `severity=N` exact-match (1..4) — scopes the picker to relevant
+    templates only."""
     safe_limit = max(1, min(50, int(limit)))
-    rows = (
-        (
-            await db.execute(
-                select(CaseTemplate)
-                .where(CaseTemplate.organization_id == org_id)
-                .order_by(CaseTemplate.updated_at.desc())
-                .limit(safe_limit)
-            )
-        )
-        .scalars()
-        .all()
+    stmt = (
+        select(CaseTemplate)
+        .where(CaseTemplate.organization_id == org_id)
+        .order_by(CaseTemplate.updated_at.desc())
+        .limit(safe_limit)
     )
+    if tag is not None:
+        stmt = stmt.where(CaseTemplate.tags.contains([tag]))
+    if severity is not None:
+        stmt = stmt.where(CaseTemplate.severity == max(1, min(4, severity)))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_template_dto(t) for t in rows]
 
 
