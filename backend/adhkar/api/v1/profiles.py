@@ -43,10 +43,16 @@ async def list_profiles(
     _user: Annotated[CurrentUser, Depends(require_permission("manageProfile"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    with_permission: str | None = None,
 ) -> list[ProfileDTO]:
-    rows = (
-        (await db.execute(select(Profile).where(Profile.organization_id == org_id))).scalars().all()
-    )
+    """List profiles in the current org. Optional `with_permission=<key>`
+    keeps only profiles whose permissions JSON array contains that key
+    — answers "which roles can manage notifications" without paging the
+    full set and filtering client-side."""
+    stmt = select(Profile).where(Profile.organization_id == org_id)
+    if with_permission is not None:
+        stmt = stmt.where(Profile.permissions.contains([with_permission]))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(p) for p in rows]
 
 
