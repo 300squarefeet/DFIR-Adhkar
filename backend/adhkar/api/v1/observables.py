@@ -118,11 +118,13 @@ async def list_recent_observables(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 10,
     is_ioc: bool | None = None,
+    data_type: str | None = None,
 ) -> list[ObservableDTO]:
     """N most-recently-updated non-deleted observables (`updated_at`
     DESC), default 10, cap 50. Optional `is_ioc=true` keeps only
-    flagged IOCs. Mirrors /v1/cases/recent + /v1/alerts/recent +
-    /v1/tasks/recent for dashboard symmetry."""
+    flagged IOCs. Optional `data_type=<name>` exact-match filter (e.g.
+    `ip`, `hash`, `domain`). Mirrors /v1/cases/recent + /v1/alerts/recent
+    + /v1/tasks/recent for dashboard symmetry."""
     safe_limit = max(1, min(50, int(limit)))
     stmt = (
         select(Observable)
@@ -134,6 +136,8 @@ async def list_recent_observables(
         stmt = stmt.where(Observable.is_ioc.is_(True))
     elif is_ioc is False:
         stmt = stmt.where(Observable.is_ioc.is_(False))
+    if data_type is not None:
+        stmt = stmt.where(Observable.data_type == data_type)
     rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(o) for o in rows]
 
