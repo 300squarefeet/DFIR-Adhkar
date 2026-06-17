@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 
 import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
@@ -44,6 +44,15 @@ interface TimelineEntry {
   created_at: string;
 }
 
+interface SimilarAlert {
+  id: string;
+  title: string;
+  severity: number;
+  status: string;
+  case_id: string | null;
+  created_at: string;
+}
+
 const STATUSES = ["New", "Updated", "Ignored", "Imported"] as const;
 
 export function AlertDetailPage({ alertId }: Props) {
@@ -55,6 +64,7 @@ export function AlertDetailPage({ alertId }: Props) {
   const [busy, setBusy] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const timelineUserNames = useUserNames(timeline.map((t) => t.actor_user_id));
+  const [similar, setSimilar] = useState<SimilarAlert[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +81,21 @@ export function AlertDetailPage({ alertId }: Props) {
         setTimeline(tl.entries);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, alertId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const results = await apiCall<SimilarAlert[]>(`/v1/alerts/${alertId}/similar`);
+        if (!cancelled) setSimilar(results);
+      } catch {
+        if (!cancelled) setSimilar([]);
       }
     })();
     return () => {
@@ -202,6 +227,40 @@ export function AlertDetailPage({ alertId }: Props) {
           ) : null}
         </article>
       ) : null}
+
+      <article>
+        <h2 className="text-lg font-medium">Related alerts ({similar?.length ?? "…"})</h2>
+        {similar === null ? (
+          <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">Loading…</p>
+        ) : similar.length === 0 ? (
+          <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">
+            No other alerts share this source/source_ref.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {similar.map((a) => (
+              <li key={a.id} className="flex items-center gap-2">
+                <Link
+                  to="/alerts/$alertId"
+                  params={{ alertId: a.id }}
+                  className="hover:underline"
+                >
+                  {a.title}
+                </Link>
+                <span className="ml-auto flex items-center gap-2">
+                  <SeverityBadge level={a.severity as SeverityLevel} />
+                  <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px]">
+                    {a.status}
+                  </span>
+                  {a.case_id ? (
+                    <span className="text-xs text-tlp-green">→ case</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
 
       <article>
         <h2 className="mb-2 text-sm font-medium">Timeline ({timeline.length})</h2>
