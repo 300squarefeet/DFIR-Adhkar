@@ -40,6 +40,24 @@ interface TimeSeriesResponse {
   points: TimeSeriesPoint[];
 }
 
+interface CasesByTlpEntry {
+  tlp: string;
+  open_count: number;
+  closed_count: number;
+}
+
+interface CasesByTlp {
+  entries: CasesByTlpEntry[];
+}
+
+const TLP_ROW_META: Record<string, string> = {
+  white: "TLP:WHITE",
+  green: "TLP:GREEN",
+  amber: "TLP:AMBER",
+  "amber-strict": "TLP:AMBER+STRICT",
+  red: "TLP:RED",
+};
+
 const LAYOUT_KEY = "adhkar.dashboard.layout.v1";
 
 interface DashboardLayout {
@@ -71,6 +89,7 @@ export function DashboardPage() {
   const [responses, setResponses] = useState<Record<string, unknown>>({});
   const [casesSeries, setCasesSeries] = useState<TimeSeriesResponse | null>(null);
   const [alertsSeries, setAlertsSeries] = useState<TimeSeriesResponse | null>(null);
+  const [casesByTlp, setCasesByTlp] = useState<CasesByTlp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [layout, setLayout] = useState<DashboardLayout>(() => loadLayout());
   const [editing, setEditing] = useState(false);
@@ -93,6 +112,12 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
+  }, [apiCall]);
+
+  useEffect(() => {
+    apiCall<CasesByTlp>("/v1/stats/cases-by-tlp")
+      .then(setCasesByTlp)
+      .catch(() => undefined);
   }, [apiCall]);
 
   useEffect(() => {
@@ -314,6 +339,65 @@ export function DashboardPage() {
       <PinnedRunbooksPanel />
       <ObservableTypesPanel />
       <ObservableTlpPanel />
+      {casesByTlp !== null &&
+      casesByTlp.entries.some((e) => e.open_count > 0 || e.closed_count > 0) ? (
+        <article className="mb-4 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-3">
+          <header className="mb-2 flex items-center gap-2 text-sm">
+            <h3 className="font-medium">Cases by TLP</h3>
+            <span className="text-xs text-md-sys-color-on-surface-variant">
+              open / closed cases per TLP
+            </span>
+          </header>
+          <ul className="space-y-1 text-xs">
+            {casesByTlp.entries.map((e) => {
+              const label = TLP_ROW_META[e.tlp] ?? e.tlp;
+              const total = e.open_count + e.closed_count;
+              if (total === 0) {
+                return (
+                  <li
+                    key={e.tlp}
+                    className="flex items-center gap-2 text-md-sys-color-on-surface-variant"
+                    aria-label={`${label}: no cases`}
+                  >
+                    <span className="w-40 truncate font-mono">{label}</span>
+                    <span className="ml-auto tabular-nums">—</span>
+                  </li>
+                );
+              }
+              const openPct = Math.round((e.open_count / total) * 100);
+              const closedPct = 100 - openPct;
+              return (
+                <li
+                  key={e.tlp}
+                  className="flex items-center gap-2"
+                  aria-label={`${label}: ${e.open_count} open, ${e.closed_count} closed`}
+                >
+                  <span className="w-40 truncate font-mono">{label}</span>
+                  <span className="rounded bg-md-sys-color-tertiary px-1.5 font-mono tabular-nums text-md-sys-color-on-tertiary">
+                    {e.open_count}
+                  </span>
+                  <span className="rounded bg-md-sys-color-surface-container px-1.5 font-mono tabular-nums text-md-sys-color-on-surface-variant">
+                    {e.closed_count}
+                  </span>
+                  <div
+                    className="ml-2 flex h-2 flex-1 overflow-hidden rounded bg-md-sys-color-surface-container"
+                    aria-hidden
+                  >
+                    <div
+                      className="h-full bg-md-sys-color-tertiary"
+                      style={{ width: `${openPct}%` }}
+                    />
+                    <div
+                      className="h-full bg-md-sys-color-outline-variant"
+                      style={{ width: `${closedPct}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </article>
+      ) : null}
       <ObservablePapPanel />
       <StageDistributionPanel />
       <AlertStatusPanel />
