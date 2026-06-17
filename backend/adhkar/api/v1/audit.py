@@ -42,6 +42,7 @@ async def list_audit(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(100, ge=1, le=500),
     entity_type: str | None = None,
+    entity_id: UUID | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
     since: datetime | None = None,
@@ -55,6 +56,8 @@ async def list_audit(
     )
     if entity_type:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if entity_id is not None:
+        stmt = stmt.where(AuditLog.entity_id == entity_id)
     if action:
         stmt = stmt.where(AuditLog.action == action)
     if actor_user_id:
@@ -95,6 +98,7 @@ async def export_audit_csv(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     entity_type: str | None = None,
+    entity_id: UUID | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
     since: datetime | None = None,
@@ -112,6 +116,8 @@ async def export_audit_csv(
     )
     if entity_type:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if entity_id is not None:
+        stmt = stmt.where(AuditLog.entity_id == entity_id)
     if action:
         stmt = stmt.where(AuditLog.action == action)
     if actor_user_id:

@@ -27,6 +27,7 @@ export function AuditLogPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [entityType, setEntityType] = useState("");
+  const [entityId, setEntityId] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
@@ -36,6 +37,7 @@ export function AuditLogPage() {
     let cancelled = false;
     const params = new URLSearchParams({ limit: "200" });
     if (entityType) params.set("entity_type", entityType);
+    if (entityId.trim()) params.set("entity_id", entityId.trim());
     if (actionFilter) params.set("action", actionFilter);
     if (since) params.set("since", new Date(since).toISOString());
     if (until) params.set("until", new Date(until).toISOString());
@@ -49,7 +51,7 @@ export function AuditLogPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall, entityType, actionFilter, since, until]);
+  }, [apiCall, entityType, entityId, actionFilter, since, until]);
 
   const userNames = useUserNames(rows?.map((r) => r.actor_user_id) ?? []);
 
@@ -97,6 +99,7 @@ export function AuditLogPage() {
                 "http://localhost:8000";
               const p = new URLSearchParams();
               if (entityType) p.set("entity_type", entityType);
+              if (entityId.trim()) p.set("entity_id", entityId.trim());
               if (actionFilter) p.set("action", actionFilter);
               if (since) p.set("since", new Date(since).toISOString());
               if (until) p.set("until", new Date(until).toISOString());
@@ -134,6 +137,12 @@ export function AuditLogPage() {
             placeholder="action (e.g. created)"
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
+          />
+          <input
+            className="w-72 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm font-mono"
+            placeholder="entity_id (UUID)"
+            value={entityId}
+            onChange={(e) => setEntityId(e.target.value)}
           />
           <label className="flex items-center gap-1 text-xs">
             <span className="text-md-sys-color-on-surface-variant">Since</span>
