@@ -35,27 +35,37 @@ async def list_my_mentions(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 50,
+    since: datetime | None = None,
+    unread_only: bool | None = None,
 ) -> list[MentionRow]:
     """Return audit_log rows where the current user was @-mentioned in the
-    current org, newest first. Capped at 200 to keep payloads bounded."""
+    current org, newest first. Capped at 200 to keep payloads bounded.
+    Optional `since=<ISO>` keeps only mentions newer than the cursor;
+    `unread_only=true` keeps only mentions after the user's stored
+    last_mentions_seen_at — pairs with /v1/mentions/me/seen."""
     safe_limit = max(1, min(200, int(limit)))
-    rows = (
-        (
-            await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.organization_id == org_id,
-                    AuditLog.entity_type == "user",
-                    AuditLog.entity_id == user.user_id,
-                    AuditLog.action == "mentioned",
-                )
-                .order_by(AuditLog.created_at.desc())
-                .limit(safe_limit)
-            )
+    stmt = (
+        select(AuditLog)
+        .where(
+            AuditLog.organization_id == org_id,
+            AuditLog.entity_type == "user",
+            AuditLog.entity_id == user.user_id,
+            AuditLog.action == "mentioned",
         )
-        .scalars()
-        .all()
+        .order_by(AuditLog.created_at.desc())
+        .limit(safe_limit)
     )
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at > since)
+    if unread_only is True:
+        from adhkar.db.models import User as _User
+
+        u = (
+            await db.execute(select(_User.last_mentions_seen_at).where(_User.id == user.user_id))
+        ).scalar_one_or_none()
+        if u is not None:
+            stmt = stmt.where(AuditLog.created_at > u)
+    rows = (await db.execute(stmt)).scalars().all()
     return [
         MentionRow(
             id=r.id,
