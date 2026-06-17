@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
+import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
 import { CORE_WIDGETS, type WidgetSpec } from "@/ui/widgets";
 
@@ -292,6 +293,7 @@ export function DashboardPage() {
         </div>
       )}
       <MttrBreakdownPanel />
+      <SlowestOpenCasesPanel />
     </section>
   );
 }

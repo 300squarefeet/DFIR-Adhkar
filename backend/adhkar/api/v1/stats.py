@@ -220,3 +220,63 @@ async def case_mttr(
     current = await _slice(current_since, now)
     prior = await _slice(prior_since, current_since)
     return MttrResponse(window_days=days, buckets=current, prior_buckets=prior)
+
+
+class SlowestCase(BaseModel):
+    id: UUID
+    number: int
+    title: str
+    severity: int
+    stage: str
+    assignee_id: UUID | None
+    hours_open: float
+
+
+class SlowestCasesResponse(BaseModel):
+    cases: list[SlowestCase]
+
+
+@router.get("/slowest-open-cases", response_model=SlowestCasesResponse)
+async def slowest_open_cases(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=10, ge=1, le=50),
+) -> SlowestCasesResponse:
+    """Open cases sorted by age oldest-first so analysts can spot stale work."""
+    now = datetime.now(tz=UTC)
+    rows = (
+        await db.execute(
+            select(
+                Case.id,
+                Case.number,
+                Case.title,
+                Case.severity,
+                Case.stage,
+                Case.assignee_id,
+                Case.created_at,
+            )
+            .where(
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+                Case.stage != "closed",
+            )
+            .order_by(Case.created_at.asc())
+            .limit(limit)
+        )
+    ).all()
+    cases: list[SlowestCase] = []
+    for row in rows:
+        hours_open = round((now - row.created_at).total_seconds() / 3600.0, 2)
+        cases.append(
+            SlowestCase(
+                id=row.id,
+                number=row.number,
+                title=row.title,
+                severity=row.severity,
+                stage=row.stage,
+                assignee_id=row.assignee_id,
+                hours_open=hours_open,
+            )
+        )
+    return SlowestCasesResponse(cases=cases)
