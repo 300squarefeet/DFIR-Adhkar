@@ -32,6 +32,8 @@ export function AdminUsersPage() {
 
   const [sortRecent, setSortRecent] = useState(false);
   const [activeWithin, setActiveWithin] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [searchQ, setSearchQ] = useState<string>("");
 
   const canManage = permissions.has("manageUser");
 
@@ -44,7 +46,12 @@ export function AdminUsersPage() {
             ? `/v1/users/recent?limit=50&active_within_days=${activeWithin}`
             : "/v1/users/recent?limit=50";
       } else {
-        url = "/v1/users";
+        const params = new URLSearchParams();
+        if (statusFilter) params.set("status", statusFilter);
+        const trimmedQ = searchQ.trim();
+        if (trimmedQ) params.set("q", trimmedQ);
+        const qs = params.toString();
+        url = qs ? `/v1/users?${qs}` : "/v1/users";
       }
       const rows = await apiCall<UserRow[]>(url);
       setUsers(rows);
@@ -56,7 +63,7 @@ export function AdminUsersPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, sortRecent, activeWithin]);
+  }, [apiCall, sortRecent, activeWithin, statusFilter, searchQ]);
 
   const invite = async () => {
     if (!inviteEmail.trim()) return;
@@ -201,6 +208,43 @@ export function AdminUsersPage() {
             </button>
           </div>
         ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-md-sys-color-on-surface-variant">status:</span>
+        {[
+          { label: "All", value: "" },
+          { label: "active", value: "active" },
+          { label: "suspended", value: "suspended" },
+          { label: "pending_invite", value: "pending_invite" },
+        ].map((opt) => {
+          const isActive = statusFilter === opt.value;
+          return (
+            <button
+              key={opt.value || "all"}
+              type="button"
+              disabled={sortRecent}
+              aria-pressed={isActive}
+              onClick={() => setStatusFilter(opt.value)}
+              className={
+                "rounded-full px-2 py-0.5 text-xs disabled:opacity-50 " +
+                (isActive
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+              }
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+        <input
+          type="search"
+          placeholder="Search users…"
+          value={searchQ}
+          disabled={sortRecent}
+          onChange={(e) => setSearchQ(e.target.value)}
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm disabled:opacity-50"
+        />
       </div>
 
       <table className="w-full table-auto border-collapse text-sm">
