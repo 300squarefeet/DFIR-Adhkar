@@ -114,17 +114,16 @@ async def list_portal_comments(
     case_id: UUID,
     user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    since: datetime | None = None,
 ) -> list[PortalCommentDTO]:
+    """Portal-side comments view. Optional `since=<ISO>` keeps only
+    comments newer than the cursor — mirrors RC190 on the internal
+    endpoint so portal polling stays cheap."""
     await _verify_share(db, user.user_id, case_id)
-    rows = (
-        (
-            await db.execute(
-                select(Comment).where(Comment.case_id == case_id).order_by(Comment.created_at)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    stmt = select(Comment).where(Comment.case_id == case_id).order_by(Comment.created_at)
+    if since is not None:
+        stmt = stmt.where(Comment.created_at >= since)
+    rows = (await db.execute(stmt)).scalars().all()
     return [PortalCommentDTO(id=c.id, content=c.content, created_at=c.created_at) for c in rows]
 
 
