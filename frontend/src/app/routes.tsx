@@ -13,6 +13,7 @@ import { AnalyzerJobsPage } from "@/pages/AnalyzerJobsPage";
 import { AttackHeatmapPage } from "@/pages/AttackHeatmapPage";
 import { MentionsPage } from "@/pages/MentionsPage";
 import { AuditLogPage } from "@/pages/AuditLogPage";
+import { NotificationDeliveriesPage } from "@/pages/NotificationDeliveriesPage";
 import { AlertDetailPage } from "@/pages/AlertDetailPage";
 import { AlertsPage } from "@/pages/AlertsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -187,6 +188,12 @@ const auditRoute = createRoute({
   component: AuditLogPage,
 });
 
+const notificationDeliveriesRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/admin/notification-deliveries",
+  component: NotificationDeliveriesPage,
+});
+
 const analyzerJobsRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/analyzer-jobs",
@@ -251,6 +258,7 @@ export const router = createRouter({
       portalRoute,
       searchRoute,
       auditRoute,
+      notificationDeliveriesRoute,
       analyzerJobsRoute,
       tasksRoute,
       taxonomiesRoute,
