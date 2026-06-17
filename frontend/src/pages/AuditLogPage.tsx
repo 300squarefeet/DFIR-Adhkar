@@ -37,6 +37,7 @@ export function AuditLogPage() {
   const [entityType, setEntityType] = useState(initialQuery.entityType);
   const [entityId, setEntityId] = useState(initialQuery.entityId);
   const [actionFilter, setActionFilter] = useState("");
+  const [actionPrefix, setActionPrefix] = useState<string>("");
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
   const [active, setActive] = useState<AuditRow | null>(null);
@@ -47,6 +48,7 @@ export function AuditLogPage() {
     if (entityType) params.set("entity_type", entityType);
     if (entityId.trim()) params.set("entity_id", entityId.trim());
     if (actionFilter) params.set("action", actionFilter);
+    if (actionPrefix) params.set("action_prefix", actionPrefix);
     if (since) params.set("since", new Date(since).toISOString());
     if (until) params.set("until", new Date(until).toISOString());
     apiCall<AuditRow[]>(`/v1/audit?${params.toString()}`)
@@ -59,7 +61,7 @@ export function AuditLogPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall, entityType, entityId, actionFilter, since, until]);
+  }, [apiCall, entityType, entityId, actionFilter, actionPrefix, since, until]);
 
   const userNames = useUserNames(rows?.map((r) => r.actor_user_id) ?? []);
 
@@ -170,6 +172,39 @@ export function AuditLogPage() {
               onChange={(e) => setUntil(e.target.value)}
             />
           </label>
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-md-sys-color-on-surface-variant">Verb group:</span>
+          {(
+            [
+              { label: "All", value: "" },
+              { label: "Cases", value: "case_" },
+              { label: "Tasks", value: "task_" },
+              { label: "Alerts", value: "alert_" },
+              { label: "Observables", value: "observable_" },
+              { label: "Comments", value: "comment_" },
+              { label: "Auth", value: "auth_" },
+              { label: "Bulk", value: "bulk_" },
+            ] as const
+          ).map((chip) => {
+            const isActive = actionPrefix === chip.value;
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setActionPrefix(chip.value)}
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (isActive
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                }
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
         {filtered.length === 0 ? (
           <p className="text-sm text-md-sys-color-on-surface-variant">No entries.</p>
