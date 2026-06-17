@@ -136,6 +136,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/stats/observables-by-type",
     "/v1/stats/case-stages",
     "/v1/stats/alerts-by-status",
+    "/v1/stats/audit-per-day",
 )
 
 
