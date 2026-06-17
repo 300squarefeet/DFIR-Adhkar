@@ -31,14 +31,22 @@ export function AdminUsersPage() {
   const [lastInvite, setLastInvite] = useState<InviteResponse | null>(null);
 
   const [sortRecent, setSortRecent] = useState(false);
+  const [activeWithin, setActiveWithin] = useState<number | null>(null);
 
   const canManage = permissions.has("manageUser");
 
   const refresh = async () => {
     try {
-      const rows = await apiCall<UserRow[]>(
-        sortRecent ? "/v1/users/recent?limit=50" : "/v1/users",
-      );
+      let url: string;
+      if (sortRecent) {
+        url =
+          activeWithin !== null
+            ? `/v1/users/recent?limit=50&active_within_days=${activeWithin}`
+            : "/v1/users/recent?limit=50";
+      } else {
+        url = "/v1/users";
+      }
+      const rows = await apiCall<UserRow[]>(url);
       setUsers(rows);
     } catch (e) {
       setError((e as Error).message);
@@ -48,7 +56,7 @@ export function AdminUsersPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, sortRecent]);
+  }, [apiCall, sortRecent, activeWithin]);
 
   const invite = async () => {
     if (!inviteEmail.trim()) return;
@@ -133,10 +141,16 @@ export function AdminUsersPage() {
         </article>
       ) : null}
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setSortRecent((v) => !v)}
+          onClick={() => {
+            setSortRecent((v) => {
+              const next = !v;
+              if (!next) setActiveWithin(null);
+              return next;
+            });
+          }}
           className={
             "rounded-full px-3 py-1 text-xs " +
             (sortRecent
@@ -147,6 +161,46 @@ export function AdminUsersPage() {
         >
           {sortRecent ? "Sorted by recent activity ✓" : "Sort by recent activity"}
         </button>
+        {sortRecent ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setActiveWithin(null)}
+              className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (activeWithin === null
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+              }
+            >
+              Any
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveWithin(7)}
+              className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (activeWithin === 7
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+              }
+            >
+              7d
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveWithin(30)}
+              className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (activeWithin === 30
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+              }
+            >
+              30d
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <table className="w-full table-auto border-collapse text-sm">
