@@ -219,7 +219,11 @@ async def list_links(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     relation: RELATION | None = None,
+    since: datetime | None = None,
 ) -> list[CaseLinkDTO]:
+    """Case links touching this case. Optional `relation=<value>`
+    scopes to one link kind; `since=<ISO>` keeps only links created
+    at or after the cursor for delta polling."""
     await _load_case(db, org_id, case_id)
     stmt = select(CaseLink).where(
         CaseLink.organization_id == org_id,
@@ -227,6 +231,8 @@ async def list_links(
     )
     if relation is not None:
         stmt = stmt.where(CaseLink.relation == relation)
+    if since is not None:
+        stmt = stmt.where(CaseLink.created_at >= since)
     rows = (await db.execute(stmt)).scalars().all()
     return [_link_dto(link) for link in rows]
 
