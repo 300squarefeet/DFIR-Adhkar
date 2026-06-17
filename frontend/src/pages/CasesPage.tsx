@@ -75,7 +75,31 @@ export function CasesPage() {
   const toast = useToast();
   const [cases, setCases] = useState<CaseRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<SavedView>(() => loadSavedView());
+
+  const urlOverride = (() => {
+    if (typeof window === "undefined") return {} as Partial<SavedView>;
+    const p = new URLSearchParams(window.location.search);
+    const out: Partial<SavedView> = {};
+    const stage = p.get("stage");
+    if (stage === "open" || stage === "in_progress" || stage === "closed") {
+      out.stage = stage;
+    }
+    const severity = p.get("severity");
+    if (severity === "1" || severity === "2" || severity === "3" || severity === "4") {
+      out.severity = severity;
+    }
+    const tag = p.get("tag");
+    if (tag !== null) out.tag = tag;
+    const flagged = p.get("flagged");
+    if (flagged === "true" || flagged === "false") out.flagged = flagged;
+    const since = p.get("since");
+    if (since !== null) out.since = since;
+    const until = p.get("until");
+    if (until !== null) out.until = until;
+    return out;
+  })();
+
+  const [view, setView] = useState<SavedView>(() => ({ ...loadSavedView(), ...urlOverride }));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
 
