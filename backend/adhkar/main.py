@@ -1,6 +1,7 @@
 """FastAPI application factory."""
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -51,6 +52,8 @@ from adhkar.core.ratelimit import RateLimitMiddleware
 from adhkar.core.security_headers import SecurityHeadersMiddleware
 from adhkar.core.settings import Settings, get_settings
 
+_log = logging.getLogger(__name__)
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
@@ -82,7 +85,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for _name, _cfg in _load_saml_providers(settings).items():
             saml_verifiers[_name] = await _build_saml_verifier(_cfg)
             if saml_verifiers[_name] is None:
-                _log = __import__("logging").getLogger("adhkar.main")
                 _log.warning(
                     "saml_metadata_unavailable provider=%s metadata_url=%s",
                     _name,
