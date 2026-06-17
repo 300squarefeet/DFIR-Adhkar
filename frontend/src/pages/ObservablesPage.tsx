@@ -35,11 +35,52 @@ export function ObservablesPage() {
     "data_type,data,tlp,is_ioc,tags,message\nip,1.2.3.4,amber,true,phish,seen in mail bounce\n",
   );
   const [importBusy, setImportBusy] = useState(false);
-  const [filterType, setFilterType] = useState("");
-  const [filterTag, setFilterTag] = useState("");
-  const [filterIoc, setFilterIoc] = useState<"" | "true" | "false">("");
-  const [filterSighted, setFilterSighted] = useState<"" | "true" | "false">("");
-  const [filterTlp, setFilterTlp] = useState("");
+  const initialView = (() => {
+    try {
+      const raw = window.localStorage.getItem("adhkar.observables.view");
+      if (!raw) return { type: "", tag: "", ioc: "" as const, sighted: "" as const, tlp: "" };
+      const p = JSON.parse(raw) as {
+        type?: string;
+        tag?: string;
+        ioc?: "" | "true" | "false";
+        sighted?: "" | "true" | "false";
+        tlp?: string;
+      };
+      return {
+        type: p.type ?? "",
+        tag: p.tag ?? "",
+        ioc: (p.ioc ?? "") as "" | "true" | "false",
+        sighted: (p.sighted ?? "") as "" | "true" | "false",
+        tlp: p.tlp ?? "",
+      };
+    } catch {
+      return { type: "", tag: "", ioc: "" as const, sighted: "" as const, tlp: "" };
+    }
+  })();
+  const [filterType, setFilterType] = useState(initialView.type);
+  const [filterTag, setFilterTag] = useState(initialView.tag);
+  const [filterIoc, setFilterIoc] = useState<"" | "true" | "false">(initialView.ioc);
+  const [filterSighted, setFilterSighted] = useState<"" | "true" | "false">(
+    initialView.sighted,
+  );
+  const [filterTlp, setFilterTlp] = useState(initialView.tlp);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "adhkar.observables.view",
+        JSON.stringify({
+          type: filterType,
+          tag: filterTag,
+          ioc: filterIoc,
+          sighted: filterSighted,
+          tlp: filterTlp,
+        }),
+      );
+    } catch {
+      /* localStorage disabled (private mode, quota) — best-effort */
+    }
+  }, [filterType, filterTag, filterIoc, filterSighted, filterTlp]);
 
   const refresh = async () => {
     try {
