@@ -186,6 +186,8 @@ async def list_alerts(
     severity: int | None = None,
     tag: str | None = None,
     unpromoted: bool | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
     limit: int = 100,
 ) -> list[AlertDTO]:
     stmt = select(Alert).where(Alert.organization_id == org_id)
@@ -201,6 +203,10 @@ async def list_alerts(
         stmt = stmt.where(Alert.case_id.is_(None))
     elif unpromoted is False:
         stmt = stmt.where(Alert.case_id.is_not(None))
+    if since is not None:
+        stmt = stmt.where(Alert.created_at >= since)
+    if until is not None:
+        stmt = stmt.where(Alert.created_at < until)
     stmt = stmt.order_by(Alert.created_at.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_alert_dto(a) for a in rows]

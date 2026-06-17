@@ -35,15 +35,26 @@ interface SavedView {
   severity: "" | "1" | "2" | "3" | "4";
   tag: string;
   flagged: "" | "true" | "false";
+  since: string;
+  until: string;
 }
 
 const SAVED_VIEW_KEY = "adhkar.cases.savedView.v1";
 
+const EMPTY_VIEW: SavedView = {
+  stage: "",
+  search: "",
+  severity: "",
+  tag: "",
+  flagged: "",
+  since: "",
+  until: "",
+};
+
 function loadSavedView(): SavedView {
   try {
     const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
-    if (!raw)
-      return { stage: "", search: "", severity: "", tag: "", flagged: "" };
+    if (!raw) return EMPTY_VIEW;
     const parsed = JSON.parse(raw) as Partial<SavedView>;
     return {
       stage: parsed.stage ?? "",
@@ -51,9 +62,11 @@ function loadSavedView(): SavedView {
       severity: parsed.severity ?? "",
       tag: parsed.tag ?? "",
       flagged: parsed.flagged ?? "",
+      since: parsed.since ?? "",
+      until: parsed.until ?? "",
     };
   } catch {
-    return { stage: "", search: "", severity: "", tag: "", flagged: "" };
+    return EMPTY_VIEW;
   }
 }
 
@@ -73,6 +86,8 @@ export function CasesPage() {
       if (view.severity) p.set("severity", view.severity);
       if (view.tag.trim()) p.set("tag", view.tag.trim());
       if (view.flagged) p.set("flagged", view.flagged);
+      if (view.since) p.set("since", new Date(view.since).toISOString());
+      if (view.until) p.set("until", new Date(view.until).toISOString());
       const rows = await apiCall<CaseRow[]>(`/v1/cases?${p.toString()}`);
       setCases(rows);
       setSelected(new Set());
@@ -85,7 +100,15 @@ export function CasesPage() {
     void refresh();
     // refresh dependency captured below
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, view.stage, view.severity, view.tag, view.flagged]);
+  }, [
+    apiCall,
+    view.stage,
+    view.severity,
+    view.tag,
+    view.flagged,
+    view.since,
+    view.until,
+  ]);
 
   useEffect(() => {
     window.localStorage.setItem(SAVED_VIEW_KEY, JSON.stringify(view));
@@ -184,6 +207,7 @@ export function CasesPage() {
               if (view.flagged) p.set("flagged", view.flagged);
               const qs = p.toString();
               return `${base}/v1/cases/export-csv${qs ? `?${qs}` : ""}`;
+              // Note: export-csv doesn't yet accept since/until; rc62 task.
             })()}
             target="_blank"
             rel="noreferrer"
@@ -248,6 +272,20 @@ export function CasesPage() {
           placeholder="Tag…"
           value={view.tag}
           onChange={(e) => setView({ ...view, tag: e.target.value })}
+        />
+        <input
+          type="date"
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.since}
+          onChange={(e) => setView({ ...view, since: e.target.value })}
+          title="Created since"
+        />
+        <input
+          type="date"
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.until}
+          onChange={(e) => setView({ ...view, until: e.target.value })}
+          title="Created until (exclusive)"
         />
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"

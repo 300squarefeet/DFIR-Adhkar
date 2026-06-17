@@ -124,6 +124,8 @@ async def list_cases(
     severity: int | None = None,
     tag: str | None = None,
     flagged: bool | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
     limit: int = 100,
 ) -> list[CaseDTO]:
     stmt = select(Case).where(Case.organization_id == org_id, Case.deleted_at.is_(None))
@@ -137,6 +139,10 @@ async def list_cases(
         stmt = stmt.where(Case.tags.contains([tag]))
     if flagged is not None:
         stmt = stmt.where(Case.flagged == flagged)
+    if since is not None:
+        stmt = stmt.where(Case.created_at >= since)
+    if until is not None:
+        stmt = stmt.where(Case.created_at < until)
     stmt = stmt.order_by(Case.number.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_case_to_dto(c) for c in rows]
