@@ -7,17 +7,19 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import (
     CurrentUser,
+    get_current_user,
     get_db,
     get_settings,
     require_current_org,
     require_permission,
 )
+from adhkar.audit import audit_and_emit
 from adhkar.auth.invite import (
     InvitePayload,
     ResetPayload,
@@ -26,7 +28,7 @@ from adhkar.auth.invite import (
     verify_invite,
     verify_reset,
 )
-from adhkar.auth.password import hash_password, validate_password_policy
+from adhkar.auth.password import hash_password, validate_password_policy, verify_password
 from adhkar.core.settings import Settings
 from adhkar.db.models import Profile, User, UserOrgMembership
 from adhkar.services.email import send_email
@@ -65,6 +67,11 @@ class ForgotRequest(BaseModel):
 class ResetRequest(BaseModel):
     token: str
     new_password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=12, max_length=200)
 
 
 @router.get("/v1/users/search", response_model=list[UserDTO])
@@ -441,3 +448,35 @@ async def user_recent_activity(
         )
         for r in rows
     ]
+
+
+@router.post("/v1/me/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_my_password(
+    body: ChangePasswordRequest,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """Self-service password change. Verifies current_password against the
+    stored argon2 hash, applies the NIST + zxcvbn policy to new_password,
+    persists the new hash, emits an audit event. 401 on wrong current,
+    400 on policy fail, 409 when the account has no local password (SSO-only)."""
+    user_row = (await db.execute(select(User).where(User.id == user.user_id))).scalar_one_or_none()
+    if not user_row or user_row.password_hash is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "no_local_password")
+    if not verify_password(body.current_password, user_row.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_current_password")
+    try:
+        validate_password_policy(body.new_password)
+    except Exception as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    user_row.password_hash = hash_password(body.new_password)
+    await audit_and_emit(
+        db,
+        actor_user_id=user.user_id,
+        organization_id=org_id,
+        action="password_changed",
+        entity_type="user",
+        entity_id=user.user_id,
+        diff={},
+    )

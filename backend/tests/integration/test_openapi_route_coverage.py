@@ -38,6 +38,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/organizations",
     "/v1/profiles",
     "/v1/me/api-keys",
+    "/v1/me/password",
     # Phase 1b
     "/v1/audit",
     # Phase 2
