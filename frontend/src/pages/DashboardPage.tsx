@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
+import { StageDistributionPanel } from "@/ui/StageDistributionPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
@@ -298,6 +299,7 @@ export function DashboardPage() {
       <SlowestOpenCasesPanel />
       <PinnedRunbooksPanel />
       <ObservableTypesPanel />
+      <StageDistributionPanel />
     </section>
   );
 }
