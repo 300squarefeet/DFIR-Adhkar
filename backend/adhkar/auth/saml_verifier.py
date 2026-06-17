@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import httpx
 import redis.asyncio as redis_async
 from saml2 import BINDING_HTTP_POST
 from saml2.client import Saml2Client
@@ -145,3 +146,27 @@ def build_verifier_from_metadata_xml(
         }
     )
     return SamlVerifier(cfg, Saml2Client(config=sp_config))
+
+
+async def build_verifier_from_metadata_url(
+    cfg: SamlProviderConfig,
+    *,
+    timeout_seconds: float = 5.0,
+) -> SamlVerifier | None:
+    """Fetch IdP metadata over HTTPS, build a SamlVerifier. Returns None
+    on any failure (caller logs + emits audit event)."""
+    if not cfg.metadata_url:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            resp = await client.get(cfg.metadata_url)
+    except httpx.HTTPError:
+        return None
+    if resp.status_code != 200 or not resp.text:
+        return None
+    try:
+        return build_verifier_from_metadata_xml(cfg, resp.text)
+    except SamlConfigError:
+        return None
+    except Exception:  # pysaml2 metadata-parse can raise many types
+        return None

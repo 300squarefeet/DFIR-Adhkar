@@ -69,6 +69,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         notif = asyncio.create_task(run_notification_dispatcher(settings))
         indexer = asyncio.create_task(run_embedding_indexer(settings))
         mmdb = asyncio.create_task(run_maxmind_downloader(settings))
+        # SAML verifiers (one per configured provider). Soft-fail: a
+        # provider whose metadata URL is unreachable lands as None and
+        # its ACS endpoint will 503. App still boots so local password
+        # and API-key login keep working during an IdP outage.
+        from adhkar.auth.saml import load_saml_providers as _load_saml_providers
+        from adhkar.auth.saml_verifier import (
+            build_verifier_from_metadata_url as _build_saml_verifier,
+        )
+
+        saml_verifiers: dict[str, object | None] = {}
+        for _name, _cfg in _load_saml_providers(settings).items():
+            saml_verifiers[_name] = await _build_saml_verifier(_cfg)
+            if saml_verifiers[_name] is None:
+                _log = __import__("logging").getLogger("adhkar.main")
+                _log.warning(
+                    "saml_metadata_unavailable provider=%s metadata_url=%s",
+                    _name,
+                    _cfg.metadata_url,
+                )
+        app.state.saml_verifiers = saml_verifiers
         try:
             yield
         finally:
