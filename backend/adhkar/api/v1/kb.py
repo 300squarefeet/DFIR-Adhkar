@@ -337,6 +337,32 @@ def _template_dto(t: CaseTemplate) -> CaseTemplateDTO:
     )
 
 
+@router.get("/v1/case-templates/recent", response_model=list[CaseTemplateDTO])
+async def list_recent_case_templates(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+) -> list[CaseTemplateDTO]:
+    """N most-recently-updated case templates (`updated_at` DESC, default
+    10, cap 50). Foundation for a "Recently used templates" picker on
+    the CreateCasePage."""
+    safe_limit = max(1, min(50, int(limit)))
+    rows = (
+        (
+            await db.execute(
+                select(CaseTemplate)
+                .where(CaseTemplate.organization_id == org_id)
+                .order_by(CaseTemplate.updated_at.desc())
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_template_dto(t) for t in rows]
+
+
 @router.get("/v1/case-templates", response_model=list[CaseTemplateDTO])
 async def list_templates(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],

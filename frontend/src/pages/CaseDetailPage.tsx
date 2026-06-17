@@ -112,6 +112,12 @@ interface RelatedCaseRow {
   relation: string;
 }
 
+interface EvidenceSummary {
+  total: number;
+  ioc_total: number;
+  by_type: { data_type: string; count: number; ioc_count: number }[];
+}
+
 export function CaseDetailPage({ caseId }: Props) {
   const { apiCall, permissions } = useAuth();
   const toast = useToast();
@@ -169,6 +175,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [logDraft, setLogDraft] = useState("");
   const [postingLog, setPostingLog] = useState(false);
   const [relatedCases, setRelatedCases] = useState<RelatedCaseRow[] | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,6 +233,23 @@ export function CaseDetailPage({ caseId }: Props) {
         if (!cancelled) setRelatedCases(rows);
       } catch {
         if (!cancelled) setRelatedCases([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const summary = await apiCall<EvidenceSummary>(
+          `/v1/cases/${caseId}/observables/summary`,
+        );
+        if (!cancelled) setEvidence(summary);
+      } catch {
+        if (!cancelled) setEvidence(null);
       }
     })();
     return () => {
@@ -1474,6 +1498,40 @@ export function CaseDetailPage({ caseId }: Props) {
           </ol>
         )}
       </article>
+
+      {evidence !== null && evidence.total > 0 ? (() => {
+        const top = evidence.by_type.slice(0, 5);
+        const max = Math.max(...top.map((b) => b.count), 1);
+        return (
+          <article className="rounded border border-md-sys-color-outline-variant p-3">
+            <h2 className="text-sm font-medium">Evidence overview</h2>
+            <p className="text-xs text-md-sys-color-on-surface-variant">
+              {evidence.total} observables · {evidence.ioc_total} flagged as IOC
+            </p>
+            <ul className="mt-2 space-y-1 text-xs">
+              {top.map((b) => (
+                <li key={b.data_type} className="flex items-center gap-2">
+                  <span className="w-20 truncate font-mono uppercase">{b.data_type}</span>
+                  <div
+                    aria-hidden
+                    className="h-2 rounded bg-md-sys-color-primary"
+                    style={{
+                      width: `${(b.count / max) * 100}%`,
+                      minWidth: "2px",
+                    }}
+                  />
+                  <span className="ml-auto tabular-nums">{b.count}</span>
+                  {b.ioc_count > 0 ? (
+                    <span className="text-md-sys-color-on-surface-variant">
+                      ({b.ioc_count} IOC)
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </article>
+        );
+      })() : null}
 
       <article>
         <h2 className="text-lg font-medium">
