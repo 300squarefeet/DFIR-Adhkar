@@ -73,23 +73,27 @@ async def list_case_observables(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    ioc_only: bool | None = None,
+    data_type: str | None = None,
 ) -> list[ObservableRow]:
+    """Per-case observables list. `ioc_only=true` keeps only flagged
+    IOCs; `data_type=<name>` exact-match scopes to one indicator type.
+    Both compose with each other."""
     await _load_case(db, org_id, case_id)
-    rows = (
-        (
-            await db.execute(
-                select(Observable)
-                .where(
-                    Observable.organization_id == org_id,
-                    Observable.case_id == case_id,
-                    Observable.deleted_at.is_(None),
-                )
-                .order_by(Observable.created_at.desc())
-            )
+    stmt = (
+        select(Observable)
+        .where(
+            Observable.organization_id == org_id,
+            Observable.case_id == case_id,
+            Observable.deleted_at.is_(None),
         )
-        .scalars()
-        .all()
+        .order_by(Observable.created_at.desc())
     )
+    if ioc_only is True:
+        stmt = stmt.where(Observable.is_ioc.is_(True))
+    if data_type is not None:
+        stmt = stmt.where(Observable.data_type == data_type)
+    rows = (await db.execute(stmt)).scalars().all()
     return [
         ObservableRow(
             id=o.id,
