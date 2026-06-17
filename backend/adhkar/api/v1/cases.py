@@ -793,6 +793,7 @@ async def list_all_tasks(
     overdue: bool | None = None,
     mine: bool | None = None,
     due_within_days: int | None = None,
+    updated_since: datetime | None = None,
     limit: int = 200,
 ) -> list[TaskDTO]:
     """Cross-case task list. Used by the analyst's 'my queue' view.
@@ -801,7 +802,9 @@ async def list_all_tasks(
     keeps only rows whose due_date is in the past AND whose status is not
     Completed/Cancelled. `due_within_days=N` (1..90) keeps only rows with
     a due_date inside the next N days that aren't already
-    Completed/Cancelled — useful for the dashboard "due this week" view."""
+    Completed/Cancelled. `updated_since=<ISO>` bounds Task.updated_at and
+    switches the sort to updated_at DESC — completes the delta-sync trio
+    with RC172/RC174/RC175."""
     safe_limit = max(1, min(500, int(limit)))
     stmt = select(Task).where(Task.organization_id == org_id)
     if mine is True:
@@ -828,7 +831,11 @@ async def list_all_tasks(
             Task.due_date <= horizon,
             Task.status.notin_(("Completed", "Cancelled")),
         )
-    stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc()).limit(safe_limit)
+    if updated_since is not None:
+        stmt = stmt.where(Task.updated_at >= updated_since).order_by(Task.updated_at.desc())
+    else:
+        stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc())
+    stmt = stmt.limit(safe_limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_task_to_dto(t) for t in rows]
 
