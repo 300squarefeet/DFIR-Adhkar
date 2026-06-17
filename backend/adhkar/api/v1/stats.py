@@ -20,7 +20,7 @@ from adhkar.api.deps import (
     require_current_org,
     require_permission,
 )
-from adhkar.db.models import Alert, Case, CaseTtp, TtpCatalogEntry
+from adhkar.db.models import Alert, Case, CaseTtp, Observable, TtpCatalogEntry
 
 router = APIRouter(prefix="/v1/stats", tags=["stats"])
 
@@ -280,3 +280,34 @@ async def slowest_open_cases(
             )
         )
     return SlowestCasesResponse(cases=cases)
+
+
+class ObservableTypeBucket(BaseModel):
+    data_type: str
+    count: int
+
+
+class ObservableTypesResponse(BaseModel):
+    entries: list[ObservableTypeBucket]
+
+
+@router.get("/observables-by-type", response_model=ObservableTypesResponse)
+async def observables_by_type(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ObservableTypesResponse:
+    """Count of non-deleted observables grouped by data_type for the org,
+    ordered by count desc then data_type. Drives the IOC-composition
+    breakdown panel."""
+    rows = (
+        await db.execute(
+            select(Observable.data_type, func.count().label("n"))
+            .where(Observable.organization_id == org_id, Observable.deleted_at.is_(None))
+            .group_by(Observable.data_type)
+            .order_by(func.count().desc(), Observable.data_type)
+        )
+    ).all()
+    return ObservableTypesResponse(
+        entries=[ObservableTypeBucket(data_type=str(r[0]), count=int(r[1])) for r in rows]
+    )
