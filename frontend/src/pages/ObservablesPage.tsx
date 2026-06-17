@@ -35,10 +35,23 @@ export function ObservablesPage() {
     "data_type,data,tlp,is_ioc,tags,message\nip,1.2.3.4,amber,true,phish,seen in mail bounce\n",
   );
   const [importBusy, setImportBusy] = useState(false);
+  const [filterType, setFilterType] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [filterIoc, setFilterIoc] = useState<"" | "true" | "false">("");
+  const [filterSighted, setFilterSighted] = useState<"" | "true" | "false">("");
+  const [filterTlp, setFilterTlp] = useState("");
 
   const refresh = async () => {
     try {
-      const r = await apiCall<ObservableRow[]>("/v1/observables?limit=500");
+      const params = new URLSearchParams({ limit: "500" });
+      if (filterType.trim()) params.set("data_type", filterType.trim());
+      if (filterTag.trim()) params.set("tag", filterTag.trim());
+      if (filterIoc) params.set("is_ioc", filterIoc);
+      if (filterSighted) params.set("sighted", filterSighted);
+      if (filterTlp) params.set("tlp", filterTlp);
+      const r = await apiCall<ObservableRow[]>(
+        `/v1/observables?${params.toString()}`,
+      );
       setRows(r);
       setSelected(new Set());
     } catch (e) {
@@ -49,7 +62,7 @@ export function ObservablesPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall]);
+  }, [apiCall, filterType, filterTag, filterIoc, filterSighted, filterTlp]);
 
   const toggleOne = (id: string) => {
     setSelected((prev) => {
@@ -151,6 +164,87 @@ export function ObservablesPage() {
             </button>
           ) : null}
         </div>
+      </div>
+      <div className="mb-3 flex flex-wrap items-end gap-2 text-xs">
+        <label className="flex flex-col">
+          <span className="text-md-sys-color-on-surface-variant">Type</span>
+          <input
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+            placeholder="ip / domain / …"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col">
+          <span className="text-md-sys-color-on-surface-variant">Tag</span>
+          <input
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+            placeholder="phish, exfil, …"
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col">
+          <span className="text-md-sys-color-on-surface-variant">IOC</span>
+          <select
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+            value={filterIoc}
+            onChange={(e) =>
+              setFilterIoc(e.target.value as "" | "true" | "false")
+            }
+          >
+            <option value="">any</option>
+            <option value="true">yes</option>
+            <option value="false">no</option>
+          </select>
+        </label>
+        <label className="flex flex-col">
+          <span className="text-md-sys-color-on-surface-variant">Sighted</span>
+          <select
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+            value={filterSighted}
+            onChange={(e) =>
+              setFilterSighted(e.target.value as "" | "true" | "false")
+            }
+          >
+            <option value="">any</option>
+            <option value="true">yes</option>
+            <option value="false">no</option>
+          </select>
+        </label>
+        <label className="flex flex-col">
+          <span className="text-md-sys-color-on-surface-variant">TLP</span>
+          <select
+            className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+            value={filterTlp}
+            onChange={(e) => setFilterTlp(e.target.value)}
+          >
+            <option value="">any</option>
+            {["white", "green", "amber", "amber-strict", "red"].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(filterType || filterTag || filterIoc || filterSighted || filterTlp) ? (
+          <button
+            type="button"
+            className="rounded-full border border-md-sys-color-outline-variant px-2 py-1 text-[10px] hover:bg-md-sys-color-surface-container"
+            onClick={() => {
+              setFilterType("");
+              setFilterTag("");
+              setFilterIoc("");
+              setFilterSighted("");
+              setFilterTlp("");
+            }}
+          >
+            Reset
+          </button>
+        ) : null}
+        <span className="ml-auto text-md-sys-color-on-surface-variant">
+          {rows.length} match{rows.length === 1 ? "" : "es"}
+        </span>
       </div>
       {showImport && canManage ? (
         <article className="mb-4 rounded border border-md-sys-color-outline-variant p-3">
