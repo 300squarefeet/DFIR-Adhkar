@@ -406,3 +406,31 @@ async def audit_per_day(
         series="audit-per-day",
         points=[TimeSeriesPoint(day=k, count=by_day.get(k, 0)) for k in _last_n_days_keys(days)],
     )
+
+
+class TlpBucket(BaseModel):
+    tlp: str
+    count: int
+
+
+class TlpResponse(BaseModel):
+    entries: list[TlpBucket]
+
+
+@router.get("/observables-by-tlp", response_model=TlpResponse)
+async def observables_by_tlp(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TlpResponse:
+    """Counts grouped by TLP (white/green/amber/amber-strict/red), zero-filled."""
+    rows = (
+        await db.execute(
+            select(Observable.tlp, func.count().label("n"))
+            .where(Observable.organization_id == org_id, Observable.deleted_at.is_(None))
+            .group_by(Observable.tlp)
+        )
+    ).all()
+    by_tlp: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("white", "green", "amber", "amber-strict", "red")
+    return TlpResponse(entries=[TlpBucket(tlp=t, count=by_tlp.get(t, 0)) for t in canonical])
