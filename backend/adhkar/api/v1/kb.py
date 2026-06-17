@@ -79,8 +79,12 @@ async def list_kb_pages(
     query: str | None = None,
     tag: str | None = None,
     pinned_only: bool = False,
+    updated_since: datetime | None = None,
     limit: int = 100,
 ) -> list[KbPageDTO]:
+    """KB page list. `updated_since=<ISO>` bounds KnowledgeBasePage.updated_at
+    and switches the sort to updated_at DESC — completes the delta-sync
+    quintet with RC172/174/175/176."""
     stmt = select(KnowledgeBasePage).where(KnowledgeBasePage.organization_id == org_id)
     if query:
         like = f"%{query}%"
@@ -91,7 +95,13 @@ async def list_kb_pages(
         stmt = stmt.where(KnowledgeBasePage.tags.contains([tag]))
     if pinned_only:
         stmt = stmt.where(KnowledgeBasePage.pinned.is_(True))
-    stmt = stmt.order_by(KnowledgeBasePage.pinned.desc(), KnowledgeBasePage.title).limit(limit)
+    if updated_since is not None:
+        stmt = stmt.where(KnowledgeBasePage.updated_at >= updated_since).order_by(
+            KnowledgeBasePage.updated_at.desc()
+        )
+    else:
+        stmt = stmt.order_by(KnowledgeBasePage.pinned.desc(), KnowledgeBasePage.title)
+    stmt = stmt.limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_kb_dto(p) for p in rows]
 
