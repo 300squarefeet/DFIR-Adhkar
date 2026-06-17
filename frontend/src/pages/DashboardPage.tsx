@@ -20,6 +20,7 @@ import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
 import { RecentAlertsPanel } from "@/ui/RecentAlertsPanel";
 import { RecentCasesPanel } from "@/ui/RecentCasesPanel";
+import { RecentTasksPanel } from "@/ui/RecentTasksPanel";
 import { SlowestOpenCasesPanel } from "@/ui/SlowestOpenCasesPanel";
 import { Sparkline } from "@/ui/Sparkline";
 import { StageDistributionPanel } from "@/ui/StageDistributionPanel";
@@ -317,6 +318,7 @@ export function DashboardPage() {
       <RecentCasesPanel />
       <MyRecentCasesPanel />
       <RecentAlertsPanel />
+      <RecentTasksPanel />
       <AlertSourcePanel />
     </section>
   );
