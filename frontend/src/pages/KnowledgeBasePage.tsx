@@ -20,10 +20,23 @@ interface KbPage {
 export function KnowledgeBasePage() {
   const { apiCall, permissions } = useAuth();
   const toast = useToast();
+  const urlOverride = (() => {
+    if (typeof window === "undefined") return {} as Partial<{ tag: string; slug: string; q: string }>;
+    const params = new URLSearchParams(window.location.search);
+    const result: Partial<{ tag: string; slug: string; q: string }> = {};
+    const tag = params.get("tag");
+    if (tag) result.tag = tag;
+    const slug = params.get("slug");
+    if (slug) result.slug = slug;
+    const q = params.get("q");
+    if (q) result.q = q;
+    return result;
+  })();
+
   const [pages, setPages] = useState<KbPage[] | null>(null);
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  const [activeSlug, setActiveSlug] = useState<string | null>(urlOverride.slug ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState(urlOverride.q ?? "");
   const [editing, setEditing] = useState(false);
   const [draftContent, setDraftContent] = useState("");
   const [newSlug, setNewSlug] = useState("");
@@ -49,7 +62,7 @@ export function KnowledgeBasePage() {
     return Array.from(new Set(pages.flatMap((p) => p.tags))).sort();
   }, [pages]);
 
-  const [activeTag, setActiveTag] = useState<string>("");
+  const [activeTag, setActiveTag] = useState<string>(urlOverride.tag ?? "");
 
   const filtered = useMemo(() => {
     if (!pages) return [];
