@@ -12,6 +12,7 @@ import { useUserNames } from "@/lib/useUserNames";
 import { ObservablePicker } from "@/ui/ObservablePicker";
 import { useToast } from "@/ui/Toast";
 import { TtpPicker } from "@/ui/TtpPicker";
+import { MentionTextarea } from "@/ui/MentionTextarea";
 import { UserPicker } from "@/ui/UserPicker";
 
 interface CaseDetail {
@@ -156,7 +157,6 @@ export function CaseDetailPage({ caseId }: Props) {
   >({});
   const [logDraft, setLogDraft] = useState("");
   const [postingLog, setPostingLog] = useState(false);
-  const [showMention, setShowMention] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1406,32 +1406,13 @@ export function CaseDetailPage({ caseId }: Props) {
         </ul>
         {permissions.has("manageCase") ? (
           <div className="flex flex-col gap-2">
-            <textarea
-              className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
-              rows={3}
-              placeholder="Add a comment… (use @ to mention an org member)"
+            <MentionTextarea
               value={commentDraft}
-              onChange={(e) => setCommentDraft(e.target.value)}
+              onChange={setCommentDraft}
+              rows={3}
+              placeholder="Add a comment… (type @ to mention an org member)"
             />
-            {showMention ? (
-              <UserPicker
-                onPick={(_id, label) => {
-                  setCommentDraft(
-                    (prev) => (prev ? prev + " " : "") + `@${label}`,
-                  );
-                  setShowMention(false);
-                }}
-                placeholder="Mention a user…"
-              />
-            ) : null}
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
-                onClick={() => setShowMention((v) => !v)}
-              >
-                {showMention ? "Cancel @" : "Mention…"}
-              </button>
               <button
                 type="button"
                 className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary disabled:opacity-50"
