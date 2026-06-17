@@ -8,6 +8,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { AlertSourcePanel } from "@/ui/AlertSourcePanel";
 import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
 import { AuditActivityPanel } from "@/ui/AuditActivityPanel";
 import { AuditNoisePanel } from "@/ui/AuditNoisePanel";
@@ -312,6 +313,7 @@ export function DashboardPage() {
       <CasesByAssigneePanel />
       <AuditNoisePanel />
       <RecentCasesPanel />
+      <AlertSourcePanel />
     </section>
   );
 }
