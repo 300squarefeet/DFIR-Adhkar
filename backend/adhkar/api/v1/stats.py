@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import distinct, func, select
+from sqlalchemy import case, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import (
@@ -434,3 +434,46 @@ async def observables_by_tlp(
     by_tlp: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
     canonical = ("white", "green", "amber", "amber-strict", "red")
     return TlpResponse(entries=[TlpBucket(tlp=t, count=by_tlp.get(t, 0)) for t in canonical])
+
+
+class AssigneeBucket(BaseModel):
+    assignee_id: UUID | None
+    open_count: int
+    closed_count: int
+
+
+class CasesByAssigneeResponse(BaseModel):
+    entries: list[AssigneeBucket]
+
+
+@router.get("/cases-by-assignee", response_model=CasesByAssigneeResponse)
+async def cases_by_assignee(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CasesByAssigneeResponse:
+    """Per-assignee workload: open and closed case counts. `assignee_id`
+    is null in the 'unassigned' bucket. Ordered by open_count DESC then
+    closed_count DESC."""
+    rows = (
+        await db.execute(
+            select(
+                Case.assignee_id,
+                func.sum(case((Case.stage != "closed", 1), else_=0)).label("open_n"),
+                func.sum(case((Case.stage == "closed", 1), else_=0)).label("closed_n"),
+            )
+            .where(Case.organization_id == org_id, Case.deleted_at.is_(None))
+            .group_by(Case.assignee_id)
+        )
+    ).all()
+    buckets: list[AssigneeBucket] = []
+    for row in rows:
+        buckets.append(
+            AssigneeBucket(
+                assignee_id=row[0],
+                open_count=int(row[1] or 0),
+                closed_count=int(row[2] or 0),
+            )
+        )
+    buckets.sort(key=lambda b: (-b.open_count, -b.closed_count))
+    return CasesByAssigneeResponse(entries=buckets)
