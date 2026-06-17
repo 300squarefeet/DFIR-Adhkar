@@ -77,14 +77,19 @@ async def list_comments(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     since: datetime | None = None,
+    author_id: UUID | None = None,
 ) -> list[CommentDTO]:
     """Per-case comments in created_at ASC order. Optional `since=<ISO>`
     keeps only comments created at or after that timestamp — useful for
-    long-poll style "new comments since I last looked" widgets."""
+    long-poll style "new comments since I last looked" widgets. Optional
+    `author_id=<uuid>` scopes to one author so a contributor profile
+    page can render only their commentary."""
     await _load_case(db, org_id, case_id)
     stmt = select(Comment).where(Comment.case_id == case_id, Comment.organization_id == org_id)
     if since is not None:
         stmt = stmt.where(Comment.created_at >= since)
+    if author_id is not None:
+        stmt = stmt.where(Comment.author_id == author_id)
     rows = (await db.execute(stmt.order_by(Comment.created_at))).scalars().all()
     return [_comment_dto(c) for c in rows]
 
