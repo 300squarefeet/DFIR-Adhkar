@@ -698,6 +698,54 @@ async def patch_task(
     return _task_to_dto(t)
 
 
+class BulkTaskPatchPayload(BaseModel):
+    ids: list[UUID] = Field(min_length=1, max_length=200)
+    patch: TaskPatch
+
+
+@router.post("/v1/tasks/bulk-patch", response_model=BulkPatchResult)
+async def bulk_patch_tasks(
+    body: BulkTaskPatchPayload,
+    user: Annotated[CurrentUser, Depends(require_permission("manageTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> BulkPatchResult:
+    """Apply the same TaskPatch to up to 200 tasks. Rows outside the
+    caller's org are silently dropped. One audit row per id."""
+    patch = body.patch.model_dump(exclude_unset=True)
+    if not patch:
+        return BulkPatchResult(updated=0, ids=[])
+    rows = (
+        (
+            await db.execute(
+                select(Task).where(
+                    Task.organization_id == org_id,
+                    Task.id.in_(body.ids),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    updated_ids: list[UUID] = []
+    for t in rows:
+        for field, value in patch.items():
+            setattr(t, field, value)
+        updated_ids.append(t.id)
+    await db.flush()
+    for tid in updated_ids:
+        await audit_and_emit(
+            db,
+            actor_user_id=user.user_id,
+            organization_id=org_id,
+            action="bulk_updated",
+            entity_type="task",
+            entity_id=tid,
+            diff={k: str(v) for k, v in patch.items()},
+        )
+    return BulkPatchResult(updated=len(updated_ids), ids=updated_ids)
+
+
 @router.delete("/v1/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
     task_id: UUID,

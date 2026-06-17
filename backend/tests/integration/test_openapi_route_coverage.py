@@ -120,6 +120,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/cases/bulk-patch",
     "/v1/alerts/bulk-patch",
     "/v1/observables/bulk-patch",
+    "/v1/tasks/bulk-patch",
     # Tasks cross-case
     "/v1/tasks",
     # Stats
