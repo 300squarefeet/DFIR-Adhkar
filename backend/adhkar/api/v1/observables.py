@@ -152,8 +152,11 @@ async def list_observables(
     sighted: bool | None = None,
     tlp: Literal["white", "green", "amber", "amber-strict", "red"] | None = None,
     tag: str | None = None,
+    updated_since: datetime | None = None,
     limit: int = 100,
 ) -> list[ObservableDTO]:
+    """Observable list. `updated_since=<ISO>` returns only rows modified
+    at or after that timestamp; useful for delta sync."""
     stmt = select(Observable).where(
         Observable.organization_id == org_id, Observable.deleted_at.is_(None)
     )
@@ -168,6 +171,8 @@ async def list_observables(
     if tag:
         # JSONB array contains — works on text[] columns via overlap when not JSONB.
         stmt = stmt.where(Observable.tags.contains([tag]))
+    if updated_since is not None:
+        stmt = stmt.where(Observable.updated_at >= updated_since)
     stmt = stmt.order_by(Observable.created_at.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(o) for o in rows]
