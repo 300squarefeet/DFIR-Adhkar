@@ -896,6 +896,48 @@ async def list_tasks(
     return [_task_to_dto(t) for t in rows]
 
 
+class TaskStatusBucket(BaseModel):
+    status: str
+    count: int
+
+
+class CaseTasksSummaryResponse(BaseModel):
+    case_id: UUID
+    total: int
+    by_status: list[TaskStatusBucket]
+
+
+@router.get(
+    "/v1/cases/{case_id}/tasks/summary",
+    response_model=CaseTasksSummaryResponse,
+)
+async def case_tasks_summary(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CaseTasksSummaryResponse:
+    """Per-status task count for this case, zero-filled over the four
+    canonical statuses so a progress bar can render without empty-bucket
+    quirks."""
+    await _load_case_or_404(db, org_id, case_id)
+    rows = (
+        await db.execute(
+            select(Task.status, func.count().label("n"))
+            .where(Task.case_id == case_id, Task.organization_id == org_id)
+            .group_by(Task.status)
+        )
+    ).all()
+    by_status: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("Waiting", "InProgress", "Completed", "Cancelled")
+    buckets = [TaskStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
+    return CaseTasksSummaryResponse(
+        case_id=case_id,
+        total=sum(b.count for b in buckets),
+        by_status=buckets,
+    )
+
+
 @router.post(
     "/v1/cases/{case_id}/tasks", response_model=TaskDTO, status_code=status.HTTP_201_CREATED
 )
