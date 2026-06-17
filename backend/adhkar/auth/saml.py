@@ -56,6 +56,8 @@ def load_saml_providers(settings: Settings) -> dict[str, SamlProviderConfig]:
     for name, cfg in parsed.items():
         if not isinstance(cfg, dict):
             continue
+        raw_wanted = cfg.get("wanted_attributes")
+        wanted_src = raw_wanted if isinstance(raw_wanted, dict) else {}
         try:
             out[str(name)] = SamlProviderConfig(
                 name=str(name),
@@ -64,10 +66,10 @@ def load_saml_providers(settings: Settings) -> dict[str, SamlProviderConfig]:
                 sp_entity_id=str(cfg["sp_entity_id"]),
                 acs_url=str(cfg["acs_url"]),
                 idp_certificate_pem=str(cfg.get("idp_certificate_pem", "")),
-                metadata_url=str(cfg.get("metadata_url", "")),
+                metadata_url=str(cfg.get("metadata_url") or ""),
                 wanted_attributes={
                     str(k): str(v)
-                    for k, v in (cfg.get("wanted_attributes") or {}).items()
+                    for k, v in wanted_src.items()
                     if isinstance(k, str) and isinstance(v, str)
                 },
             )

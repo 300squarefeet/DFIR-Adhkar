@@ -103,18 +103,13 @@ def test_extract_assertion_picks_up_nameid_when_email_missing() -> None:
     assert attrs.get("NameID") == "soc@example.test"
 
 
-import json as _json  # noqa: E402
-
-from adhkar.auth.saml import load_saml_providers as _load_saml_providers  # noqa: E402
-
-
 def test_load_saml_providers_reads_metadata_url(monkeypatch) -> None:
     monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
     monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
     monkeypatch.setenv(
         "ADHKAR_SAML_PROVIDERS_JSON",
-        _json.dumps(
+        json.dumps(
             {
                 "okta": {
                     "idp_entity_id": "http://www.okta.com/exk-x",
@@ -130,7 +125,7 @@ def test_load_saml_providers_reads_metadata_url(monkeypatch) -> None:
     from adhkar.core.settings import Settings, get_settings
 
     get_settings.cache_clear()
-    providers = _load_saml_providers(Settings())
+    providers = load_saml_providers(Settings())
     cfg = providers["okta"]
     assert cfg.metadata_url == "https://acme.okta.com/app/sso/saml/metadata"
     assert cfg.wanted_attributes == {"email": "mail", "display_name": "displayName"}
@@ -142,7 +137,7 @@ def test_load_saml_providers_defaults_new_fields(monkeypatch) -> None:
     monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
     monkeypatch.setenv(
         "ADHKAR_SAML_PROVIDERS_JSON",
-        _json.dumps(
+        json.dumps(
             {
                 "minimal": {
                     "idp_entity_id": "a",
@@ -156,6 +151,82 @@ def test_load_saml_providers_defaults_new_fields(monkeypatch) -> None:
     from adhkar.core.settings import Settings, get_settings
 
     get_settings.cache_clear()
-    cfg = _load_saml_providers(Settings())["minimal"]
+    cfg = load_saml_providers(Settings())["minimal"]
     assert cfg.metadata_url == ""
     assert cfg.wanted_attributes == {}
+
+
+def test_load_saml_providers_handles_null_metadata_url(monkeypatch) -> None:
+    monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
+    monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
+    monkeypatch.setenv(
+        "ADHKAR_SAML_PROVIDERS_JSON",
+        json.dumps(
+            {
+                "provider": {
+                    "idp_entity_id": "a",
+                    "idp_sso_url": "b",
+                    "sp_entity_id": "c",
+                    "acs_url": "d",
+                    "metadata_url": None,
+                }
+            }
+        ),
+    )
+    from adhkar.core.settings import Settings, get_settings
+
+    get_settings.cache_clear()
+    cfg = load_saml_providers(Settings())["provider"]
+    assert cfg.metadata_url == ""
+
+
+def test_load_saml_providers_handles_nondict_wanted_attributes(monkeypatch) -> None:
+    monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
+    monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
+    monkeypatch.setenv(
+        "ADHKAR_SAML_PROVIDERS_JSON",
+        json.dumps(
+            {
+                "provider": {
+                    "idp_entity_id": "a",
+                    "idp_sso_url": "b",
+                    "sp_entity_id": "c",
+                    "acs_url": "d",
+                    "wanted_attributes": "not-a-dict",
+                }
+            }
+        ),
+    )
+    from adhkar.core.settings import Settings, get_settings
+
+    get_settings.cache_clear()
+    # Loader must NOT crash; provider must load with empty wanted_attributes.
+    providers = load_saml_providers(Settings())
+    assert providers["provider"].wanted_attributes == {}
+
+
+def test_load_saml_providers_drops_nonstr_wanted_attribute_values(monkeypatch) -> None:
+    monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h/db")
+    monkeypatch.setenv("REDIS_URL", "redis://h:6379/0")
+    monkeypatch.setenv(
+        "ADHKAR_SAML_PROVIDERS_JSON",
+        json.dumps(
+            {
+                "provider": {
+                    "idp_entity_id": "a",
+                    "idp_sso_url": "b",
+                    "sp_entity_id": "c",
+                    "acs_url": "d",
+                    "wanted_attributes": {"email": "mail", "display_name": ["bad", "type"]},
+                }
+            }
+        ),
+    )
+    from adhkar.core.settings import Settings, get_settings
+
+    get_settings.cache_clear()
+    cfg = load_saml_providers(Settings())["provider"]
+    assert cfg.wanted_attributes == {"email": "mail"}
