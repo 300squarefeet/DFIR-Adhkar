@@ -26,8 +26,16 @@ export function AuditLogPage() {
   const [rows, setRows] = useState<AuditRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
-  const [entityType, setEntityType] = useState("");
-  const [entityId, setEntityId] = useState("");
+  const initialQuery = (() => {
+    if (typeof window === "undefined") return { entityType: "", entityId: "" };
+    const p = new URLSearchParams(window.location.search);
+    return {
+      entityType: p.get("entity_type") ?? "",
+      entityId: p.get("entity_id") ?? "",
+    };
+  })();
+  const [entityType, setEntityType] = useState(initialQuery.entityType);
+  const [entityId, setEntityId] = useState(initialQuery.entityId);
   const [actionFilter, setActionFilter] = useState("");
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
