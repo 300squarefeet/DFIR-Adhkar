@@ -156,11 +156,15 @@ async def list_recent_cases(
     limit: int = 10,
     assignee_id: UUID | None = None,
     mine: bool | None = None,
+    stage: str | None = None,
+    open_only: bool | None = None,
 ) -> list[CaseDTO]:
     """N most-recently-updated cases (`updated_at` DESC) for the current
     org, default 10, capped 50. `mine=true` is shorthand for
-    `assignee_id=<current user>`. Skips soft-deleted cases. Same DTO
-    shape as the main list endpoint so the frontend can reuse the renderer."""
+    `assignee_id=<current user>`. `stage=<name>` filters to one workflow
+    stage (open, in_progress, etc). `open_only=true` shorthand excludes
+    `stage=closed`. Skips soft-deleted cases. Same DTO shape as the main
+    list endpoint so the frontend can reuse the renderer."""
     safe_limit = max(1, min(50, int(limit)))
     stmt = (
         select(Case)
@@ -172,6 +176,10 @@ async def list_recent_cases(
         stmt = stmt.where(Case.assignee_id == user.user_id)
     elif assignee_id is not None:
         stmt = stmt.where(Case.assignee_id == assignee_id)
+    if stage is not None:
+        stmt = stmt.where(Case.stage == stage)
+    elif open_only is True:
+        stmt = stmt.where(Case.stage != "closed")
     rows = (await db.execute(stmt)).scalars().all()
     return [_case_to_dto(c) for c in rows]
 
