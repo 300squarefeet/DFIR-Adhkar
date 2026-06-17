@@ -20,6 +20,12 @@ interface TemplateRow {
   id: string;
   name: string;
   display_name: string;
+  severity: number;
+  tlp: string;
+  pap: string;
+  tags: string[];
+  tasks: { title?: string; mandatory?: boolean }[];
+  summary?: string | null;
 }
 
 export function CreateCasePage() {
@@ -102,16 +108,52 @@ export function CreateCasePage() {
             <option value="">— scratch —</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.display_name || t.name}
+                {t.display_name || t.name} · S{t.severity} · TLP {t.tlp} ·{" "}
+                {t.tasks.length} task{t.tasks.length === 1 ? "" : "s"}
               </option>
             ))}
           </select>
-          {templateId ? (
-            <p className="mt-1 text-xs text-md-sys-color-on-surface-variant">
-              Severity/TLP/tasks come from the template; only the title and
-              description below are used.
-            </p>
-          ) : null}
+          {templateId
+            ? (() => {
+                const t = templates.find((x) => x.id === templateId);
+                if (!t) return null;
+                return (
+                  <div className="mt-2 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface-container p-2 text-xs">
+                    {t.summary ? (
+                      <p className="mb-1 text-md-sys-color-on-surface-variant">
+                        {t.summary}
+                      </p>
+                    ) : null}
+                    <p>
+                      <strong>Severity</strong> S{t.severity} ·{" "}
+                      <strong>TLP</strong> {t.tlp} · <strong>PAP</strong>{" "}
+                      {t.pap}
+                    </p>
+                    {t.tags.length > 0 ? (
+                      <p>
+                        <strong>Tags</strong>: {t.tags.join(", ")}
+                      </p>
+                    ) : null}
+                    {t.tasks.length > 0 ? (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer">
+                          {t.tasks.length} task
+                          {t.tasks.length === 1 ? "" : "s"} will be created
+                        </summary>
+                        <ul className="ml-4 mt-1 list-disc">
+                          {t.tasks.map((task, i) => (
+                            <li key={i}>
+                              {task.title ?? "(untitled)"}
+                              {task.mandatory ? " · required" : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </div>
+                );
+              })()
+            : null}
         </label>
       ) : null}
       <label className="block">
