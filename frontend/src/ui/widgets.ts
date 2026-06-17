@@ -78,4 +78,50 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     derive: (r) => asArray<{ is_ioc?: boolean }>(r).filter((o) => Boolean(o.is_ioc)).length,
     tone: "warn",
   },
+  {
+    id: "flagged-cases",
+    title: "Flagged cases",
+    path: "/v1/cases?flagged=true&limit=500",
+    derive: (r) => asArray<unknown>(r).length,
+    tone: "alert",
+  },
+  {
+    id: "unpromoted-alerts",
+    title: "Unpromoted alerts",
+    path: "/v1/alerts?unpromoted=true&limit=500",
+    derive: (r) => asArray<unknown>(r).length,
+    tone: "warn",
+  },
+  {
+    id: "overdue-tasks",
+    title: "Overdue tasks",
+    path: "/v1/tasks?overdue=true&limit=500",
+    derive: (r) => asArray<unknown>(r).length,
+    tone: "alert",
+  },
+  {
+    id: "my-open-tasks",
+    title: "My open tasks",
+    path: "/v1/tasks?mine=true&limit=500",
+    derive: (r) =>
+      asArray<{ status?: string }>(r).filter(
+        (t) => t.status !== "Completed" && t.status !== "Cancelled",
+      ).length,
+  },
+  {
+    id: "my-mentions-unread",
+    title: "My unread mentions",
+    path: "/v1/mentions/me/unread",
+    derive: (r) =>
+      typeof r === "object" && r !== null && "unread" in r
+        ? Number((r as { unread?: unknown }).unread ?? 0)
+        : 0,
+    tone: "warn",
+  },
+  {
+    id: "sighted-observables",
+    title: "Sighted observables",
+    path: "/v1/observables?sighted=true&limit=500",
+    derive: (r) => asArray<unknown>(r).length,
+  },
 ];
