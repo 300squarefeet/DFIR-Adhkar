@@ -129,6 +129,12 @@ interface PapSummary {
   by_pap: Array<{ pap: string; count: number }>;
 }
 
+interface TlpSummary {
+  case_id: string;
+  total: number;
+  by_tlp: Array<{ tlp: string; count: number }>;
+}
+
 interface TasksSummary {
   case_id: string;
   total: number;
@@ -232,6 +238,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [evidence, setEvidence] = useState<EvidenceSummary | null>(null);
   const [evidenceTags, setEvidenceTags] = useState<string[]>([]);
   const [papSummary, setPapSummary] = useState<PapSummary | null>(null);
+  const [tlpSummary, setTlpSummary] = useState<TlpSummary | null>(null);
   const [tasksSummary, setTasksSummary] = useState<TasksSummary | null>(null);
   const [links, setLinks] = useState<CaseLinkRow[]>([]);
   const [relationFilter, setRelationFilter] = useState<string>("");
@@ -346,6 +353,23 @@ export function CaseDetailPage({ caseId }: Props) {
         if (!cancelled) setPapSummary(summary);
       } catch {
         if (!cancelled) setPapSummary(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const summary = await apiCall<TlpSummary>(
+          `/v1/cases/${caseId}/observables/tlp-summary`,
+        );
+        if (!cancelled) setTlpSummary(summary);
+      } catch {
+        if (!cancelled) setTlpSummary(null);
       }
     })();
     return () => {
@@ -1737,6 +1761,36 @@ export function CaseDetailPage({ caseId }: Props) {
                   className={`rounded-full px-2 py-0.5 font-mono ${cls}`}
                 >
                   {b.pap} · {b.count}
+                </span>
+              );
+            })}
+        </section>
+      ) : null}
+
+      {tlpSummary !== null && tlpSummary.total > 0 ? (
+        <section className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-md-sys-color-on-surface-variant">TLP:</span>
+          {tlpSummary.by_tlp
+            .filter((b) => b.count > 0)
+            .map((b) => {
+              const cls =
+                b.tlp === "white"
+                  ? "bg-md-sys-color-surface-container text-md-sys-color-on-surface"
+                  : b.tlp === "green"
+                    ? "bg-severity-1/20 text-md-sys-color-on-surface"
+                    : b.tlp === "amber"
+                      ? "bg-severity-3/20 text-md-sys-color-on-surface"
+                      : b.tlp === "amber-strict"
+                        ? "bg-severity-3/40 text-md-sys-color-on-surface"
+                        : b.tlp === "red"
+                          ? "bg-severity-4/20 text-md-sys-color-on-surface"
+                          : "bg-md-sys-color-surface-container text-md-sys-color-on-surface";
+              return (
+                <span
+                  key={b.tlp}
+                  className={`rounded-full px-2 py-0.5 font-mono ${cls}`}
+                >
+                  {b.tlp} · {b.count}
                 </span>
               );
             })}
