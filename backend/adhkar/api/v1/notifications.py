@@ -335,10 +335,15 @@ async def list_deliveries(
     status_filter: Literal["pending", "succeeded", "failed"] | None = None,
     rule_id: UUID | None = None,
     endpoint_id: UUID | None = None,
+    event_type: str | None = None,
+    since: datetime | None = None,
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[DeliveryDTO]:
     """Read-only history of dispatcher attempts. Useful for diagnosing why a
-    notification rule isn't firing or which endpoint is rejecting."""
+    notification rule isn't firing or which endpoint is rejecting.
+    `event_type=<name>` scopes to one event family; `since=<ISO>` bounds
+    created_at — pairs with the failed-deliveries widget for tail-only
+    investigation."""
     stmt = (
         select(NotificationDelivery)
         .where(NotificationDelivery.organization_id == org_id)
@@ -351,6 +356,10 @@ async def list_deliveries(
         stmt = stmt.where(NotificationDelivery.rule_id == rule_id)
     if endpoint_id:
         stmt = stmt.where(NotificationDelivery.endpoint_id == endpoint_id)
+    if event_type is not None:
+        stmt = stmt.where(NotificationDelivery.event_type == event_type)
+    if since is not None:
+        stmt = stmt.where(NotificationDelivery.created_at >= since)
     rows = (await db.execute(stmt)).scalars().all()
     return [
         DeliveryDTO(
