@@ -46,13 +46,17 @@ async def list_audit(
     entity_type: str | None = None,
     entity_id: UUID | None = None,
     action: str | None = None,
+    action_prefix: str | None = None,
     actor_user_id: UUID | None = None,
     me: bool | None = None,
     ip: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> list[AuditLogDTO]:
-    """`me=true` is a shorthand for actor_user_id=<current user>."""
+    """`me=true` is a shorthand for actor_user_id=<current user>.
+    `action_prefix=<str>` matches any audit action starting with the
+    string (e.g. `task_` to catch task_created/task_completed/etc) —
+    composes with the exact-match `action` filter."""
     if me is True:
         actor_user_id = user.user_id
     stmt = (
@@ -70,6 +74,8 @@ async def list_audit(
         stmt = stmt.where(AuditLog.entity_id == entity_id)
     if action:
         stmt = stmt.where(AuditLog.action == action)
+    if action_prefix:
+        stmt = stmt.where(AuditLog.action.like(f"{action_prefix}%"))
     if actor_user_id:
         stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
     if since is not None:
