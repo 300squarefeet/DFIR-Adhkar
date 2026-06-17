@@ -147,6 +147,14 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     link: "/knowledge-base",
   },
   {
+    id: "failed-deliveries",
+    title: "Failed deliveries",
+    path: "/v1/notification-deliveries?status_filter=failed&limit=500",
+    derive: (r) => asArray<unknown>(r).length,
+    tone: "alert",
+    link: "/admin/notification-deliveries",
+  },
+  {
     id: "mttr-30d-hours",
     title: "Median MTTR 30d (h)",
     path: "/v1/stats/case-mttr?days=30",
