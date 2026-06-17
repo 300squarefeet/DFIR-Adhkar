@@ -36,6 +36,7 @@ export function NotificationsPage() {
   const [rules, setRules] = useState<RuleRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<string>("");
 
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
@@ -48,8 +49,11 @@ export function NotificationsPage() {
 
   const refresh = async () => {
     try {
+      const epsUrl = kindFilter
+        ? `/v1/notification-endpoints?kind=${encodeURIComponent(kindFilter)}`
+        : "/v1/notification-endpoints";
       const [eps, rs] = await Promise.all([
-        apiCall<EndpointRow[]>("/v1/notification-endpoints"),
+        apiCall<EndpointRow[]>(epsUrl),
         apiCall<RuleRow[]>("/v1/notification-rules"),
       ]);
       setEndpoints(eps);
@@ -64,7 +68,7 @@ export function NotificationsPage() {
     void refresh();
     // refresh is intentionally fresh per render here; small page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall]);
+  }, [apiCall, kindFilter]);
 
   const createWebhook = async () => {
     if (!newName.trim() || !newUrl.trim()) return;
@@ -129,6 +133,33 @@ export function NotificationsPage() {
 
       <article>
         <h2 className="mb-2 text-lg font-medium">Endpoints ({endpoints.length})</h2>
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-md-sys-color-on-surface-variant">Endpoint kind:</span>
+          {[
+            { label: "All", value: "" },
+            { label: "webhook", value: "webhook" },
+            { label: "slack", value: "slack" },
+            { label: "teams", value: "teams" },
+            { label: "mattermost", value: "mattermost" },
+          ].map((chip) => {
+            const active = kindFilter === chip.value;
+            return (
+              <button
+                key={chip.value || "all"}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setKindFilter(chip.value)}
+                className={
+                  active
+                    ? "rounded-full bg-md-sys-color-primary px-2 py-0.5 text-xs text-md-sys-color-on-primary"
+                    : "rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+                }
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
         {endpoints.length === 0 ? (
           <p className="text-sm text-md-sys-color-on-surface-variant">No endpoints.</p>
         ) : (
