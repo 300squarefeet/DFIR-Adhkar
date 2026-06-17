@@ -69,18 +69,19 @@ async def list_endpoints(
     _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    kind: str | None = None,
+    enabled: bool | None = None,
 ) -> list[EndpointDTO]:
-    rows = (
-        (
-            await db.execute(
-                select(NotificationEndpoint)
-                .where(NotificationEndpoint.organization_id == org_id)
-                .order_by(NotificationEndpoint.name)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    """Notification endpoints in the current org. Optional `kind=<name>`
+    scopes to one transport (webhook, slack, teams, mattermost);
+    `enabled=true|false` scopes to active/disabled. Symmetric with
+    RC201 rules-list filters."""
+    stmt = select(NotificationEndpoint).where(NotificationEndpoint.organization_id == org_id)
+    if kind is not None:
+        stmt = stmt.where(NotificationEndpoint.kind == kind)
+    if enabled is not None:
+        stmt = stmt.where(NotificationEndpoint.enabled.is_(enabled))
+    rows = (await db.execute(stmt.order_by(NotificationEndpoint.name))).scalars().all()
     return [_endpoint_dto(e) for e in rows]
 
 
