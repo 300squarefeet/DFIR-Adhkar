@@ -552,8 +552,10 @@ async def export_cases_csv(
     tag: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    updated_since: datetime | None = None,
 ) -> PlainTextResponse:
-    """CSV dump of cases. Same filter surface as the list endpoint."""
+    """CSV dump of cases. Same filter surface as the list endpoint
+    (including RC175 updated_since)."""
     import csv
     import io
 
@@ -570,6 +572,8 @@ async def export_cases_csv(
         stmt = stmt.where(Case.created_at >= since)
     if until is not None:
         stmt = stmt.where(Case.created_at < until)
+    if updated_since is not None:
+        stmt = stmt.where(Case.updated_at >= updated_since)
     rows = (await db.execute(stmt.order_by(Case.number.desc()))).scalars().all()
     buf = io.StringIO()
     w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
