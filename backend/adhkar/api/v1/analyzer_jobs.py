@@ -58,8 +58,12 @@ def _to_dto(j: AnalyzerJob) -> JobDTO:
 @router.get("/v1/analyzers", response_model=list[AnalyzerInfoDTO])
 async def list_analyzers(
     _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    data_type: str | None = None,
 ) -> list[AnalyzerInfoDTO]:
-    return [
+    """Registered analyzers. Optional `data_type=<name>` keeps only
+    analyzers whose `supported_types` set contains the value — drives
+    the per-observable analyzer picker without filtering client-side."""
+    out = [
         AnalyzerInfoDTO(
             name=a.name,
             description=a.description,
@@ -67,6 +71,9 @@ async def list_analyzers(
         )
         for a in get_registry().all()
     ]
+    if data_type is not None:
+        out = [a for a in out if data_type in a.supported_types]
+    return out
 
 
 @router.post(
