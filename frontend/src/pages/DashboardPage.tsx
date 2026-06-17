@@ -13,6 +13,7 @@ import { AlertStatusPanel } from "@/ui/AlertStatusPanel";
 import { AuditActivityPanel } from "@/ui/AuditActivityPanel";
 import { AuditNoisePanel } from "@/ui/AuditNoisePanel";
 import { CasesByAssigneePanel } from "@/ui/CasesByAssigneePanel";
+import { FailedDeliveriesPanel } from "@/ui/FailedDeliveriesPanel";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { MyRecentCasesPanel } from "@/ui/MyRecentCasesPanel";
 import { ObservablePapPanel } from "@/ui/ObservablePapPanel";
@@ -403,6 +404,7 @@ export function DashboardPage() {
       <AlertStatusPanel />
       <TaskStatusPanel />
       <AuditActivityPanel />
+      <FailedDeliveriesPanel />
       <CasesByAssigneePanel />
       <AuditNoisePanel />
       <RecentCasesPanel />
