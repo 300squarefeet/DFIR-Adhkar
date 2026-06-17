@@ -18,6 +18,7 @@ from saml2.response import StatusError
 
 from adhkar.auth.saml import SamlProviderConfig
 from adhkar.auth.saml_errors import (
+    SamlAudienceError,
     SamlConfigError,
     SamlReplayError,
     SamlSignatureError,
@@ -60,7 +61,12 @@ class SamlVerifier:
         except StatusError as e:
             raise SamlSignatureError(f"status_error:{e}") from e
         except Exception as e:  # pysaml2 raises a variety of subclasses
-            raise SamlSignatureError(f"parse_failed:{type(e).__name__}") from e
+            name = type(e).__name__
+            if name in {"ToEarly", "ResponseLifetimeExceed"}:
+                raise SamlTimingError(f"timing:{name}") from e
+            if name == "NotForMe":
+                raise SamlAudienceError(f"audience:{name}") from e
+            raise SamlSignatureError(f"parse_failed:{name}") from e
         if response is None:
             raise SamlSignatureError("response_none")
         assertion = response.assertion

@@ -61,3 +61,62 @@ async def test_valid_response_returns_claims(
     assert claims.name_id == "soc@example.test"
     assert claims.assertion_id == "assertion-valid"
     assert claims.not_on_or_after > FROZEN_NOW
+
+
+from adhkar.auth.saml_errors import (  # noqa: E402
+    SamlAudienceError,
+    SamlRecipientError,
+    SamlReplayError,
+    SamlSignatureError,
+    SamlTimingError,
+)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_wrong_signer_raises_signature_error(verifier, redis) -> None:
+    with pytest.raises(SamlSignatureError):
+        await verifier.verify_and_extract(_b64("wrong_signer_response.xml"), redis=redis)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_unsigned_raises_signature_error(verifier, redis) -> None:
+    with pytest.raises(SamlSignatureError):
+        await verifier.verify_and_extract(_b64("unsigned_response.xml"), redis=redis)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_expired_raises_timing_or_signature(verifier, redis) -> None:
+    with pytest.raises((SamlTimingError, SamlSignatureError)):
+        await verifier.verify_and_extract(_b64("expired_response.xml"), redis=redis)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_not_yet_valid_raises_timing_or_signature(verifier, redis) -> None:
+    with pytest.raises((SamlTimingError, SamlSignatureError)):
+        await verifier.verify_and_extract(_b64("not_yet_valid_response.xml"), redis=redis)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_wrong_audience_raises_audience_or_signature(verifier, redis) -> None:
+    with pytest.raises((SamlAudienceError, SamlSignatureError)):
+        await verifier.verify_and_extract(_b64("wrong_audience_response.xml"), redis=redis)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_wrong_recipient_raises_recipient_or_signature(verifier, redis) -> None:
+    with pytest.raises((SamlRecipientError, SamlSignatureError)):
+        await verifier.verify_and_extract(_b64("wrong_recipient_response.xml"), redis=redis)
+
+
+@pytest.mark.asyncio
+@freeze_time(FROZEN_NOW)
+async def test_replay_second_call_raises_replay_error(verifier, redis) -> None:
+    await verifier.verify_and_extract(_b64("valid_response.xml"), redis=redis)
+    with pytest.raises(SamlReplayError):
+        await verifier.verify_and_extract(_b64("valid_response.xml"), redis=redis)
