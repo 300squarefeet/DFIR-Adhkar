@@ -44,6 +44,7 @@ export function AttackHeatmapPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTechnique, setActiveTechnique] = useState<string | null>(null);
   const [drilldown, setDrilldown] = useState<CaseStub[]>([]);
+  const [tacticFilter, setTacticFilter] = useState<string>("");
 
   const openTechnique = async (techniqueId: string) => {
     setActiveTechnique(techniqueId);
@@ -71,16 +72,28 @@ export function AttackHeatmapPage() {
     };
   }, [apiCall]);
 
+  const filtered = useMemo(
+    () =>
+      tacticFilter
+        ? (data?.entries.filter((e) => e.tactic === tacticFilter) ?? [])
+        : (data?.entries ?? []),
+    [data, tacticFilter],
+  );
+
+  const availableTactics = useMemo(() => {
+    if (!data) return [] as string[];
+    return Array.from(new Set(data.entries.map((e) => e.tactic))).sort();
+  }, [data]);
+
   const byTactic = useMemo(() => {
     const m = new Map<string, HeatmapEntry[]>();
-    if (!data) return m;
-    for (const e of data.entries) {
+    for (const e of filtered) {
       const list = m.get(e.tactic) ?? [];
       list.push(e);
       m.set(e.tactic, list);
     }
     return m;
-  }, [data]);
+  }, [filtered]);
 
   const max = useMemo(() => {
     if (!data) return 0;
@@ -116,6 +129,43 @@ export function AttackHeatmapPage() {
         Per-technique case count for this org, grouped by tactic. Darker
         tiles = more cases. Max observed: {max}.
       </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-md-sys-color-on-surface-variant">
+          Tactic:
+        </span>
+        <button
+          type="button"
+          aria-pressed={tacticFilter === ""}
+          onClick={() => setTacticFilter("")}
+          className={
+            "rounded-full px-2 py-0.5 text-xs " +
+            (tacticFilter === ""
+              ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+              : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+          }
+        >
+          All
+        </button>
+        {availableTactics.map((t) => {
+          const active = tacticFilter === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setTacticFilter(t)}
+              className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (active
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+              }
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         {tactics.map((tactic) => (
           <article
