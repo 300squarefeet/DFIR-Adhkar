@@ -15,6 +15,7 @@ import { AuditNoisePanel } from "@/ui/AuditNoisePanel";
 import { CasesByAssigneePanel } from "@/ui/CasesByAssigneePanel";
 import { MttrBreakdownPanel } from "@/ui/MttrBreakdownPanel";
 import { MyRecentCasesPanel } from "@/ui/MyRecentCasesPanel";
+import { ObservablePapPanel } from "@/ui/ObservablePapPanel";
 import { ObservableTlpPanel } from "@/ui/ObservableTlpPanel";
 import { ObservableTypesPanel } from "@/ui/ObservableTypesPanel";
 import { PinnedRunbooksPanel } from "@/ui/PinnedRunbooksPanel";
@@ -313,6 +314,7 @@ export function DashboardPage() {
       <PinnedRunbooksPanel />
       <ObservableTypesPanel />
       <ObservableTlpPanel />
+      <ObservablePapPanel />
       <StageDistributionPanel />
       <AlertStatusPanel />
       <TaskStatusPanel />
