@@ -27,6 +27,7 @@ export function CaseTemplatesPage() {
   const [rows, setRows] = useState<TemplateRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string>("");
 
   // Inline create form
   const [showCreate, setShowCreate] = useState(false);
@@ -43,7 +44,10 @@ export function CaseTemplatesPage() {
 
   const refresh = async () => {
     try {
-      const r = await apiCall<TemplateRow[]>("/v1/case-templates");
+      const url = tagFilter
+        ? `/v1/case-templates?tag=${encodeURIComponent(tagFilter)}`
+        : "/v1/case-templates";
+      const r = await apiCall<TemplateRow[]>(url);
       setRows(r);
     } catch (e) {
       setError((e as Error).message);
@@ -53,7 +57,7 @@ export function CaseTemplatesPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall]);
+  }, [apiCall, tagFilter]);
 
   const create = async () => {
     if (!name.trim() || !displayName.trim()) return;
@@ -193,6 +197,25 @@ export function CaseTemplatesPage() {
           </button>
         </article>
       ) : null}
+
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="Filter by tag…"
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          className="rounded-full border border-md-sys-color-outline-variant bg-md-sys-color-surface px-3 py-1 text-sm"
+        />
+        {tagFilter !== "" ? (
+          <button
+            type="button"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-sm hover:bg-md-sys-color-surface-container"
+            onClick={() => setTagFilter("")}
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-md-sys-color-on-surface-variant">No templates yet.</p>
