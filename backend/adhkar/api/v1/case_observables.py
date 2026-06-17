@@ -121,6 +121,62 @@ class SimilarityCountsResponse(BaseModel):
     counts: list[SimilarityCount]
 
 
+class ObservablePapBucket(BaseModel):
+    pap: str
+    count: int
+
+
+class ObservablePapSummaryResponse(BaseModel):
+    case_id: UUID
+    total: int
+    by_pap: list[ObservablePapBucket]
+
+
+@router.get(
+    "/v1/cases/{case_id}/observables/pap-summary",
+    response_model=ObservablePapSummaryResponse,
+)
+async def case_observable_pap_summary(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ObservablePapSummaryResponse:
+    """Per-PAP count of observables attached to this case, zero-filled
+    across the four canonical buckets so a sharing-posture badge can
+    render without special-casing empty PAPs."""
+    case = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+    rows = (
+        await db.execute(
+            select(Observable.pap, func.count().label("n"))
+            .where(
+                Observable.case_id == case_id,
+                Observable.organization_id == org_id,
+                Observable.deleted_at.is_(None),
+            )
+            .group_by(Observable.pap)
+        )
+    ).all()
+    by_pap: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("white", "green", "amber", "red")
+    buckets = [ObservablePapBucket(pap=p, count=by_pap.get(p, 0)) for p in canonical]
+    return ObservablePapSummaryResponse(
+        case_id=case_id,
+        total=sum(b.count for b in buckets),
+        by_pap=buckets,
+    )
+
+
 class ObservableTagsResponse(BaseModel):
     case_id: UUID
     tags: list[str]

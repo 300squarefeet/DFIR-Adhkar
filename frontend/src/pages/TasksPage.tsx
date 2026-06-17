@@ -41,6 +41,7 @@ export function TasksPage() {
         overdue?: boolean;
         mandatory?: "" | "true" | "false";
         due_within_days?: number | null;
+        updated_within_hours?: 0 | 24 | 168 | 720;
       };
     const p = new URLSearchParams(window.location.search);
     const out: {
@@ -49,6 +50,7 @@ export function TasksPage() {
       overdue?: boolean;
       mandatory?: "" | "true" | "false";
       due_within_days?: number | null;
+      updated_within_hours?: 0 | 24 | 168 | 720;
     } = {};
     const s = p.get("status_filter");
     if (s === "Waiting" || s === "InProgress" || s === "Completed" || s === "Cancelled")
@@ -62,6 +64,11 @@ export function TasksPage() {
       const n = Number.parseInt(d, 10);
       if (Number.isFinite(n) && n >= 1 && n <= 90) out.due_within_days = n;
     }
+    const u = p.get("updated_within_hours");
+    if (u !== null) {
+      const n = Number.parseInt(u, 10);
+      if (n === 0 || n === 24 || n === 168 || n === 720) out.updated_within_hours = n;
+    }
     return out;
   })();
   const initialView = (() => {
@@ -74,6 +81,7 @@ export function TasksPage() {
           overdue: false,
           mandatory: "" as "" | "true" | "false",
           due_within_days: null as number | null,
+          updated_within_hours: 0 as 0 | 24 | 168 | 720,
         };
       const p = JSON.parse(raw) as {
         status?: TaskStatus | "";
@@ -81,18 +89,23 @@ export function TasksPage() {
         overdue?: boolean;
         mandatory?: "" | "true" | "false";
         due_within_days?: number | null;
+        updated_within_hours?: 0 | 24 | 168 | 720;
       };
       const dRaw = p.due_within_days;
       const dNorm =
         typeof dRaw === "number" && Number.isFinite(dRaw) && dRaw >= 1 && dRaw <= 90
           ? dRaw
           : null;
+      const uRaw = p.updated_within_hours;
+      const uNorm: 0 | 24 | 168 | 720 =
+        uRaw === 24 || uRaw === 168 || uRaw === 720 ? uRaw : 0;
       return {
         status: (p.status ?? "") as TaskStatus | "",
         mine: Boolean(p.mine),
         overdue: Boolean(p.overdue),
         mandatory: (p.mandatory ?? "") as "" | "true" | "false",
         due_within_days: dNorm,
+        updated_within_hours: uNorm,
       };
     } catch {
       return {
@@ -101,6 +114,7 @@ export function TasksPage() {
         overdue: false,
         mandatory: "" as "" | "true" | "false",
         due_within_days: null as number | null,
+        updated_within_hours: 0 as 0 | 24 | 168 | 720,
       };
     }
   })();
@@ -116,6 +130,9 @@ export function TasksPage() {
   );
   const [dueWithin, setDueWithin] = useState<number | null>(
     urlOverride.due_within_days ?? initialView.due_within_days,
+  );
+  const [updatedWithinHours, setUpdatedWithinHours] = useState<0 | 24 | 168 | 720>(
+    urlOverride.updated_within_hours ?? initialView.updated_within_hours,
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -157,12 +174,13 @@ export function TasksPage() {
           overdue,
           mandatory,
           due_within_days: dueWithin,
+          updated_within_hours: updatedWithinHours,
         }),
       );
     } catch {
       /* private mode — best-effort */
     }
-  }, [status, mine, overdue, mandatory, dueWithin]);
+  }, [status, mine, overdue, mandatory, dueWithin, updatedWithinHours]);
 
   const refresh = async () => {
     try {
@@ -177,6 +195,12 @@ export function TasksPage() {
         params.set("overdue", "true");
       }
       if (mandatory) params.set("mandatory", mandatory);
+      if (updatedWithinHours >= 1) {
+        params.set(
+          "updated_since",
+          new Date(Date.now() - updatedWithinHours * 3600 * 1000).toISOString(),
+        );
+      }
       const r = await apiCall<TaskRow[]>(`/v1/tasks?${params.toString()}`);
       setRows(r);
     } catch (e) {
@@ -187,7 +211,7 @@ export function TasksPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, status, mine, overdue, mandatory, dueWithin]);
+  }, [apiCall, status, mine, overdue, mandatory, dueWithin, updatedWithinHours]);
 
   const userNames = useUserNames(rows?.map((r) => r.assignee_id) ?? []);
 
@@ -242,6 +266,13 @@ export function TasksPage() {
               p.set("overdue", "true");
             }
             if (mandatory) p.set("mandatory", mandatory);
+            if (updatedWithinHours >= 1) {
+              p.set("updated_within_hours", String(updatedWithinHours));
+              p.set(
+                "updated_since",
+                new Date(Date.now() - updatedWithinHours * 3600 * 1000).toISOString(),
+              );
+            }
             const qs = p.toString();
             const url = `${window.location.origin}/tasks${qs ? `?${qs}` : ""}`;
             navigator.clipboard
@@ -267,6 +298,12 @@ export function TasksPage() {
               p.set("overdue", "true");
             }
             if (mandatory) p.set("mandatory", mandatory);
+            if (updatedWithinHours >= 1) {
+              p.set(
+                "updated_since",
+                new Date(Date.now() - updatedWithinHours * 3600 * 1000).toISOString(),
+              );
+            }
             const qs = p.toString();
             return `${base}/v1/tasks/export-csv${qs ? `?${qs}` : ""}`;
           })()}
@@ -306,6 +343,39 @@ export function TasksPage() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setDueWithin(chip.value)}
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (active
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                }
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          className="flex items-center gap-1 text-sm"
+          role="group"
+          aria-label="Edited within filter"
+        >
+          <span className="text-md-sys-color-on-surface-variant">Edited:</span>
+          {(
+            [
+              { label: "Any", value: 0 },
+              { label: "24h", value: 24 },
+              { label: "7d", value: 168 },
+              { label: "30d", value: 720 },
+            ] as const
+          ).map((chip) => {
+            const active = updatedWithinHours === chip.value;
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setUpdatedWithinHours(chip.value)}
                 className={
                   "rounded-full px-2 py-0.5 text-xs " +
                   (active
