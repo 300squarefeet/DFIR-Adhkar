@@ -275,6 +275,28 @@ export function CaseDetailPage({ caseId }: Props) {
     }
   };
 
+  const moveTask = async (taskId: string, delta: -1 | 1) => {
+    const idx = tasks.findIndex((t) => t.id === taskId);
+    const next = idx + delta;
+    if (idx < 0 || next < 0 || next >= tasks.length) return;
+    const reordered = [...tasks];
+    const a = reordered[idx];
+    const b = reordered[next];
+    if (!a || !b) return;
+    reordered[idx] = b;
+    reordered[next] = a;
+    setTasks(reordered);
+    try {
+      await apiCall(`/v1/cases/${caseId}/tasks/reorder`, {
+        method: "POST",
+        body: JSON.stringify({ ordered_ids: reordered.map((t) => t.id) }),
+      });
+    } catch (e) {
+      setTasks(tasks);
+      toast.error((e as Error).message);
+    }
+  };
+
   const toggleTaskLogs = async (taskId: string) => {
     if (expandedTaskLogs === taskId) {
       setExpandedTaskLogs(null);
@@ -929,6 +951,31 @@ export function CaseDetailPage({ caseId }: Props) {
                   </button>
                   {permissions.has("manageTask") ? (
                     <>
+                      <button
+                        type="button"
+                        title="Move up"
+                        className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container disabled:opacity-30"
+                        disabled={tasks.findIndex((x) => x.id === t.id) === 0}
+                        onClick={() => {
+                          void moveTask(t.id, -1);
+                        }}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        title="Move down"
+                        className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container disabled:opacity-30"
+                        disabled={
+                          tasks.findIndex((x) => x.id === t.id) ===
+                          tasks.length - 1
+                        }
+                        onClick={() => {
+                          void moveTask(t.id, +1);
+                        }}
+                      >
+                        ↓
+                      </button>
                       <button
                         type="button"
                         className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container"

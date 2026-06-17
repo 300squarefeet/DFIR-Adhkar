@@ -444,6 +444,62 @@ async def create_task(
     return _task_to_dto(task)
 
 
+class TaskReorder(BaseModel):
+    ordered_ids: list[UUID] = Field(min_length=1, max_length=500)
+
+
+class TaskReorderResult(BaseModel):
+    updated: int
+
+
+@router.post("/v1/cases/{case_id}/tasks/reorder", response_model=TaskReorderResult)
+async def reorder_tasks(
+    case_id: UUID,
+    body: TaskReorder,
+    user: Annotated[CurrentUser, Depends(require_permission("manageTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TaskReorderResult:
+    """Assign each task in `ordered_ids` an ascending order_index by
+    position. Tasks belonging to other cases or orgs are silently
+    skipped; missing ids in the list keep their old position."""
+    await _load_case_or_404(db, org_id, case_id)
+    rows = (
+        (
+            await db.execute(
+                select(Task).where(
+                    Task.case_id == case_id,
+                    Task.organization_id == org_id,
+                    Task.id.in_(body.ordered_ids),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    by_id = {t.id: t for t in rows}
+    updated = 0
+    for position, tid in enumerate(body.ordered_ids):
+        t = by_id.get(tid)
+        if t is None:
+            continue
+        if t.order_index != position:
+            t.order_index = position
+            updated += 1
+    await db.flush()
+    if updated:
+        await audit_and_emit(
+            db,
+            actor_user_id=user.user_id,
+            organization_id=org_id,
+            action="reordered_tasks",
+            entity_type="case",
+            entity_id=case_id,
+            diff={"ordered_ids": [str(i) for i in body.ordered_ids]},
+        )
+    return TaskReorderResult(updated=updated)
+
+
 @router.patch("/v1/tasks/{task_id}", response_model=TaskDTO)
 async def patch_task(
     task_id: UUID,
