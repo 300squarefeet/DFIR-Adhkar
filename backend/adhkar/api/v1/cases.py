@@ -287,6 +287,72 @@ async def list_case_contributors(
     return out
 
 
+@router.get("/v1/cases/{case_id}/contributors/me", response_model=ContributorRow)
+async def my_case_contributor_row(
+    case_id: UUID,
+    user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ContributorRow:
+    """The caller's own activity counts on this case (comments, task_log,
+    audit). Returns zeros if the caller has never touched the case
+    instead of 404, so a "your activity" badge can render unconditionally."""
+    from adhkar.db.models import AuditLog as _AuditLog
+    from adhkar.db.models import Comment as _Comment
+    from adhkar.db.models import TaskLog as _TaskLog
+
+    case = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+    comments_n = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(_Comment)
+                .where(_Comment.case_id == case_id, _Comment.author_id == user.user_id)
+            )
+        ).scalar_one()
+    )
+    task_logs_n = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(_TaskLog)
+                .join(Task, Task.id == _TaskLog.task_id)
+                .where(Task.case_id == case_id, _TaskLog.author_id == user.user_id)
+            )
+        ).scalar_one()
+    )
+    audit_n = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(_AuditLog)
+                .where(
+                    _AuditLog.organization_id == org_id,
+                    _AuditLog.entity_type == "case",
+                    _AuditLog.entity_id == case_id,
+                    _AuditLog.actor_user_id == user.user_id,
+                )
+            )
+        ).scalar_one()
+    )
+    return ContributorRow(
+        user_id=user.user_id,
+        comment_count=comments_n,
+        task_log_count=task_logs_n,
+        audit_count=audit_n,
+    )
+
+
 class RelatedCaseRow(BaseModel):
     case_id: UUID
     number: int
