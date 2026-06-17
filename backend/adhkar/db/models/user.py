@@ -1,8 +1,9 @@
 """User account."""
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import CITEXT
 from sqlalchemy.dialects.postgresql import UUID as PgUUID  # noqa: N811
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,3 +23,6 @@ class User(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
         PgUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True
     )
     theme: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    last_mentions_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

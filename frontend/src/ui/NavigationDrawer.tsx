@@ -1,4 +1,7 @@
 import { Link } from "@tanstack/react-router";
+import { useContext, useEffect, useState } from "react";
+
+import { AuthContext } from "@/lib/auth";
 
 interface Item {
   to?: string;
@@ -31,11 +34,39 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/portal", label: "Portal", icon: "groups" },
 ];
 
+function useUnreadMentions(): number {
+  const ctx = useContext(AuthContext);
+  const [n, setN] = useState(0);
+  const apiCall = ctx?.apiCall;
+  const user = ctx?.user;
+  useEffect(() => {
+    if (!apiCall || !user) return;
+    let cancelled = false;
+    const poll = () => {
+      apiCall<{ unread: number }>("/v1/mentions/me/unread")
+        .then((r) => {
+          if (!cancelled) setN(r.unread);
+        })
+        .catch(() => undefined);
+    };
+    poll();
+    const id = window.setInterval(poll, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [apiCall, user]);
+  return n;
+}
+
 export function NavigationDrawer() {
+  const unread = useUnreadMentions();
   return (
     <nav className="flex h-full w-56 flex-col gap-1 border-r border-outline-variant bg-surface-container-low p-2">
       {ITEMS.map((it) => {
         if (it.to) {
+          const badge =
+            it.to === "/mentions" && unread > 0 ? unread : null;
           return (
             <Link
               key={it.label}
@@ -46,6 +77,11 @@ export function NavigationDrawer() {
                 {it.icon}
               </span>
               <span>{it.label}</span>
+              {badge !== null ? (
+                <span className="ml-auto rounded-full bg-md-sys-color-primary px-2 py-0.5 text-[10px] text-md-sys-color-on-primary">
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              ) : null}
             </Link>
           );
         }

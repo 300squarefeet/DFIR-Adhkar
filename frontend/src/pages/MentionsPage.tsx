@@ -35,6 +35,8 @@ export function MentionsPage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    // Opening this page marks everything seen.
+    apiCall("/v1/mentions/me/seen", { method: "POST" }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
