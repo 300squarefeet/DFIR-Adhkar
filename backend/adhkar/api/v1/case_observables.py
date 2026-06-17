@@ -177,6 +177,63 @@ async def case_observable_pap_summary(
     )
 
 
+class ObservableTlpBucket(BaseModel):
+    tlp: str
+    count: int
+
+
+class ObservableTlpSummaryResponse(BaseModel):
+    case_id: UUID
+    total: int
+    by_tlp: list[ObservableTlpBucket]
+
+
+@router.get(
+    "/v1/cases/{case_id}/observables/tlp-summary",
+    response_model=ObservableTlpSummaryResponse,
+)
+async def case_observable_tlp_summary(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ObservableTlpSummaryResponse:
+    """Per-TLP count of observables attached to this case, zero-filled
+    across the five canonical buckets so a sensitivity-posture badge
+    can render without empty-bucket quirks. Companion to the RC196
+    PAP summary."""
+    case = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+    rows = (
+        await db.execute(
+            select(Observable.tlp, func.count().label("n"))
+            .where(
+                Observable.case_id == case_id,
+                Observable.organization_id == org_id,
+                Observable.deleted_at.is_(None),
+            )
+            .group_by(Observable.tlp)
+        )
+    ).all()
+    by_tlp: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("white", "green", "amber", "amber-strict", "red")
+    buckets = [ObservableTlpBucket(tlp=t, count=by_tlp.get(t, 0)) for t in canonical]
+    return ObservableTlpSummaryResponse(
+        case_id=case_id,
+        total=sum(b.count for b in buckets),
+        by_tlp=buckets,
+    )
+
+
 class ObservableTagsResponse(BaseModel):
     case_id: UUID
     tags: list[str]
