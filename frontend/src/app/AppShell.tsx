@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 import { ActivityFeed } from "@/ui/ActivityFeed";
 import { CommandPalette } from "@/ui/CommandPalette";
+import { MentionToastListener } from "@/ui/MentionToastListener";
 import { NavigationDrawer } from "@/ui/NavigationDrawer";
 import { TopAppBar } from "@/ui/TopAppBar";
 
@@ -34,6 +35,7 @@ export function AppShell({ children }: AppShellProps) {
         <ActivityFeed />
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <MentionToastListener />
     </div>
   );
 }
