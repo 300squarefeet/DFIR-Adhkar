@@ -6,9 +6,9 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ from adhkar.api.deps import (
     require_current_org,
     require_permission,
 )
-from adhkar.db.models import NotificationEndpoint, NotificationRule
+from adhkar.db.models import NotificationDelivery, NotificationEndpoint, NotificationRule
 
 router = APIRouter(tags=["notifications"])
 
@@ -308,3 +308,61 @@ async def delete_rule(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "rule_not_found")
     await db.delete(r)
     await db.flush()
+
+
+# ---------- Deliveries (read-only) ----------
+
+
+class DeliveryDTO(BaseModel):
+    id: UUID
+    rule_id: UUID | None
+    endpoint_id: UUID | None
+    event_type: str
+    payload: dict[str, Any]
+    status: str
+    attempts: int
+    last_error: str | None
+    created_at: datetime
+    delivered_at: datetime | None
+
+
+@router.get("/v1/notification-deliveries", response_model=list[DeliveryDTO])
+async def list_deliveries(
+    _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: Literal["pending", "succeeded", "failed"] | None = None,
+    rule_id: UUID | None = None,
+    endpoint_id: UUID | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[DeliveryDTO]:
+    """Read-only history of dispatcher attempts. Useful for diagnosing why a
+    notification rule isn't firing or which endpoint is rejecting."""
+    stmt = (
+        select(NotificationDelivery)
+        .where(NotificationDelivery.organization_id == org_id)
+        .order_by(desc(NotificationDelivery.created_at))
+        .limit(limit)
+    )
+    if status_filter:
+        stmt = stmt.where(NotificationDelivery.status == status_filter)
+    if rule_id:
+        stmt = stmt.where(NotificationDelivery.rule_id == rule_id)
+    if endpoint_id:
+        stmt = stmt.where(NotificationDelivery.endpoint_id == endpoint_id)
+    rows = (await db.execute(stmt)).scalars().all()
+    return [
+        DeliveryDTO(
+            id=d.id,
+            rule_id=d.rule_id,
+            endpoint_id=d.endpoint_id,
+            event_type=d.event_type,
+            payload=dict(d.payload),
+            status=d.status,
+            attempts=d.attempts,
+            last_error=d.last_error,
+            created_at=d.created_at,
+            delivered_at=d.delivered_at,
+        )
+        for d in rows
+    ]

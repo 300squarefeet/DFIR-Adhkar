@@ -85,6 +85,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     # Phase 7
     "/v1/notification-endpoints",
     "/v1/notification-rules",
+    "/v1/notification-deliveries",
     # Phase 8
     "/v1/ai/freeform",
     "/v1/ai/calls",
