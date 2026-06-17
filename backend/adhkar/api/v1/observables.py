@@ -90,11 +90,15 @@ async def search_observables(
     q: str = "",
     data_type: str | None = None,
     only_unattached: bool = False,
+    is_ioc: bool | None = None,
+    tag: str | None = None,
     limit: int = 20,
 ) -> list[ObservableDTO]:
     """Substring search across (data_type, data, tags). Used by the
     CaseDetailPage observable-attach picker; orders by created_at desc
-    so the most recent matches surface first."""
+    so the most recent matches surface first. Optional `is_ioc=true`
+    keeps only flagged IOCs; `tag=<name>` exact-match (ARRAY.contains)
+    — both compose with the substring search."""
     safe_limit = max(1, min(100, int(limit)))
     pattern = f"%{q.strip()}%" if q.strip() else "%"
     stmt = select(Observable).where(
@@ -104,6 +108,10 @@ async def search_observables(
         stmt = stmt.where(Observable.data_type == data_type)
     if only_unattached:
         stmt = stmt.where(Observable.case_id.is_(None))
+    if is_ioc is not None:
+        stmt = stmt.where(Observable.is_ioc.is_(is_ioc))
+    if tag is not None:
+        stmt = stmt.where(Observable.tags.contains([tag]))
     if q.strip():
         stmt = stmt.where(Observable.data.ilike(pattern))
     stmt = stmt.order_by(Observable.created_at.desc()).limit(safe_limit)
