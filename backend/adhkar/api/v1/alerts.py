@@ -554,6 +554,7 @@ async def alert_timeline(
     limit: int = 100,
     since: datetime | None = None,
     action: str | None = None,
+    action_prefix: str | None = None,
     entity_type: str | None = None,
     actor_user_id: UUID | None = None,
 ) -> AlertTimelineResponse:
@@ -562,7 +563,8 @@ async def alert_timeline(
     invocations that target the alert). Optional `since=<ISO>` and
     `action=<name>` mirror the RC192 case-timeline filter surface;
     `entity_type=<name>` (RC205) scopes to one entity family;
-    `actor_user_id=<uuid>` (RC244) scopes to one contributor."""
+    `actor_user_id=<uuid>` (RC244) scopes to one contributor;
+    `action_prefix=<str>` (RC259) matches a verb family."""
     from sqlalchemy import Text, or_
 
     a = (
@@ -592,6 +594,8 @@ async def alert_timeline(
         stmt = stmt.where(AuditLog.created_at >= since)
     if action is not None:
         stmt = stmt.where(AuditLog.action == action)
+    if action_prefix is not None:
+        stmt = stmt.where(AuditLog.action.like(f"{action_prefix}%"))
     if entity_type is not None:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
     if actor_user_id is not None:
