@@ -161,13 +161,23 @@ async def list_users(
     _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    status: str | None = None,
+    q: str | None = None,
 ) -> list[UserDTO]:
-    """List users that are members of the current org."""
+    """List users that are members of the current org. Optional `status=
+    <value>` scopes to one lifecycle (active/suspended/pending_invite);
+    `q=<substring>` does a case-insensitive substring search across
+    display_name and email."""
     stmt = (
         select(User)
         .join(UserOrgMembership, UserOrgMembership.user_id == User.id)
         .where(UserOrgMembership.organization_id == org_id, User.deleted_at.is_(None))
     )
+    if status is not None:
+        stmt = stmt.where(User.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((User.display_name.ilike(like)) | (User.email.ilike(like)))
     rows = (await db.execute(stmt)).scalars().all()
     return [
         UserDTO(id=u.id, email=u.email, display_name=u.display_name, status=u.status) for u in rows
