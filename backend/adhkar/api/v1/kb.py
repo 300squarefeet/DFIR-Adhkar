@@ -96,6 +96,33 @@ async def list_kb_pages(
     return [_kb_dto(p) for p in rows]
 
 
+@router.get("/v1/kb/pages/recent", response_model=list[KbPageDTO])
+async def list_recent_kb_pages(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+) -> list[KbPageDTO]:
+    """N most-recently-updated KB pages (`updated_at` DESC, default 10,
+    cap 50). Mirrors /v1/cases/recent + /v1/alerts/recent +
+    /v1/tasks/recent + /v1/observables/recent for symmetry. Useful
+    for a "Recently edited runbooks" widget."""
+    safe_limit = max(1, min(50, int(limit)))
+    rows = (
+        (
+            await db.execute(
+                select(KnowledgeBasePage)
+                .where(KnowledgeBasePage.organization_id == org_id)
+                .order_by(KnowledgeBasePage.updated_at.desc())
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_kb_dto(p) for p in rows]
+
+
 @router.post("/v1/kb/pages", response_model=KbPageDTO, status_code=status.HTTP_201_CREATED)
 async def create_kb_page(
     body: KbPageCreate,
