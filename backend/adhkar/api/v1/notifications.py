@@ -438,3 +438,65 @@ async def export_deliveries_csv(
             "Content-Disposition": 'attachment; filename="adhkar-notification-deliveries.csv"'
         },
     )
+
+
+class TestEndpointResult(BaseModel):
+    delivery_id: UUID
+    ok: bool
+    error: str | None
+
+
+@router.post(
+    "/v1/notification-endpoints/{endpoint_id}/test",
+    response_model=TestEndpointResult,
+    status_code=status.HTTP_200_OK,
+)
+async def test_endpoint(
+    endpoint_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TestEndpointResult:
+    """Fire a synthetic test payload at the endpoint's configured URL and
+    record the result as a NotificationDelivery row with
+    event_type='endpoint.test'. Lets admins validate a webhook/Slack URL
+    without crafting a matching NotificationRule + real event."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    import httpx
+
+    from adhkar.notifications.dispatcher import _post_webhook
+
+    endpoint = (
+        await db.execute(
+            select(NotificationEndpoint).where(
+                NotificationEndpoint.id == endpoint_id,
+                NotificationEndpoint.organization_id == org_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not endpoint:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "endpoint_not_found")
+    payload: dict[str, Any] = {
+        "event_type": "endpoint.test",
+        "organization_id": str(org_id),
+        "synthetic": True,
+        "note": "Adhkar IR — endpoint validation ping",
+    }
+    async with httpx.AsyncClient() as client:
+        ok, err = await _post_webhook(client, endpoint, payload)
+    delivery = NotificationDelivery(
+        organization_id=org_id,
+        rule_id=None,
+        endpoint_id=endpoint.id,
+        event_type="endpoint.test",
+        payload=payload,
+        status="succeeded" if ok else "failed",
+        attempts=1,
+        last_error=err,
+        delivered_at=_dt.now(tz=_UTC) if ok else None,
+    )
+    db.add(delivery)
+    await db.flush()
+    return TestEndpointResult(delivery_id=delivery.id, ok=ok, error=err)
