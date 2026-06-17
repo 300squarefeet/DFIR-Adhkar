@@ -35,16 +35,34 @@ interface SavedView {
   status: string;
   source: string;
   search: string;
+  severity: "" | "1" | "2" | "3" | "4";
+  tag: string;
+  unpromoted: "" | "true" | "false";
 }
 
 function loadView(): SavedView {
+  const empty: SavedView = {
+    status: "",
+    source: "",
+    search: "",
+    severity: "",
+    tag: "",
+    unpromoted: "",
+  };
   try {
     const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
-    if (!raw) return { status: "", source: "", search: "" };
+    if (!raw) return empty;
     const p = JSON.parse(raw) as Partial<SavedView>;
-    return { status: p.status ?? "", source: p.source ?? "", search: p.search ?? "" };
+    return {
+      status: p.status ?? "",
+      source: p.source ?? "",
+      search: p.search ?? "",
+      severity: p.severity ?? "",
+      tag: p.tag ?? "",
+      unpromoted: p.unpromoted ?? "",
+    };
   } catch {
-    return { status: "", source: "", search: "" };
+    return empty;
   }
 }
 
@@ -64,6 +82,9 @@ export function AlertsPage() {
       const params = new URLSearchParams({ limit: "200" });
       if (view.status) params.set("alert_status", view.status);
       if (view.source) params.set("source", view.source);
+      if (view.severity) params.set("severity", view.severity);
+      if (view.tag.trim()) params.set("tag", view.tag.trim());
+      if (view.unpromoted) params.set("unpromoted", view.unpromoted);
       const rows = await apiCall<AlertRow[]>(`/v1/alerts?${params.toString()}`);
       setAlerts(rows);
       setSelected(new Set());
@@ -75,7 +96,14 @@ export function AlertsPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, view.status, view.source]);
+  }, [
+    apiCall,
+    view.status,
+    view.source,
+    view.severity,
+    view.tag,
+    view.unpromoted,
+  ]);
 
   useEffect(() => {
     window.localStorage.setItem(SAVED_VIEW_KEY, JSON.stringify(view));
@@ -202,6 +230,43 @@ export function AlertsPage() {
           placeholder="Source filter (e.g. splunk)"
           value={view.source}
           onChange={(e) => setView({ ...view, source: e.target.value })}
+        />
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.severity}
+          onChange={(e) =>
+            setView({
+              ...view,
+              severity: e.target.value as SavedView["severity"],
+            })
+          }
+        >
+          <option value="">All severities</option>
+          <option value="1">S1</option>
+          <option value="2">S2</option>
+          <option value="3">S3</option>
+          <option value="4">S4</option>
+        </select>
+        <select
+          className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          value={view.unpromoted}
+          onChange={(e) =>
+            setView({
+              ...view,
+              unpromoted: e.target.value as SavedView["unpromoted"],
+            })
+          }
+          title="Filter by case promotion state"
+        >
+          <option value="">All</option>
+          <option value="true">Unpromoted</option>
+          <option value="false">Promoted</option>
+        </select>
+        <input
+          className="w-28 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+          placeholder="Tag…"
+          value={view.tag}
+          onChange={(e) => setView({ ...view, tag: e.target.value })}
         />
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"

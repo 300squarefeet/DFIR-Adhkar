@@ -110,6 +110,9 @@ async def list_alerts(
     db: Annotated[AsyncSession, Depends(get_db)],
     alert_status: STATUS | None = None,
     source: str | None = None,
+    severity: int | None = None,
+    tag: str | None = None,
+    unpromoted: bool | None = None,
     limit: int = 100,
 ) -> list[AlertDTO]:
     stmt = select(Alert).where(Alert.organization_id == org_id)
@@ -117,6 +120,14 @@ async def list_alerts(
         stmt = stmt.where(Alert.status == alert_status)
     if source:
         stmt = stmt.where(Alert.source == source)
+    if severity is not None:
+        stmt = stmt.where(Alert.severity == severity)
+    if tag:
+        stmt = stmt.where(Alert.tags.contains([tag]))
+    if unpromoted is True:
+        stmt = stmt.where(Alert.case_id.is_(None))
+    elif unpromoted is False:
+        stmt = stmt.where(Alert.case_id.is_not(None))
     stmt = stmt.order_by(Alert.created_at.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_alert_dto(a) for a in rows]
