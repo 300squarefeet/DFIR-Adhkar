@@ -163,19 +163,20 @@ async def list_case_ttps(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    tactic: str | None = None,
 ) -> list[CaseTtpDTO]:
+    """Per-case TTP mappings. Optional `tactic=<name>` scopes to one
+    ATT&CK tactic so the case detail page can render "show only
+    persistence techniques" without filtering client-side."""
     await _load_case(db, org_id, case_id)
-    rows = (
-        (
-            await db.execute(
-                select(CaseTtp)
-                .where(CaseTtp.case_id == case_id, CaseTtp.organization_id == org_id)
-                .order_by(CaseTtp.tactic, CaseTtp.technique_id)
-            )
-        )
-        .scalars()
-        .all()
+    stmt = (
+        select(CaseTtp)
+        .where(CaseTtp.case_id == case_id, CaseTtp.organization_id == org_id)
+        .order_by(CaseTtp.tactic, CaseTtp.technique_id)
     )
+    if tactic is not None:
+        stmt = stmt.where(CaseTtp.tactic == tactic)
+    rows = (await db.execute(stmt)).scalars().all()
     return [_case_ttp_dto(t) for t in rows]
 
 
