@@ -161,10 +161,16 @@ async def list_observables(
     tlp: Literal["white", "green", "amber", "amber-strict", "red"] | None = None,
     tag: str | None = None,
     updated_since: datetime | None = None,
+    case_id: UUID | None = None,
+    unattached: bool | None = None,
     limit: int = 100,
 ) -> list[ObservableDTO]:
     """Observable list. `updated_since=<ISO>` returns only rows modified
-    at or after that timestamp; useful for delta sync."""
+    at or after that timestamp; useful for delta sync. `case_id=<uuid>`
+    scopes to one case (cheap alternative to /v1/cases/{id}/observables
+    when callers already use this endpoint shape); `unattached=true`
+    keeps only observables with no case_id (mutually exclusive — explicit
+    case_id wins)."""
     stmt = select(Observable).where(
         Observable.organization_id == org_id, Observable.deleted_at.is_(None)
     )
@@ -181,6 +187,10 @@ async def list_observables(
         stmt = stmt.where(Observable.tags.contains([tag]))
     if updated_since is not None:
         stmt = stmt.where(Observable.updated_at >= updated_since)
+    if case_id is not None:
+        stmt = stmt.where(Observable.case_id == case_id)
+    elif unattached is True:
+        stmt = stmt.where(Observable.case_id.is_(None))
     stmt = stmt.order_by(Observable.created_at.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(o) for o in rows]
