@@ -38,23 +38,44 @@ export function ObservablesPage() {
   const initialView = (() => {
     try {
       const raw = window.localStorage.getItem("adhkar.observables.view");
-      if (!raw) return { type: "", tag: "", ioc: "" as const, sighted: "" as const, tlp: "" };
+      if (!raw)
+        return {
+          type: "",
+          tag: "",
+          ioc: "" as const,
+          sighted: "" as const,
+          tlp: "",
+          updatedWithin: 0 as 0 | 24 | 168 | 720,
+        };
       const p = JSON.parse(raw) as {
         type?: string;
         tag?: string;
         ioc?: "" | "true" | "false";
         sighted?: "" | "true" | "false";
         tlp?: string;
+        updatedWithin?: number;
       };
+      const uw =
+        p.updatedWithin === 24 || p.updatedWithin === 168 || p.updatedWithin === 720
+          ? (p.updatedWithin as 24 | 168 | 720)
+          : (0 as const);
       return {
         type: p.type ?? "",
         tag: p.tag ?? "",
         ioc: (p.ioc ?? "") as "" | "true" | "false",
         sighted: (p.sighted ?? "") as "" | "true" | "false",
         tlp: p.tlp ?? "",
+        updatedWithin: uw as 0 | 24 | 168 | 720,
       };
     } catch {
-      return { type: "", tag: "", ioc: "" as const, sighted: "" as const, tlp: "" };
+      return {
+        type: "",
+        tag: "",
+        ioc: "" as const,
+        sighted: "" as const,
+        tlp: "",
+        updatedWithin: 0 as 0 | 24 | 168 | 720,
+      };
     }
   })();
   const urlOverride = (() => {
@@ -66,6 +87,7 @@ export function ObservablesPage() {
       filterIoc: "" | "true" | "false";
       filterSighted: "" | "true" | "false";
       filterTlp: string;
+      updatedWithin: 0 | 24 | 168 | 720;
     }> = {};
     const dt = sp.get("data_type");
     if (dt !== null) out.filterType = dt;
@@ -84,6 +106,12 @@ export function ObservablesPage() {
       tlp === "red"
     )
       out.filterTlp = tlp;
+    const uwRaw = sp.get("updated_within_hours");
+    if (uwRaw !== null) {
+      const n = Number.parseInt(uwRaw, 10);
+      if (n === 24 || n === 168 || n === 720) out.updatedWithin = n;
+      else if (n === 0) out.updatedWithin = 0;
+    }
     return out;
   })();
   const [filterType, setFilterType] = useState<string>(urlOverride.filterType ?? initialView.type);
@@ -93,6 +121,9 @@ export function ObservablesPage() {
     urlOverride.filterSighted ?? initialView.sighted,
   );
   const [filterTlp, setFilterTlp] = useState<string>(urlOverride.filterTlp ?? initialView.tlp);
+  const [updatedWithin, setUpdatedWithin] = useState<0 | 24 | 168 | 720>(
+    urlOverride.updatedWithin ?? initialView.updatedWithin,
+  );
 
   useEffect(() => {
     try {
@@ -104,12 +135,13 @@ export function ObservablesPage() {
           ioc: filterIoc,
           sighted: filterSighted,
           tlp: filterTlp,
+          updatedWithin,
         }),
       );
     } catch {
       /* localStorage disabled (private mode, quota) — best-effort */
     }
-  }, [filterType, filterTag, filterIoc, filterSighted, filterTlp]);
+  }, [filterType, filterTag, filterIoc, filterSighted, filterTlp, updatedWithin]);
 
   const refresh = async () => {
     try {
@@ -119,6 +151,10 @@ export function ObservablesPage() {
       if (filterIoc) params.set("is_ioc", filterIoc);
       if (filterSighted) params.set("sighted", filterSighted);
       if (filterTlp) params.set("tlp", filterTlp);
+      if (updatedWithin >= 1) {
+        const since = new Date(Date.now() - updatedWithin * 3600 * 1000).toISOString();
+        params.set("updated_since", since);
+      }
       const r = await apiCall<ObservableRow[]>(
         `/v1/observables?${params.toString()}`,
       );
@@ -132,7 +168,7 @@ export function ObservablesPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, filterType, filterTag, filterIoc, filterSighted, filterTlp]);
+  }, [apiCall, filterType, filterTag, filterIoc, filterSighted, filterTlp, updatedWithin]);
 
   const toggleOne = (id: string) => {
     setSelected((prev) => {
@@ -214,6 +250,7 @@ export function ObservablesPage() {
               if (filterIoc) p.set("is_ioc", filterIoc);
               if (filterSighted) p.set("sighted", filterSighted);
               if (filterTlp) p.set("tlp", filterTlp);
+              if (updatedWithin >= 1) p.set("updated_within_hours", String(updatedWithin));
               const qs = p.toString();
               const url = `${window.location.origin}/observables${qs ? `?${qs}` : ""}`;
               navigator.clipboard
@@ -348,6 +385,34 @@ export function ObservablesPage() {
         <span className="ml-auto text-md-sys-color-on-surface-variant">
           {rows.length} match{rows.length === 1 ? "" : "es"}
         </span>
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-md-sys-color-on-surface-variant">Edited:</span>
+        {(
+          [
+            { label: "Any", value: 0 as const },
+            { label: "24h", value: 24 as const },
+            { label: "7d", value: 168 as const },
+            { label: "30d", value: 720 as const },
+          ] satisfies { label: string; value: 0 | 24 | 168 | 720 }[]
+        ).map((c) => {
+          const active = updatedWithin === c.value;
+          return (
+            <button
+              key={c.value}
+              type="button"
+              aria-pressed={active}
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                active
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+              }`}
+              onClick={() => setUpdatedWithin(c.value)}
+            >
+              {c.label}
+            </button>
+          );
+        })}
       </div>
       {showImport && canManage ? (
         <article className="mb-4 rounded border border-md-sys-color-outline-variant p-3">
