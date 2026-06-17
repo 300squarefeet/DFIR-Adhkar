@@ -745,10 +745,14 @@ async def list_recent_tasks(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 10,
     mine: bool | None = None,
+    status_filter: TASK_STATUS | None = None,
+    open_only: bool | None = None,
 ) -> list[TaskDTO]:
     """N most-recently-updated tasks (`updated_at` DESC), default 10, cap
-    50. `mine=true` is shorthand for assignee_id=<current user>. Mirrors
-    /v1/cases/recent + /v1/alerts/recent for dashboard symmetry."""
+    50. `mine=true` is shorthand for assignee_id=<current user>.
+    `status_filter=<value>` scopes to one task status; `open_only=true`
+    excludes Completed and Cancelled. Mirrors /v1/cases/recent for
+    dashboard symmetry."""
     safe_limit = max(1, min(50, int(limit)))
     stmt = (
         select(Task)
@@ -758,6 +762,10 @@ async def list_recent_tasks(
     )
     if mine is True:
         stmt = stmt.where(Task.assignee_id == user.user_id)
+    if status_filter is not None:
+        stmt = stmt.where(Task.status == status_filter)
+    elif open_only is True:
+        stmt = stmt.where(Task.status.notin_(("Completed", "Cancelled")))
     rows = (await db.execute(stmt)).scalars().all()
     return [_task_to_dto(t) for t in rows]
 
