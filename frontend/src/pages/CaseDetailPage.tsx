@@ -37,6 +37,8 @@ interface TaskRow {
   status: string;
   order_index: number;
   mandatory: boolean;
+  assignee_id: string | null;
+  due_date: string | null;
 }
 
 interface CommentRow {
@@ -145,6 +147,15 @@ export function CaseDetailPage({ caseId }: Props) {
   const [newTaskMandatory, setNewTaskMandatory] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [showAssigneeForTask, setShowAssigneeForTask] = useState<string | null>(null);
+  const [editingDueForTask, setEditingDueForTask] = useState<string | null>(null);
+  const [dueDraft, setDueDraft] = useState("");
+  const [expandedTaskLogs, setExpandedTaskLogs] = useState<string | null>(null);
+  const [taskLogs, setTaskLogs] = useState<
+    Record<string, { id: string; content: string; created_at: string; author_id: string | null }[]>
+  >({});
+  const [logDraft, setLogDraft] = useState("");
+  const [postingLog, setPostingLog] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,6 +237,83 @@ export function CaseDetailPage({ caseId }: Props) {
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     } catch (e) {
       toast.error((e as Error).message);
+    }
+  };
+
+  const setTaskAssignee = async (
+    taskId: string,
+    assigneeId: string | null,
+    label: string,
+  ) => {
+    try {
+      const updated = await apiCall<TaskRow>(`/v1/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assignee_id: assigneeId }),
+      });
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      toast.success(`Task assignee: ${label}`);
+      setShowAssigneeForTask(null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const saveTaskDue = async (taskId: string) => {
+    try {
+      const updated = await apiCall<TaskRow>(`/v1/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          due_date: dueDraft ? new Date(dueDraft).toISOString() : null,
+        }),
+      });
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setEditingDueForTask(null);
+      toast.success("Due date saved.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const toggleTaskLogs = async (taskId: string) => {
+    if (expandedTaskLogs === taskId) {
+      setExpandedTaskLogs(null);
+      return;
+    }
+    setExpandedTaskLogs(taskId);
+    setLogDraft("");
+    if (taskLogs[taskId]) return;
+    try {
+      const rows = await apiCall<
+        { id: string; content: string; created_at: string; author_id: string | null }[]
+      >(`/v1/tasks/${taskId}/logs`);
+      setTaskLogs((prev) => ({ ...prev, [taskId]: rows }));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const postTaskLog = async (taskId: string) => {
+    if (!logDraft.trim()) return;
+    setPostingLog(true);
+    try {
+      const created = await apiCall<{
+        id: string;
+        content: string;
+        created_at: string;
+        author_id: string | null;
+      }>(`/v1/tasks/${taskId}/logs`, {
+        method: "POST",
+        body: JSON.stringify({ content: logDraft.trim() }),
+      });
+      setTaskLogs((prev) => ({
+        ...prev,
+        [taskId]: [...(prev[taskId] ?? []), created],
+      }));
+      setLogDraft("");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPostingLog(false);
     }
   };
 
@@ -807,27 +895,146 @@ export function CaseDetailPage({ caseId }: Props) {
             {tasks.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-3 rounded border border-md-sys-color-outline-variant px-3 py-2"
+                className="rounded border border-md-sys-color-outline-variant px-3 py-2"
               >
-                <span className="font-mono text-xs">{t.status}</span>
-                <span>{t.title}</span>
-                {t.mandatory ? (
-                  <span className="text-xs text-severity-3">required</span>
-                ) : null}
-                {permissions.has("manageTask") ? (
-                  <select
-                    className="ml-auto rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-0.5 text-xs"
-                    value={t.status}
-                    onChange={(e) => {
-                      void setTaskStatus(t.id, e.target.value);
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs">{t.status}</span>
+                  <span>{t.title}</span>
+                  {t.mandatory ? (
+                    <span className="text-xs text-severity-3">required</span>
+                  ) : null}
+                  {t.due_date ? (
+                    <span className="text-xs text-md-sys-color-on-surface-variant">
+                      due {new Date(t.due_date).toLocaleDateString()}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="ml-auto rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container"
+                    onClick={() => {
+                      void toggleTaskLogs(t.id);
                     }}
                   >
-                    {["Waiting", "InProgress", "Completed", "Cancelled"].map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                    {expandedTaskLogs === t.id ? "Hide log" : "Log"}
+                  </button>
+                  {permissions.has("manageTask") ? (
+                    <>
+                      <button
+                        type="button"
+                        className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container"
+                        onClick={() => {
+                          if (editingDueForTask === t.id) {
+                            setEditingDueForTask(null);
+                          } else {
+                            setEditingDueForTask(t.id);
+                            setDueDraft(
+                              t.due_date ? t.due_date.slice(0, 10) : "",
+                            );
+                          }
+                        }}
+                      >
+                        {editingDueForTask === t.id ? "Cancel" : "Due"}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] hover:bg-md-sys-color-surface-container"
+                        onClick={() =>
+                          setShowAssigneeForTask(
+                            showAssigneeForTask === t.id ? null : t.id,
+                          )
+                        }
+                      >
+                        Assignee
+                      </button>
+                      <select
+                        className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-0.5 text-xs"
+                        value={t.status}
+                        onChange={(e) => {
+                          void setTaskStatus(t.id, e.target.value);
+                        }}
+                      >
+                        {["Waiting", "InProgress", "Completed", "Cancelled"].map(
+                          (s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </>
+                  ) : null}
+                </div>
+                {editingDueForTask === t.id && permissions.has("manageTask") ? (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <input
+                      type="date"
+                      className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+                      value={dueDraft}
+                      onChange={(e) => setDueDraft(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-[10px] text-md-sys-color-on-primary"
+                      onClick={() => {
+                        void saveTaskDue(t.id);
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : null}
+                {showAssigneeForTask === t.id && permissions.has("manageTask") ? (
+                  <div className="mt-2">
+                    <UserPicker
+                      onPick={(id, label) => {
+                        void setTaskAssignee(t.id, id, label);
+                      }}
+                      placeholder="Assign task to…"
+                    />
+                  </div>
+                ) : null}
+                {expandedTaskLogs === t.id ? (
+                  <div className="mt-2 space-y-1 border-t border-md-sys-color-outline-variant/50 pt-2 text-xs">
+                    {(taskLogs[t.id] ?? []).length === 0 ? (
+                      <p className="text-md-sys-color-on-surface-variant">
+                        No log entries yet.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {(taskLogs[t.id] ?? []).map((log) => (
+                          <li
+                            key={log.id}
+                            className="rounded border border-md-sys-color-outline-variant/50 px-2 py-1"
+                          >
+                            <p className="whitespace-pre-wrap">{log.content}</p>
+                            <p className="text-[10px] text-md-sys-color-on-surface-variant">
+                              {new Date(log.created_at).toLocaleString()}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {permissions.has("manageTask") ? (
+                      <div className="flex gap-2">
+                        <input
+                          className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1"
+                          placeholder="Add log entry…"
+                          value={logDraft}
+                          onChange={(e) => setLogDraft(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="rounded-full bg-md-sys-color-primary px-3 py-0.5 text-md-sys-color-on-primary disabled:opacity-50"
+                          onClick={() => {
+                            void postTaskLog(t.id);
+                          }}
+                          disabled={postingLog || !logDraft.trim()}
+                        >
+                          {postingLog ? "…" : "Post"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </li>
             ))}
