@@ -275,33 +275,39 @@ async def list_similar_alerts(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 50,
+    alert_status: STATUS | None = None,
+    unpromoted: bool | None = None,
 ) -> list[AlertDTO]:
     """Alerts in the current org sharing (source, source_ref) with this one,
     excluding the source alert itself. Useful when a SIEM re-fires or when
-    cross-referencing investigations. Ordered by created_at DESC, cap 200."""
+    cross-referencing investigations. Ordered by created_at DESC, cap 200.
+    Optional `alert_status=<value>` scopes to one status (New/Updated/
+    Ignored/Imported); `unpromoted=true` keeps only similars not yet
+    promoted to a case so an analyst can spot "still fresh" duplicates."""
     safe_limit = max(1, min(200, int(limit)))
     src = (
         await db.execute(select(Alert).where(Alert.id == alert_id, Alert.organization_id == org_id))
     ).scalar_one_or_none()
     if src is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "alert_not_found")
-    rows = (
-        (
-            await db.execute(
-                select(Alert)
-                .where(
-                    Alert.organization_id == org_id,
-                    Alert.source == src.source,
-                    Alert.source_ref == src.source_ref,
-                    Alert.id != alert_id,
-                )
-                .order_by(Alert.created_at.desc())
-                .limit(safe_limit)
-            )
+    stmt = (
+        select(Alert)
+        .where(
+            Alert.organization_id == org_id,
+            Alert.source == src.source,
+            Alert.source_ref == src.source_ref,
+            Alert.id != alert_id,
         )
-        .scalars()
-        .all()
+        .order_by(Alert.created_at.desc())
+        .limit(safe_limit)
     )
+    if alert_status is not None:
+        stmt = stmt.where(Alert.status == alert_status)
+    if unpromoted is True:
+        stmt = stmt.where(Alert.case_id.is_(None))
+    elif unpromoted is False:
+        stmt = stmt.where(Alert.case_id.is_not(None))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_alert_dto(a) for a in rows]
 
 
