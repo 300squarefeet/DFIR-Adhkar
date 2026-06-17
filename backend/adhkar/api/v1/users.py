@@ -80,11 +80,14 @@ async def search_users(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     q: str = "",
+    status: str | None = None,
     limit: int = 10,
 ) -> list[UserDTO]:
     """Find org members by email or display_name (ilike). Used by the
     case-assignee picker — viewCase is enough since we only expose the
-    triple (id, email, display_name)."""
+    triple (id, email, display_name). Optional `status=<value>` scopes
+    to one lifecycle (active/suspended/pending_invite) so the picker
+    doesn't surface invitees who can't yet be assigned."""
     safe_limit = max(1, min(50, int(limit)))
     stmt = (
         select(User)
@@ -97,6 +100,8 @@ async def search_users(
     if q.strip():
         pattern = f"%{q.strip()}%"
         stmt = stmt.where((User.email.ilike(pattern)) | (User.display_name.ilike(pattern)))
+    if status is not None:
+        stmt = stmt.where(User.status == status)
     stmt = stmt.order_by(User.display_name).limit(safe_limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [
