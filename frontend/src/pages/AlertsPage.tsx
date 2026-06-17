@@ -31,6 +31,8 @@ interface PromoteResponse {
 
 const SAVED_VIEW_KEY = "adhkar.alerts.savedView.v1";
 
+type UpdatedWithinHours = 0 | 24 | 168 | 720;
+
 interface SavedView {
   status: string;
   source: string;
@@ -40,6 +42,13 @@ interface SavedView {
   unpromoted: "" | "true" | "false";
   since: string;
   until: string;
+  updatedWithinHours: UpdatedWithinHours;
+}
+
+function coerceUpdatedWithinHours(value: unknown): UpdatedWithinHours {
+  const n = typeof value === "string" ? Number(value) : value;
+  if (n === 24 || n === 168 || n === 720) return n;
+  return 0;
 }
 
 function loadView(): SavedView {
@@ -52,6 +61,7 @@ function loadView(): SavedView {
     unpromoted: "",
     since: "",
     until: "",
+    updatedWithinHours: 0,
   };
   try {
     const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
@@ -66,6 +76,7 @@ function loadView(): SavedView {
       unpromoted: p.unpromoted ?? "",
       since: p.since ?? "",
       until: p.until ?? "",
+      updatedWithinHours: coerceUpdatedWithinHours(p.updatedWithinHours),
     };
   } catch {
     return empty;
@@ -100,6 +111,10 @@ export function AlertsPage() {
     if (since !== null) out.since = since;
     const until = p.get("until");
     if (until !== null) out.until = until;
+    const updatedWithin = p.get("updated_within_hours");
+    if (updatedWithin !== null) {
+      out.updatedWithinHours = coerceUpdatedWithinHours(updatedWithin);
+    }
     return out;
   })();
   const [view, setView] = useState<SavedView>(() => ({ ...loadView(), ...urlOverride }));
@@ -114,6 +129,12 @@ export function AlertsPage() {
       if (view.unpromoted) params.set("unpromoted", view.unpromoted);
       if (view.since) params.set("since", new Date(view.since).toISOString());
       if (view.until) params.set("until", new Date(view.until).toISOString());
+      if (view.updatedWithinHours >= 1) {
+        const cutoff = new Date(
+          Date.now() - view.updatedWithinHours * 3600 * 1000,
+        ).toISOString();
+        params.set("updated_since", cutoff);
+      }
       const rows = await apiCall<AlertRow[]>(`/v1/alerts?${params.toString()}`);
       setAlerts(rows);
       setSelected(new Set());
@@ -134,6 +155,7 @@ export function AlertsPage() {
     view.unpromoted,
     view.since,
     view.until,
+    view.updatedWithinHours,
   ]);
 
   useEffect(() => {
@@ -245,6 +267,8 @@ export function AlertsPage() {
               if (view.unpromoted) p.set("unpromoted", view.unpromoted);
               if (view.since) p.set("since", new Date(view.since).toISOString());
               if (view.until) p.set("until", new Date(view.until).toISOString());
+              if (view.updatedWithinHours >= 1)
+                p.set("updated_within_hours", String(view.updatedWithinHours));
               const qs = p.toString();
               const url = `${window.location.origin}/alerts${qs ? `?${qs}` : ""}`;
               navigator.clipboard
@@ -360,6 +384,36 @@ export function AlertsPage() {
           onChange={(e) => setView({ ...view, until: e.target.value })}
           title="Created until (exclusive)"
         />
+        <div className="flex items-center gap-1" role="group" aria-label="Edited within">
+          <span className="text-xs text-md-sys-color-on-surface-variant">Edited:</span>
+          {(
+            [
+              { label: "Any", value: 0 as UpdatedWithinHours },
+              { label: "24h", value: 24 as UpdatedWithinHours },
+              { label: "7d", value: 168 as UpdatedWithinHours },
+              { label: "30d", value: 720 as UpdatedWithinHours },
+            ]
+          ).map((opt) => {
+            const active = view.updatedWithinHours === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setView({ ...view, updatedWithinHours: opt.value })
+                }
+                className={
+                  active
+                    ? "rounded-full px-2 py-0.5 text-xs bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "rounded-full px-2 py-0.5 text-xs border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+                }
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           placeholder="Local filter (title / source_ref)"
