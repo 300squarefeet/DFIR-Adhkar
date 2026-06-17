@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Link } from "@tanstack/react-router";
 
+import { SeverityBadge, type SeverityLevel } from "@/design-system/components/SeverityBadge";
 import { TLPBadge, type TLPValue } from "@/design-system/components/TLPBadge";
 import { useAuth } from "@/lib/auth";
 import { TaxonomyTagPicker } from "@/ui/TaxonomyTagPicker";
@@ -24,6 +25,14 @@ interface Observable {
   ignore_similarity: boolean;
   message: string | null;
   created_at: string;
+}
+
+interface CaseRef {
+  case_id: string;
+  number: number;
+  title: string;
+  severity: number;
+  stage: string;
 }
 
 interface SimilarObservable {
@@ -55,6 +64,7 @@ export function ObservableDetailPage({ observableId }: Props) {
     { name: string; supported_types: string[] }[]
   >([]);
   const [runBusy, setRunBusy] = useState(false);
+  const [caseRefs, setCaseRefs] = useState<CaseRef[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +86,23 @@ export function ObservableDetailPage({ observableId }: Props) {
           .catch(() => undefined);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, observableId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const refs = await apiCall<CaseRef[]>(
+          `/v1/observables/${observableId}/case-refs`,
+        );
+        if (!cancelled) setCaseRefs(refs);
+      } catch {
+        if (!cancelled) setCaseRefs([]);
       }
     })();
     return () => {
@@ -337,6 +364,41 @@ export function ObservableDetailPage({ observableId }: Props) {
                 )}
                 <span className="text-xs text-md-sys-color-on-surface-variant">
                   {new Date(m.created_at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+
+      <article>
+        <h2 className="text-lg font-medium">
+          Cross-case references ({caseRefs === null ? "…" : caseRefs.length})
+        </h2>
+        {caseRefs === null ? (
+          <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">Loading…</p>
+        ) : caseRefs.length === 0 ? (
+          <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">
+            Not seen in any other case.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {caseRefs.map((r) => (
+              <li
+                key={r.case_id}
+                className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant px-3 py-1"
+              >
+                <Link
+                  to="/cases/$caseId"
+                  params={{ caseId: r.case_id }}
+                  className="hover:underline"
+                >
+                  <span className="font-mono mr-2">#{r.number}</span>
+                  <span>{r.title}</span>
+                </Link>
+                <SeverityBadge level={r.severity as SeverityLevel} />
+                <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] uppercase">
+                  {r.stage}
                 </span>
               </li>
             ))}
