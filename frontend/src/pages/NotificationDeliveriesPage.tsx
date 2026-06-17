@@ -52,25 +52,42 @@ export function NotificationDeliveriesPage() {
 
   const initialQuery = (() => {
     if (typeof window === "undefined")
-      return { statusFilter: "" as "" | "pending" | "succeeded" | "failed", ruleId: "", endpointId: "" };
+      return {
+        statusFilter: "" as "" | "pending" | "succeeded" | "failed",
+        ruleId: "",
+        endpointId: "",
+        eventType: "",
+        since: 0,
+      };
     const p = new URLSearchParams(window.location.search);
     const rawStatus = p.get("status_filter") ?? "";
     const statusFilter: "" | "pending" | "succeeded" | "failed" =
       rawStatus === "pending" || rawStatus === "succeeded" || rawStatus === "failed"
         ? rawStatus
         : "";
+    const rawSince = parseInt(p.get("since_hours") ?? "0", 10);
+    const since = Number.isFinite(rawSince) && rawSince > 0 ? rawSince : 0;
     return {
       statusFilter,
       ruleId: p.get("rule_id") ?? "",
       endpointId: p.get("endpoint_id") ?? "",
+      eventType: p.get("event_type") ?? "",
+      since,
     };
   })();
 
   const [statusFilter, setStatusFilter] = useState<"" | "pending" | "succeeded" | "failed">(initialQuery.statusFilter);
   const [ruleId, setRuleId] = useState(initialQuery.ruleId);
   const [endpointId, setEndpointId] = useState(initialQuery.endpointId);
+  const [eventType, setEventType] = useState<string>(initialQuery.eventType);
+  const [since, setSince] = useState<number>(initialQuery.since);
 
-  const hasFilters = statusFilter !== "" || ruleId.trim() !== "" || endpointId.trim() !== "";
+  const hasFilters =
+    statusFilter !== "" ||
+    ruleId.trim() !== "" ||
+    endpointId.trim() !== "" ||
+    eventType.trim() !== "" ||
+    since >= 1;
 
   const fetch = useCallback(() => {
     setRows(null);
@@ -79,10 +96,14 @@ export function NotificationDeliveriesPage() {
     if (statusFilter) params.set("status_filter", statusFilter);
     if (ruleId.trim()) params.set("rule_id", ruleId.trim());
     if (endpointId.trim()) params.set("endpoint_id", endpointId.trim());
+    if (eventType.trim()) params.set("event_type", eventType.trim());
+    if (since >= 1) {
+      params.set("since", new Date(Date.now() - since * 3600 * 1000).toISOString());
+    }
     apiCall<DeliveryDTO[]>(`/v1/notification-deliveries?${params.toString()}`)
       .then((r) => setRows(r))
       .catch((e: Error) => setError(e.message));
-  }, [apiCall, statusFilter, ruleId, endpointId]);
+  }, [apiCall, statusFilter, ruleId, endpointId, eventType, since]);
 
   useEffect(() => {
     fetch();
@@ -92,7 +113,16 @@ export function NotificationDeliveriesPage() {
     setStatusFilter("");
     setRuleId("");
     setEndpointId("");
+    setEventType("");
+    setSince(0);
   }
+
+  const sinceOptions: { label: string; value: number }[] = [
+    { label: "Any", value: 0 },
+    { label: "24h", value: 24 },
+    { label: "7d", value: 168 },
+    { label: "30d", value: 720 },
+  ];
 
   if (!permissions.has("manageConfig")) {
     return (
@@ -119,6 +149,40 @@ export function NotificationDeliveriesPage() {
         >
           Refresh
         </button>
+      </div>
+
+      {/* Event-type filter row */}
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="text"
+          className="w-72 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 font-mono text-sm"
+          placeholder="event_type (e.g. case.created)"
+          value={eventType}
+          onChange={(e) => setEventType(e.target.value)}
+        />
+      </div>
+
+      {/* Since-hours chip row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-md-sys-color-on-surface-variant">Since:</span>
+        {sinceOptions.map((opt) => {
+          const active = since === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setSince(opt.value)}
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                active
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Filter row */}
