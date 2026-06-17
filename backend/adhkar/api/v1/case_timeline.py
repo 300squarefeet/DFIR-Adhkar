@@ -52,10 +52,13 @@ async def case_timeline(
     limit: int = 200,
     since: datetime | None = None,
     action: str | None = None,
+    entity_type: str | None = None,
 ) -> TimelineResponse:
     """Audit-log derived timeline. `since=<ISO>` keeps only entries
     created at or after the cursor; `action=<name>` scopes to one
-    audit action (e.g. `commented`, `task_completed`)."""
+    audit action (e.g. `commented`, `task_completed`); `entity_type=
+    <name>` keeps only direct rows for that entity (e.g. `task` to
+    hide comment + alert chatter)."""
     safe_limit = max(1, min(500, int(limit)))
     case = (
         await db.execute(
@@ -89,6 +92,8 @@ async def case_timeline(
         stmt = stmt.where(AuditLog.created_at >= since)
     if action is not None:
         stmt = stmt.where(AuditLog.action == action)
+    if entity_type is not None:
+        stmt = stmt.where(AuditLog.entity_type == entity_type)
     rows = (await db.execute(stmt)).scalars().all()
     return TimelineResponse(
         case_id=case_id,
