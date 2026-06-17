@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from adhkar.api.v1.case_comments import _MENTION_RE
+from adhkar.services.mentions import MENTION_RE as _MENTION_RE
 
 
 def _extract(text: str) -> list[str]:

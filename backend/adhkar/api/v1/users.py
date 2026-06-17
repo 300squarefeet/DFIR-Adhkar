@@ -88,14 +88,11 @@ async def search_users(
     )
     if q.strip():
         pattern = f"%{q.strip()}%"
-        stmt = stmt.where(
-            (User.email.ilike(pattern)) | (User.display_name.ilike(pattern))
-        )
+        stmt = stmt.where((User.email.ilike(pattern)) | (User.display_name.ilike(pattern)))
     stmt = stmt.order_by(User.display_name).limit(safe_limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [
-        UserDTO(id=u.id, email=u.email, display_name=u.display_name, status=u.status)
-        for u in rows
+        UserDTO(id=u.id, email=u.email, display_name=u.display_name, status=u.status) for u in rows
     ]
 
 
