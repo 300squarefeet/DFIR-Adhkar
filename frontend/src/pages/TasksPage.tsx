@@ -70,6 +70,36 @@ export function TasksPage() {
   const [mandatory, setMandatory] = useState<"" | "true" | "false">(
     initialView.mandatory,
   );
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const bulkClose = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Close ${selected.size} task(s)?`)) return;
+    setBulkBusy(true);
+    try {
+      const r = await apiCall<{ updated: number }>("/v1/tasks/bulk-patch", {
+        method: "POST",
+        body: JSON.stringify({
+          ids: Array.from(selected),
+          patch: { status: "Completed" },
+        }),
+      });
+      toast.success(`Closed ${r.updated} task(s).`);
+      setSelected(new Set());
+      await refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
   useEffect(() => {
     try {
       window.localStorage.setItem(
@@ -199,6 +229,18 @@ export function TasksPage() {
             </option>
           ))}
         </select>
+        {permissions.has("manageTask") && selected.size > 0 ? (
+          <button
+            type="button"
+            className="rounded-full bg-md-sys-color-primary px-3 py-1 text-xs text-md-sys-color-on-primary disabled:opacity-50"
+            onClick={() => {
+              void bulkClose();
+            }}
+            disabled={bulkBusy}
+          >
+            {bulkBusy ? "Closing…" : `Close ${selected.size}`}
+          </button>
+        ) : null}
       </div>
       {groupedByCase.size === 0 ? (
         <p className="text-sm text-md-sys-color-on-surface-variant">No tasks.</p>
@@ -225,6 +267,16 @@ export function TasksPage() {
                     key={t.id}
                     className="flex items-center gap-2 rounded border border-md-sys-color-outline-variant/50 px-3 py-1.5"
                   >
+                    {permissions.has("manageTask") &&
+                    t.status !== "Completed" &&
+                    t.status !== "Cancelled" ? (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(t.id)}
+                        onChange={() => toggleSelected(t.id)}
+                        aria-label={`Select task ${t.title}`}
+                      />
+                    ) : null}
                     <span
                       className={
                         "rounded-full px-2 py-0.5 text-[10px] uppercase " +
