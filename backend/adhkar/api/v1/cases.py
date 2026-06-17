@@ -126,8 +126,12 @@ async def list_cases(
     flagged: bool | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    updated_since: datetime | None = None,
     limit: int = 100,
 ) -> list[CaseDTO]:
+    """Case list. `since`/`until` bound created_at; `updated_since=<ISO>`
+    is a delta-sync companion that bounds updated_at and switches the
+    sort to updated_at DESC — symmetric with RC172/RC174."""
     stmt = select(Case).where(Case.organization_id == org_id, Case.deleted_at.is_(None))
     if stage:
         stmt = stmt.where(Case.stage == stage)
@@ -143,7 +147,11 @@ async def list_cases(
         stmt = stmt.where(Case.created_at >= since)
     if until is not None:
         stmt = stmt.where(Case.created_at < until)
-    stmt = stmt.order_by(Case.number.desc()).limit(limit)
+    if updated_since is not None:
+        stmt = stmt.where(Case.updated_at >= updated_since).order_by(Case.updated_at.desc())
+    else:
+        stmt = stmt.order_by(Case.number.desc())
+    stmt = stmt.limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_case_to_dto(c) for c in rows]
 
