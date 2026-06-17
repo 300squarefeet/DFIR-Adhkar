@@ -154,6 +154,16 @@ interface AttachmentRow {
   created_at: string;
 }
 
+interface PromotedAlert {
+  id: string;
+  title: string;
+  severity: number;
+  source: string;
+  source_ref: string;
+  status: string;
+  created_at: string;
+}
+
 const LINK_RELATIONS = [
   "related",
   "duplicate",
@@ -227,6 +237,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [relationFilter, setRelationFilter] = useState<string>("");
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
   const [avFilter, setAvFilter] = useState<string>("");
+  const [promotedFrom, setPromotedFrom] = useState<PromotedAlert[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -392,6 +403,23 @@ export function CaseDetailPage({ caseId }: Props) {
       cancelled = true;
     };
   }, [apiCall, caseId, avFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiCall<PromotedAlert[]>(
+          `/v1/alerts?case_id=${caseId}&limit=50`,
+        );
+        if (!cancelled) setPromotedFrom(rows);
+      } catch {
+        if (!cancelled) setPromotedFrom([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
 
   const createTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -1819,6 +1847,40 @@ export function CaseDetailPage({ caseId }: Props) {
               })}
             </ul>
           )}
+        </article>
+      )}
+
+      {promotedFrom.length === 0 ? null : (
+        <article>
+          <h2 className="text-lg font-medium">Promoted from ({promotedFrom.length})</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {promotedFrom.map((a) => (
+              <li
+                key={a.id}
+                className="rounded border border-md-sys-color-outline-variant px-3 py-1.5"
+              >
+                <Link
+                  to="/alerts/$alertId"
+                  params={{ alertId: a.id }}
+                  className="flex flex-wrap items-center gap-2 hover:underline"
+                >
+                  <span className="font-mono text-xs text-md-sys-color-on-surface-variant">
+                    {a.source}
+                  </span>
+                  <span className="font-mono text-xs text-md-sys-color-on-surface-variant">
+                    {a.source_ref}
+                  </span>
+                  <span className="text-sm">{a.title}</span>
+                  <span className="ml-auto flex items-center gap-2">
+                    <SeverityBadge level={a.severity as SeverityLevel} />
+                    <span className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-[10px] uppercase">
+                      {a.status}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </article>
       )}
 
