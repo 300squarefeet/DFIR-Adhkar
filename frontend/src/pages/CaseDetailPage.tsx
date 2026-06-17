@@ -708,6 +708,15 @@ export function CaseDetailPage({ caseId }: Props) {
           >
             Print preview
           </a>
+          {permissions.has("viewAudit") ? (
+            <a
+              href={`/admin/audit?entity_type=case&entity_id=${caseId}`}
+              className="rounded-full border border-md-sys-color-outline-variant px-3 py-0.5 text-xs hover:bg-md-sys-color-surface-container"
+              title="Open this case's audit trail"
+            >
+              Audit trail
+            </a>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {editingHeader ? (
