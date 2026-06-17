@@ -209,10 +209,13 @@ async def list_case_contributors(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    since: datetime | None = None,
 ) -> list[ContributorRow]:
     """Distinct user_ids that have touched this case via Comments, TaskLogs,
     or AuditLog entries scoped to the case. Excludes None/system actors.
-    Ordered by total activity (comments+logs+audit) desc."""
+    Ordered by total activity (comments+logs+audit) desc. Optional
+    `since=<ISO>` scopes all three aggregations to the trailing window
+    so a "recent collaborators" badge can hit one URL."""
     # Fail-fast 404 if the case doesn't exist or isn't in caller's org.
     from adhkar.db.models import AuditLog as _AuditLog
     from adhkar.db.models import Comment as _Comment
@@ -232,33 +235,36 @@ async def list_case_contributors(
 
     # Run three small aggregations in parallel-ish via sequential awaits;
     # each is a small grouped count.
-    comment_rows = (
-        await db.execute(
-            select(_Comment.author_id, func.count().label("n"))
-            .where(_Comment.case_id == case_id, _Comment.author_id.is_not(None))
-            .group_by(_Comment.author_id)
+    comment_stmt = (
+        select(_Comment.author_id, func.count().label("n"))
+        .where(_Comment.case_id == case_id, _Comment.author_id.is_not(None))
+        .group_by(_Comment.author_id)
+    )
+    if since is not None:
+        comment_stmt = comment_stmt.where(_Comment.created_at >= since)
+    comment_rows = (await db.execute(comment_stmt)).all()
+    tasklog_stmt = (
+        select(_TaskLog.author_id, func.count().label("n"))
+        .join(Task, Task.id == _TaskLog.task_id)
+        .where(Task.case_id == case_id, _TaskLog.author_id.is_not(None))
+        .group_by(_TaskLog.author_id)
+    )
+    if since is not None:
+        tasklog_stmt = tasklog_stmt.where(_TaskLog.created_at >= since)
+    tasklog_rows = (await db.execute(tasklog_stmt)).all()
+    audit_stmt = (
+        select(_AuditLog.actor_user_id, func.count().label("n"))
+        .where(
+            _AuditLog.organization_id == org_id,
+            _AuditLog.entity_type == "case",
+            _AuditLog.entity_id == case_id,
+            _AuditLog.actor_user_id.is_not(None),
         )
-    ).all()
-    tasklog_rows = (
-        await db.execute(
-            select(_TaskLog.author_id, func.count().label("n"))
-            .join(Task, Task.id == _TaskLog.task_id)
-            .where(Task.case_id == case_id, _TaskLog.author_id.is_not(None))
-            .group_by(_TaskLog.author_id)
-        )
-    ).all()
-    audit_rows = (
-        await db.execute(
-            select(_AuditLog.actor_user_id, func.count().label("n"))
-            .where(
-                _AuditLog.organization_id == org_id,
-                _AuditLog.entity_type == "case",
-                _AuditLog.entity_id == case_id,
-                _AuditLog.actor_user_id.is_not(None),
-            )
-            .group_by(_AuditLog.actor_user_id)
-        )
-    ).all()
+        .group_by(_AuditLog.actor_user_id)
+    )
+    if since is not None:
+        audit_stmt = audit_stmt.where(_AuditLog.created_at >= since)
+    audit_rows = (await db.execute(audit_stmt)).all()
 
     per_user: dict[UUID, dict[str, int]] = {}
     for uid, n in comment_rows:
