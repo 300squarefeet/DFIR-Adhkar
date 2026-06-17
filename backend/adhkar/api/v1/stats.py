@@ -376,3 +376,33 @@ async def alerts_by_status(
     return AlertStatusesResponse(
         entries=[AlertStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
     )
+
+
+@router.get("/audit-per-day", response_model=TimeSeriesResponse)
+async def audit_per_day(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = Query(default=14, ge=1, le=90),
+) -> TimeSeriesResponse:
+    """Audit-log row count per day for the last N days, zero-filled.
+    Useful for spotting activity spikes."""
+    from adhkar.db.models import AuditLog as _AuditLog
+
+    since = datetime.now(tz=UTC) - timedelta(days=days)
+    day_col = func.date(_AuditLog.created_at)
+    stmt = (
+        select(day_col.label("day"), func.count().label("n"))
+        .where(_AuditLog.organization_id == org_id, _AuditLog.created_at >= since)
+        .group_by(day_col)
+    )
+    rows = (await db.execute(stmt)).all()
+    by_day: dict[str, int] = {}
+    for row in rows:
+        day = row[0]
+        key = day.isoformat() if hasattr(day, "isoformat") else str(day)
+        by_day[key] = int(row[1])
+    return TimeSeriesResponse(
+        series="audit-per-day",
+        points=[TimeSeriesPoint(day=k, count=by_day.get(k, 0)) for k in _last_n_days_keys(days)],
+    )
