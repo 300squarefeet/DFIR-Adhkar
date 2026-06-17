@@ -236,11 +236,20 @@ async def list_calls(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     case_id: UUID | None = None,
+    provider: str | None = None,
+    since: datetime | None = None,
     limit: int = 100,
 ) -> list[AiCallDTO]:
+    """AI call audit feed. Optional `provider=<name>` scopes to one
+    provider (e.g. anthropic/openai); `since=<ISO>` bounds created_at
+    for delta polling and cost-window investigations."""
     stmt = select(AiCall).where(AiCall.organization_id == org_id)
     if case_id:
         stmt = stmt.where(AiCall.case_id == case_id)
+    if provider is not None:
+        stmt = stmt.where(AiCall.provider == provider)
+    if since is not None:
+        stmt = stmt.where(AiCall.created_at >= since)
     stmt = stmt.order_by(AiCall.created_at.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(c) for c in rows]
