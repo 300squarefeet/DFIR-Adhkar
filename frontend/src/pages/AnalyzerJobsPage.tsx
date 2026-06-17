@@ -37,6 +37,7 @@ export function AnalyzerJobsPage() {
   const { apiCall, permissions } = useAuth();
   const toast = useToast();
   const [catalog, setCatalog] = useState<AnalyzerInfo[]>([]);
+  const [catalogFilter, setCatalogFilter] = useState<string>("");
   const [observables, setObservables] = useState<Observable[]>([]);
   const [activeObs, setActiveObs] = useState<string | null>(null);
   const [jobs, setJobs] = useState<AnalyzerJob[]>([]);
@@ -47,12 +48,8 @@ export function AnalyzerJobsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [cat, obs] = await Promise.all([
-          apiCall<AnalyzerInfo[]>("/v1/analyzers"),
-          apiCall<Observable[]>("/v1/observables?limit=200"),
-        ]);
+        const obs = await apiCall<Observable[]>("/v1/observables?limit=200");
         if (cancelled) return;
-        setCatalog(cat);
         setObservables(obs);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -62,6 +59,25 @@ export function AnalyzerJobsPage() {
       cancelled = true;
     };
   }, [apiCall]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = catalogFilter
+          ? `/v1/analyzers?data_type=${encodeURIComponent(catalogFilter)}`
+          : "/v1/analyzers";
+        const cat = await apiCall<AnalyzerInfo[]>(url);
+        if (cancelled) return;
+        setCatalog(cat);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, catalogFilter]);
 
   const openObservable = async (id: string) => {
     setActiveObs(id);
@@ -161,6 +177,35 @@ export function AnalyzerJobsPage() {
 
             <article>
               <h3 className="mb-2 text-sm font-medium">Catalog</h3>
+              <div className="mb-2 flex flex-wrap gap-1">
+                {[
+                  { label: "All", value: "" },
+                  { label: "ip", value: "ip" },
+                  { label: "domain", value: "domain" },
+                  { label: "url", value: "url" },
+                  { label: "hash", value: "hash" },
+                  { label: "email", value: "email" },
+                  { label: "filename", value: "filename" },
+                ].map((chip) => {
+                  const active = catalogFilter === chip.value;
+                  return (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setCatalogFilter(chip.value)}
+                      className={
+                        "rounded-full px-2 py-0.5 text-xs " +
+                        (active
+                          ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                          : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                      }
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {catalog
                   .filter((a) => a.supported_types.includes(activeObservable.data_type))
