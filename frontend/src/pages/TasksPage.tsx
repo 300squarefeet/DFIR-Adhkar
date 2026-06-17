@@ -40,6 +40,7 @@ export function TasksPage() {
         mine?: boolean;
         overdue?: boolean;
         mandatory?: "" | "true" | "false";
+        due_within_days?: number | null;
       };
     const p = new URLSearchParams(window.location.search);
     const out: {
@@ -47,6 +48,7 @@ export function TasksPage() {
       mine?: boolean;
       overdue?: boolean;
       mandatory?: "" | "true" | "false";
+      due_within_days?: number | null;
     } = {};
     const s = p.get("status_filter");
     if (s === "Waiting" || s === "InProgress" || s === "Completed" || s === "Cancelled")
@@ -55,6 +57,11 @@ export function TasksPage() {
     if (p.get("overdue") === "true") out.overdue = true;
     const m = p.get("mandatory");
     if (m === "true" || m === "false") out.mandatory = m;
+    const d = p.get("due_within_days");
+    if (d !== null) {
+      const n = Number.parseInt(d, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 90) out.due_within_days = n;
+    }
     return out;
   })();
   const initialView = (() => {
@@ -66,18 +73,26 @@ export function TasksPage() {
           mine: false,
           overdue: false,
           mandatory: "" as "" | "true" | "false",
+          due_within_days: null as number | null,
         };
       const p = JSON.parse(raw) as {
         status?: TaskStatus | "";
         mine?: boolean;
         overdue?: boolean;
         mandatory?: "" | "true" | "false";
+        due_within_days?: number | null;
       };
+      const dRaw = p.due_within_days;
+      const dNorm =
+        typeof dRaw === "number" && Number.isFinite(dRaw) && dRaw >= 1 && dRaw <= 90
+          ? dRaw
+          : null;
       return {
         status: (p.status ?? "") as TaskStatus | "",
         mine: Boolean(p.mine),
         overdue: Boolean(p.overdue),
         mandatory: (p.mandatory ?? "") as "" | "true" | "false",
+        due_within_days: dNorm,
       };
     } catch {
       return {
@@ -85,6 +100,7 @@ export function TasksPage() {
         mine: false,
         overdue: false,
         mandatory: "" as "" | "true" | "false",
+        due_within_days: null as number | null,
       };
     }
   })();
@@ -97,6 +113,9 @@ export function TasksPage() {
   );
   const [mandatory, setMandatory] = useState<"" | "true" | "false">(
     urlOverride.mandatory ?? initialView.mandatory,
+  );
+  const [dueWithin, setDueWithin] = useState<number | null>(
+    urlOverride.due_within_days ?? initialView.due_within_days,
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -132,19 +151,31 @@ export function TasksPage() {
     try {
       window.localStorage.setItem(
         "adhkar.tasks.savedView.v1",
-        JSON.stringify({ status, mine, overdue, mandatory }),
+        JSON.stringify({
+          status,
+          mine,
+          overdue,
+          mandatory,
+          due_within_days: dueWithin,
+        }),
       );
     } catch {
       /* private mode — best-effort */
     }
-  }, [status, mine, overdue, mandatory]);
+  }, [status, mine, overdue, mandatory, dueWithin]);
 
   const refresh = async () => {
     try {
       const params = new URLSearchParams({ limit: "200" });
       if (status) params.set("status_filter", status);
       if (mine) params.set("mine", "true");
-      if (overdue) params.set("overdue", "true");
+      // dueWithin and overdue are mutually exclusive: when dueWithin is set,
+      // don't send overdue (preserves the user's saved toggle for re-selection).
+      if (dueWithin !== null && dueWithin >= 1) {
+        params.set("due_within_days", String(dueWithin));
+      } else if (overdue) {
+        params.set("overdue", "true");
+      }
       if (mandatory) params.set("mandatory", mandatory);
       const r = await apiCall<TaskRow[]>(`/v1/tasks?${params.toString()}`);
       setRows(r);
@@ -156,7 +187,7 @@ export function TasksPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, status, mine, overdue, mandatory]);
+  }, [apiCall, status, mine, overdue, mandatory, dueWithin]);
 
   const userNames = useUserNames(rows?.map((r) => r.assignee_id) ?? []);
 
@@ -205,7 +236,11 @@ export function TasksPage() {
             const p = new URLSearchParams();
             if (status) p.set("status_filter", status);
             if (mine) p.set("mine", "true");
-            if (overdue) p.set("overdue", "true");
+            if (dueWithin !== null && dueWithin >= 1) {
+              p.set("due_within_days", String(dueWithin));
+            } else if (overdue) {
+              p.set("overdue", "true");
+            }
             if (mandatory) p.set("mandatory", mandatory);
             const qs = p.toString();
             const url = `${window.location.origin}/tasks${qs ? `?${qs}` : ""}`;
@@ -226,7 +261,11 @@ export function TasksPage() {
             const p = new URLSearchParams();
             if (status) p.set("status_filter", status);
             if (mine) p.set("mine", "true");
-            if (overdue) p.set("overdue", "true");
+            if (dueWithin !== null && dueWithin >= 1) {
+              p.set("due_within_days", String(dueWithin));
+            } else if (overdue) {
+              p.set("overdue", "true");
+            }
             if (mandatory) p.set("mandatory", mandatory);
             const qs = p.toString();
             return `${base}/v1/tasks/export-csv${qs ? `?${qs}` : ""}`;
@@ -253,6 +292,32 @@ export function TasksPage() {
           />
           Overdue
         </label>
+        <div className="flex items-center gap-1 text-sm" role="group" aria-label="Due within filter">
+          <span className="text-md-sys-color-on-surface-variant">Due:</span>
+          {([
+            { label: "Any", value: null },
+            { label: "7d", value: 7 },
+            { label: "30d", value: 30 },
+          ] as const).map((chip) => {
+            const active = dueWithin === chip.value;
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setDueWithin(chip.value)}
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (active
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                }
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
         <select
           className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
           value={mandatory}
