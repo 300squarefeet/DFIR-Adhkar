@@ -118,6 +118,11 @@ interface EvidenceSummary {
   by_type: { data_type: string; count: number; ioc_count: number }[];
 }
 
+interface ObservableTagsResponse {
+  case_id: string;
+  tags: string[];
+}
+
 interface CaseLinkRow {
   id: string;
   source_case_id: string;
@@ -193,6 +198,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [postingLog, setPostingLog] = useState(false);
   const [relatedCases, setRelatedCases] = useState<RelatedCaseRow[] | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSummary | null>(null);
+  const [evidenceTags, setEvidenceTags] = useState<string[]>([]);
   const [links, setLinks] = useState<CaseLinkRow[]>([]);
   const [relationFilter, setRelationFilter] = useState<string>("");
 
@@ -269,6 +275,23 @@ export function CaseDetailPage({ caseId }: Props) {
         if (!cancelled) setEvidence(summary);
       } catch {
         if (!cancelled) setEvidence(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await apiCall<ObservableTagsResponse>(
+          `/v1/cases/${caseId}/observables/tags`,
+        );
+        if (!cancelled) setEvidenceTags(resp.tags);
+      } catch {
+        if (!cancelled) setEvidenceTags([]);
       }
     })();
     return () => {
@@ -1534,6 +1557,24 @@ export function CaseDetailPage({ caseId }: Props) {
           </ol>
         )}
       </article>
+
+      {evidenceTags.length > 0 ? (
+        <section>
+          <div className="flex flex-wrap items-center gap-1 mt-2">
+            <span className="text-xs text-md-sys-color-on-surface-variant">
+              Tags from evidence:
+            </span>
+            {evidenceTags.map((t) => (
+              <span
+                key={t}
+                className="inline-block rounded-full bg-md-sys-color-surface-container px-2 py-0.5 text-xs font-mono mr-1 mb-1"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {evidence !== null && evidence.total > 0 ? (() => {
         const top = evidence.by_type.slice(0, 5);
