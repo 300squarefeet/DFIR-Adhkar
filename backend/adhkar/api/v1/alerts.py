@@ -543,10 +543,13 @@ async def alert_timeline(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 100,
+    since: datetime | None = None,
+    action: str | None = None,
 ) -> AlertTimelineResponse:
     """Per-alert audit feed: direct entity_type='alert' rows + any audit
     row whose diff JSON references this alert id (covers e.g. responder
-    invocations that target the alert)."""
+    invocations that target the alert). Optional `since=<ISO>` and
+    `action=<name>` mirror the RC192 case-timeline filter surface."""
     from sqlalchemy import Text, or_
 
     a = (
@@ -560,24 +563,23 @@ async def alert_timeline(
 
     from adhkar.db.models import AuditLog
 
-    rows = (
-        (
-            await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.organization_id == org_id,
-                    or_(
-                        (AuditLog.entity_type == "alert") & (AuditLog.entity_id == alert_id),
-                        AuditLog.diff.cast(Text).contains(aid_str),
-                    ),
-                )
-                .order_by(_desc(AuditLog.created_at))
-                .limit(safe_limit)
-            )
+    stmt = (
+        select(AuditLog)
+        .where(
+            AuditLog.organization_id == org_id,
+            or_(
+                (AuditLog.entity_type == "alert") & (AuditLog.entity_id == alert_id),
+                AuditLog.diff.cast(Text).contains(aid_str),
+            ),
         )
-        .scalars()
-        .all()
+        .order_by(_desc(AuditLog.created_at))
+        .limit(safe_limit)
     )
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at >= since)
+    if action is not None:
+        stmt = stmt.where(AuditLog.action == action)
+    rows = (await db.execute(stmt)).scalars().all()
     return AlertTimelineResponse(
         alert_id=alert_id,
         entries=[
