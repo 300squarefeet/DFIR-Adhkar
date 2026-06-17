@@ -730,6 +730,30 @@ async def _load_case_or_404(db: AsyncSession, org_id: UUID, case_id: UUID) -> Ca
     return c
 
 
+@router.get("/v1/tasks/recent", response_model=list[TaskDTO])
+async def list_recent_tasks(
+    user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+    mine: bool | None = None,
+) -> list[TaskDTO]:
+    """N most-recently-updated tasks (`updated_at` DESC), default 10, cap
+    50. `mine=true` is shorthand for assignee_id=<current user>. Mirrors
+    /v1/cases/recent + /v1/alerts/recent for dashboard symmetry."""
+    safe_limit = max(1, min(50, int(limit)))
+    stmt = (
+        select(Task)
+        .where(Task.organization_id == org_id)
+        .order_by(Task.updated_at.desc())
+        .limit(safe_limit)
+    )
+    if mine is True:
+        stmt = stmt.where(Task.assignee_id == user.user_id)
+    rows = (await db.execute(stmt)).scalars().all()
+    return [_task_to_dto(t) for t in rows]
+
+
 @router.get("/v1/tasks", response_model=list[TaskDTO])
 async def list_all_tasks(
     user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],

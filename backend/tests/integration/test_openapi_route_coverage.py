@@ -137,6 +137,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/tasks/bulk-patch",
     # Tasks cross-case
     "/v1/tasks",
+    "/v1/tasks/recent",
     # Stats
     "/v1/stats/cases-per-day",
     "/v1/stats/alerts-per-day",
