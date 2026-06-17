@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
@@ -91,6 +92,9 @@ async def list_comments(
     return [_comment_dto(c) for c in rows]
 
 
+_MENTION_RE = re.compile(r"@([A-Za-z0-9_.\-]+(?:\s[A-Za-z0-9_.\-]+)*)")
+
+
 @router.post(
     "/v1/cases/{case_id}/comments",
     response_model=CommentDTO,
@@ -112,7 +116,56 @@ async def create_comment(
     )
     db.add(c)
     await db.flush()
+    # Best-effort mention dispatch: parse @<display_name> tokens, resolve
+    # to org members, emit one outbox event per match so the existing
+    # notification dispatcher delivers via the configured endpoints.
+    await _emit_mentions(db, org_id, case_id, c.id, user.user_id, body.content)
     return _comment_dto(c)
+
+
+async def _emit_mentions(
+    db: AsyncSession,
+    org_id: UUID,
+    case_id: UUID,
+    comment_id: UUID,
+    actor_user_id: UUID,
+    content: str,
+) -> None:
+    candidates = {m.group(1).strip() for m in _MENTION_RE.finditer(content)}
+    if not candidates:
+        return
+    from adhkar.audit import audit_and_emit
+    from adhkar.db.models import User, UserOrgMembership
+
+    rows = (
+        (
+            await db.execute(
+                select(User)
+                .join(UserOrgMembership, UserOrgMembership.user_id == User.id)
+                .where(
+                    UserOrgMembership.organization_id == org_id,
+                    User.deleted_at.is_(None),
+                    User.display_name.in_(list(candidates)),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for u in rows:
+        await audit_and_emit(
+            db,
+            actor_user_id=actor_user_id,
+            organization_id=org_id,
+            action="mentioned",
+            entity_type="user",
+            entity_id=u.id,
+            diff={
+                "case_id": str(case_id),
+                "comment_id": str(comment_id),
+                "mentioned_display_name": u.display_name,
+            },
+        )
 
 
 @router.patch("/v1/comments/{comment_id}", response_model=CommentDTO)
