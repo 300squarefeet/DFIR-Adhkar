@@ -232,8 +232,12 @@ async def list_alerts(
     unpromoted: bool | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    updated_since: datetime | None = None,
     limit: int = 100,
 ) -> list[AlertDTO]:
+    """Alert list. `since`/`until` bound created_at; `updated_since=<ISO>`
+    is a delta-sync companion that bounds updated_at and switches the
+    sort to updated_at DESC so polling cursors land on the latest edits."""
     stmt = select(Alert).where(Alert.organization_id == org_id)
     if alert_status:
         stmt = stmt.where(Alert.status == alert_status)
@@ -251,7 +255,11 @@ async def list_alerts(
         stmt = stmt.where(Alert.created_at >= since)
     if until is not None:
         stmt = stmt.where(Alert.created_at < until)
-    stmt = stmt.order_by(Alert.created_at.desc()).limit(limit)
+    if updated_since is not None:
+        stmt = stmt.where(Alert.updated_at >= updated_since).order_by(Alert.updated_at.desc())
+    else:
+        stmt = stmt.order_by(Alert.created_at.desc())
+    stmt = stmt.limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [_alert_dto(a) for a in rows]
 
