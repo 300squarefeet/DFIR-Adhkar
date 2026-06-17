@@ -222,18 +222,19 @@ async def list_rules(
     _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    enabled: bool | None = None,
+    entity: str | None = None,
 ) -> list[RuleDTO]:
-    rows = (
-        (
-            await db.execute(
-                select(NotificationRule)
-                .where(NotificationRule.organization_id == org_id)
-                .order_by(NotificationRule.name)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    """Notification rules in the current org. Optional `enabled=true|false`
+    scopes to the active/disabled set; `entity=<name>` matches rules whose
+    `event_filter.entity` equals that value (case, alert, task, etc.) —
+    useful for "show me all alert-firing rules"."""
+    stmt = select(NotificationRule).where(NotificationRule.organization_id == org_id)
+    if enabled is not None:
+        stmt = stmt.where(NotificationRule.enabled.is_(enabled))
+    if entity is not None:
+        stmt = stmt.where(NotificationRule.event_filter["entity"].astext == entity)
+    rows = (await db.execute(stmt.order_by(NotificationRule.name))).scalars().all()
     return [_rule_dto(r) for r in rows]
 
 
