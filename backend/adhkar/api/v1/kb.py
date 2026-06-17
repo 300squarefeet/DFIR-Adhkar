@@ -383,18 +383,22 @@ async def list_templates(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    tag: str | None = None,
+    updated_since: datetime | None = None,
 ) -> list[CaseTemplateDTO]:
-    rows = (
-        (
-            await db.execute(
-                select(CaseTemplate)
-                .where(CaseTemplate.organization_id == org_id)
-                .order_by(CaseTemplate.display_name)
-            )
+    """Template list. `tag=<name>` exact-match (ARRAY.contains).
+    `updated_since=<ISO>` bounds CaseTemplate.updated_at and switches
+    sort to updated_at DESC — completes the delta-sync hex."""
+    stmt = select(CaseTemplate).where(CaseTemplate.organization_id == org_id)
+    if tag is not None:
+        stmt = stmt.where(CaseTemplate.tags.contains([tag]))
+    if updated_since is not None:
+        stmt = stmt.where(CaseTemplate.updated_at >= updated_since).order_by(
+            CaseTemplate.updated_at.desc()
         )
-        .scalars()
-        .all()
-    )
+    else:
+        stmt = stmt.order_by(CaseTemplate.display_name)
+    rows = (await db.execute(stmt)).scalars().all()
     return [_template_dto(t) for t in rows]
 
 
