@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
@@ -366,3 +367,74 @@ async def list_deliveries(
         )
         for d in rows
     ]
+
+
+@router.get(
+    "/v1/notification-deliveries/export-csv",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def export_deliveries_csv(
+    _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: Literal["pending", "succeeded", "failed"] | None = None,
+    rule_id: UUID | None = None,
+    endpoint_id: UUID | None = None,
+    limit: int = Query(default=5000, ge=1, le=50_000),
+) -> PlainTextResponse:
+    """CSV dump of dispatcher attempt history. Mirrors the list-endpoint
+    filter surface; useful for compliance bundles and post-incident review."""
+    import csv
+    import io
+    import json as _json
+
+    stmt = (
+        select(NotificationDelivery)
+        .where(NotificationDelivery.organization_id == org_id)
+        .order_by(desc(NotificationDelivery.created_at))
+        .limit(limit)
+    )
+    if status_filter:
+        stmt = stmt.where(NotificationDelivery.status == status_filter)
+    if rule_id:
+        stmt = stmt.where(NotificationDelivery.rule_id == rule_id)
+    if endpoint_id:
+        stmt = stmt.where(NotificationDelivery.endpoint_id == endpoint_id)
+    rows = (await db.execute(stmt)).scalars().all()
+    buf = io.StringIO()
+    w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    w.writerow(
+        [
+            "created_at",
+            "rule_id",
+            "endpoint_id",
+            "event_type",
+            "status",
+            "attempts",
+            "last_error",
+            "delivered_at",
+            "payload",
+        ]
+    )
+    for d in rows:
+        w.writerow(
+            [
+                d.created_at.isoformat(),
+                str(d.rule_id) if d.rule_id else "",
+                str(d.endpoint_id) if d.endpoint_id else "",
+                d.event_type,
+                d.status,
+                d.attempts,
+                d.last_error or "",
+                d.delivered_at.isoformat() if d.delivered_at else "",
+                _json.dumps(d.payload, separators=(",", ":"), sort_keys=True),
+            ]
+        )
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="adhkar-notification-deliveries.csv"'
+        },
+    )
