@@ -79,19 +79,23 @@ async def list_case_pages(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    q: str | None = None,
+    updated_since: datetime | None = None,
 ) -> list[CasePageDTO]:
+    """Per-case wiki pages, alphabetical. Optional `q=<substring>`
+    case-insensitive ilike across title and content; `updated_since=
+    <ISO>` switches sort to updated_at DESC so polling cursors land
+    on the latest edits."""
     await _load_case_or_404(db, org_id, case_id)
-    rows = (
-        (
-            await db.execute(
-                select(CasePage)
-                .where(CasePage.case_id == case_id, CasePage.organization_id == org_id)
-                .order_by(CasePage.title)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    stmt = select(CasePage).where(CasePage.case_id == case_id, CasePage.organization_id == org_id)
+    if q is not None and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((CasePage.title.ilike(like)) | (CasePage.content.ilike(like)))
+    if updated_since is not None:
+        stmt = stmt.where(CasePage.updated_at >= updated_since).order_by(CasePage.updated_at.desc())
+    else:
+        stmt = stmt.order_by(CasePage.title)
+    rows = (await db.execute(stmt)).scalars().all()
     return [_to_dto(p) for p in rows]
 
 
