@@ -4,6 +4,7 @@
  * we don't refetch the same list multiple times.
  */
 
+import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
@@ -242,9 +243,19 @@ export function DashboardPage() {
                 }
               >
                 <div className={"text-3xl font-semibold " + toneClass}>{value}</div>
-                <div className="text-xs text-md-sys-color-on-surface-variant">
-                  {w.title}
-                </div>
+                {w.link && !editing ? (
+                  <Link
+                    to={w.link}
+                    className="block text-xs text-md-sys-color-on-surface-variant hover:underline"
+                    title={`Open ${w.title.toLowerCase()}`}
+                  >
+                    {w.title}
+                  </Link>
+                ) : (
+                  <div className="text-xs text-md-sys-color-on-surface-variant">
+                    {w.title}
+                  </div>
+                )}
                 {editing ? (
                   <div className="mt-2 flex items-center gap-1 text-xs">
                     <button

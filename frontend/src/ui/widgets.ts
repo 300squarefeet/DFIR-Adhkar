@@ -12,6 +12,8 @@ export interface WidgetSpec {
   /** Derive a single KPI number from the response */
   derive: (rows: unknown) => number;
   tone?: "default" | "warn" | "alert";
+  /** Optional UI deep-link to a list page that matches the same filter. */
+  link?: string;
 }
 
 interface Severityish {
@@ -30,6 +32,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     title: "Open cases",
     path: "/v1/cases?limit=500",
     derive: (r) => asArray<Severityish>(r).filter((c) => c.stage !== "closed").length,
+    link: "/cases",
   },
   {
     id: "critical-cases",
@@ -38,6 +41,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     derive: (r) =>
       asArray<Severityish>(r).filter((c) => c.severity === 4 && c.stage !== "closed").length,
     tone: "alert",
+    link: "/cases",
   },
   {
     id: "high-cases",
@@ -48,12 +52,14 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
         (c) => (c.severity ?? 0) >= 3 && c.stage !== "closed",
       ).length,
     tone: "warn",
+    link: "/cases",
   },
   {
     id: "closed-cases",
     title: "Closed cases",
     path: "/v1/cases?limit=500",
     derive: (r) => asArray<Severityish>(r).filter((c) => c.stage === "closed").length,
+    link: "/cases",
   },
   {
     id: "new-alerts",
@@ -64,12 +70,14 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
         (a) => a.status === "New" || a.status === "Updated",
       ).length,
     tone: "warn",
+    link: "/alerts",
   },
   {
     id: "imported-alerts",
     title: "Imported alerts",
     path: "/v1/alerts?limit=500",
     derive: (r) => asArray<Severityish>(r).filter((a) => a.status === "Imported").length,
+    link: "/alerts",
   },
   {
     id: "iocs",
@@ -77,6 +85,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     path: "/v1/observables?limit=500",
     derive: (r) => asArray<{ is_ioc?: boolean }>(r).filter((o) => Boolean(o.is_ioc)).length,
     tone: "warn",
+    link: "/observables",
   },
   {
     id: "flagged-cases",
@@ -84,6 +93,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     path: "/v1/cases?flagged=true&limit=500",
     derive: (r) => asArray<unknown>(r).length,
     tone: "alert",
+    link: "/cases",
   },
   {
     id: "unpromoted-alerts",
@@ -91,6 +101,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     path: "/v1/alerts?unpromoted=true&limit=500",
     derive: (r) => asArray<unknown>(r).length,
     tone: "warn",
+    link: "/alerts",
   },
   {
     id: "overdue-tasks",
@@ -98,6 +109,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     path: "/v1/tasks?overdue=true&limit=500",
     derive: (r) => asArray<unknown>(r).length,
     tone: "alert",
+    link: "/tasks",
   },
   {
     id: "my-open-tasks",
@@ -107,6 +119,7 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
       asArray<{ status?: string }>(r).filter(
         (t) => t.status !== "Completed" && t.status !== "Cancelled",
       ).length,
+    link: "/tasks",
   },
   {
     id: "my-mentions-unread",
@@ -117,11 +130,13 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
         ? Number((r as { unread?: unknown }).unread ?? 0)
         : 0,
     tone: "warn",
+    link: "/mentions",
   },
   {
     id: "sighted-observables",
     title: "Sighted observables",
     path: "/v1/observables?sighted=true&limit=500",
     derive: (r) => asArray<unknown>(r).length,
+    link: "/observables",
   },
 ];
