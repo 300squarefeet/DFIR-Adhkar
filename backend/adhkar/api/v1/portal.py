@@ -49,19 +49,30 @@ class PortalCommentCreate(BaseModel):
 async def list_my_shared_cases(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    stage: str | None = None,
+    open_only: bool | None = None,
+    updated_since: datetime | None = None,
 ) -> list[PortalCaseRow]:
-    rows = (
-        await db.execute(
-            select(CaseShare, Case)
-            .join(Case, Case.id == CaseShare.case_id)
-            .where(
-                CaseShare.user_id == user.user_id,
-                CaseShare.revoked_at.is_(None),
-                Case.deleted_at.is_(None),
-            )
-            .order_by(Case.updated_at.desc())
+    """Cases shared with the current portal user. Optional `stage=<name>`
+    scopes to one workflow stage; `open_only=true` excludes closed.
+    `updated_since=<ISO>` enables delta polling for a portal sync widget."""
+    stmt = (
+        select(CaseShare, Case)
+        .join(Case, Case.id == CaseShare.case_id)
+        .where(
+            CaseShare.user_id == user.user_id,
+            CaseShare.revoked_at.is_(None),
+            Case.deleted_at.is_(None),
         )
-    ).all()
+        .order_by(Case.updated_at.desc())
+    )
+    if stage is not None:
+        stmt = stmt.where(Case.stage == stage)
+    elif open_only is True:
+        stmt = stmt.where(Case.stage != "closed")
+    if updated_since is not None:
+        stmt = stmt.where(Case.updated_at >= updated_since)
+    rows = (await db.execute(stmt)).all()
     return [
         PortalCaseRow(
             id=c.id,
