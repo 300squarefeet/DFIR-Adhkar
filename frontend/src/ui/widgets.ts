@@ -139,4 +139,29 @@ export const CORE_WIDGETS: ReadonlyArray<WidgetSpec> = [
     derive: (r) => asArray<unknown>(r).length,
     link: "/observables",
   },
+  {
+    id: "mttr-30d-hours",
+    title: "Median MTTR 30d (h)",
+    path: "/v1/stats/case-mttr?days=30",
+    derive: (r) => {
+      if (typeof r !== "object" || r === null || !("buckets" in r)) return 0;
+      const buckets = (r as { buckets?: { median_hours?: number | null; closed_count?: number }[] })
+        .buckets;
+      if (!Array.isArray(buckets)) return 0;
+      const all: number[] = [];
+      for (const b of buckets) {
+        if (typeof b.median_hours === "number" && b.closed_count) {
+          for (let i = 0; i < b.closed_count; i++) all.push(b.median_hours);
+        }
+      }
+      if (all.length === 0) return 0;
+      all.sort((a, b) => a - b);
+      const mid = all.length >> 1;
+      const m =
+        all.length % 2 === 1
+          ? (all[mid] ?? 0)
+          : ((all[mid - 1] ?? 0) + (all[mid] ?? 0)) / 2;
+      return Math.round(m);
+    },
+  },
 ];
