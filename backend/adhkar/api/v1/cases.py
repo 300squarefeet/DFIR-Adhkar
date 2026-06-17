@@ -865,19 +865,28 @@ async def list_tasks(
     _user: Annotated[CurrentUser, Depends(require_permission("viewTask"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: TASK_STATUS | None = None,
+    open_only: bool | None = None,
+    mandatory: bool | None = None,
 ) -> list[TaskDTO]:
+    """Per-case task list, board order. `status_filter=<value>` scopes
+    to one status; `open_only=true` excludes Completed and Cancelled;
+    `mandatory=true|false` filters the required-flag — same filter
+    surface as the cross-case list endpoint so a re-fetch shares
+    code paths."""
     await _load_case_or_404(db, org_id, case_id)
-    rows = (
-        (
-            await db.execute(
-                select(Task)
-                .where(Task.case_id == case_id, Task.organization_id == org_id)
-                .order_by(Task.order_index, Task.created_at)
-            )
-        )
-        .scalars()
-        .all()
+    stmt = (
+        select(Task)
+        .where(Task.case_id == case_id, Task.organization_id == org_id)
+        .order_by(Task.order_index, Task.created_at)
     )
+    if status_filter is not None:
+        stmt = stmt.where(Task.status == status_filter)
+    elif open_only is True:
+        stmt = stmt.where(Task.status.notin_(("Completed", "Cancelled")))
+    if mandatory is not None:
+        stmt = stmt.where(Task.mandatory == mandatory)
+    rows = (await db.execute(stmt)).scalars().all()
     return [_task_to_dto(t) for t in rows]
 
 
