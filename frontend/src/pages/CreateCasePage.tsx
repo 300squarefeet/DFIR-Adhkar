@@ -3,7 +3,7 @@
  * On success navigates to the new case's detail page.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useRouter } from "@tanstack/react-router";
 
@@ -16,6 +16,12 @@ interface CreatedCase {
   number: number;
 }
 
+interface TemplateRow {
+  id: string;
+  name: string;
+  display_name: string;
+}
+
 export function CreateCasePage() {
   const { apiCall, permissions } = useAuth();
   const router = useRouter();
@@ -25,24 +31,48 @@ export function CreateCasePage() {
   const [tlp, setTlp] = useState<TLPValue>("amber");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [templateId, setTemplateId] = useState("");
 
   const canCreate = permissions.has("manageCase");
+
+  useEffect(() => {
+    apiCall<TemplateRow[]>("/v1/case-templates")
+      .then(setTemplates)
+      .catch(() => setTemplates([]));
+  }, [apiCall]);
 
   const submit = async () => {
     if (!title.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      const created = await apiCall<CreatedCase>("/v1/cases", {
-        method: "POST",
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          severity,
-          tlp,
-        }),
-      });
-      await router.navigate({ to: "/cases/$caseId", params: { caseId: created.id } });
+      let caseId: string;
+      if (templateId) {
+        const r = await apiCall<{ case_id: string; case_number: number }>(
+          `/v1/case-templates/${templateId}/apply`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              title: title.trim(),
+              description: description.trim() || null,
+            }),
+          },
+        );
+        caseId = r.case_id;
+      } else {
+        const created = await apiCall<CreatedCase>("/v1/cases", {
+          method: "POST",
+          body: JSON.stringify({
+            title: title.trim(),
+            description: description.trim() || null,
+            severity,
+            tlp,
+          }),
+        });
+        caseId = created.id;
+      }
+      await router.navigate({ to: "/cases/$caseId", params: { caseId } });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -61,6 +91,29 @@ export function CreateCasePage() {
   return (
     <section className="max-w-xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">New Case</h1>
+      {templates.length > 0 ? (
+        <label className="block">
+          <span className="text-sm">Template (optional)</span>
+          <select
+            className="mt-1 w-full rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+          >
+            <option value="">— scratch —</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.display_name || t.name}
+              </option>
+            ))}
+          </select>
+          {templateId ? (
+            <p className="mt-1 text-xs text-md-sys-color-on-surface-variant">
+              Severity/TLP/tasks come from the template; only the title and
+              description below are used.
+            </p>
+          ) : null}
+        </label>
+      ) : null}
       <label className="block">
         <span className="text-sm">Title</span>
         <input
