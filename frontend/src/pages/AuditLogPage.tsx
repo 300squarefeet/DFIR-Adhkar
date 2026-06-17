@@ -28,6 +28,8 @@ export function AuditLogPage() {
   const [filter, setFilter] = useState("");
   const [entityType, setEntityType] = useState("");
   const [actionFilter, setActionFilter] = useState("");
+  const [since, setSince] = useState("");
+  const [until, setUntil] = useState("");
   const [active, setActive] = useState<AuditRow | null>(null);
 
   useEffect(() => {
@@ -35,6 +37,8 @@ export function AuditLogPage() {
     const params = new URLSearchParams({ limit: "200" });
     if (entityType) params.set("entity_type", entityType);
     if (actionFilter) params.set("action", actionFilter);
+    if (since) params.set("since", new Date(since).toISOString());
+    if (until) params.set("until", new Date(until).toISOString());
     apiCall<AuditRow[]>(`/v1/audit?${params.toString()}`)
       .then((r) => {
         if (!cancelled) setRows(r);
@@ -45,7 +49,7 @@ export function AuditLogPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiCall, entityType, actionFilter]);
+  }, [apiCall, entityType, actionFilter, since, until]);
 
   const userNames = useUserNames(rows?.map((r) => r.actor_user_id) ?? []);
 
@@ -94,6 +98,8 @@ export function AuditLogPage() {
               const p = new URLSearchParams();
               if (entityType) p.set("entity_type", entityType);
               if (actionFilter) p.set("action", actionFilter);
+              if (since) p.set("since", new Date(since).toISOString());
+              if (until) p.set("until", new Date(until).toISOString());
               const qs = p.toString();
               return `${base}/v1/audit/export-csv${qs ? `?${qs}` : ""}`;
             })()}
@@ -129,6 +135,24 @@ export function AuditLogPage() {
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
           />
+          <label className="flex items-center gap-1 text-xs">
+            <span className="text-md-sys-color-on-surface-variant">Since</span>
+            <input
+              type="date"
+              className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+              value={since}
+              onChange={(e) => setSince(e.target.value)}
+            />
+          </label>
+          <label className="flex items-center gap-1 text-xs">
+            <span className="text-md-sys-color-on-surface-variant">Until</span>
+            <input
+              type="date"
+              className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-1 text-sm"
+              value={until}
+              onChange={(e) => setUntil(e.target.value)}
+            />
+          </label>
         </div>
         {filtered.length === 0 ? (
           <p className="text-sm text-md-sys-color-on-surface-variant">No entries.</p>

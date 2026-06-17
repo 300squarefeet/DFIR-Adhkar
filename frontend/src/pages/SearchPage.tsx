@@ -22,7 +22,25 @@ interface SearchResponse {
 }
 
 const RECENT_KEY = "adhkar.search.recent.v1";
+const FACETS_KEY = "adhkar.search.facets.v1";
 const RECENT_MAX = 8;
+
+function loadFacets(): {
+  entityType: "" | "case" | "alert";
+  minSev: "" | "1" | "2" | "3" | "4";
+} {
+  try {
+    const raw = window.localStorage.getItem(FACETS_KEY);
+    if (!raw) return { entityType: "", minSev: "" };
+    const p = JSON.parse(raw) as Partial<{
+      entityType: "" | "case" | "alert";
+      minSev: "" | "1" | "2" | "3" | "4";
+    }>;
+    return { entityType: p.entityType ?? "", minSev: p.minSev ?? "" };
+  } catch {
+    return { entityType: "", minSev: "" };
+  }
+}
 
 function loadRecent(): string[] {
   try {
@@ -44,8 +62,24 @@ export function SearchPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
-  const [entityType, setEntityType] = useState<"" | "case" | "alert">("");
-  const [minSev, setMinSev] = useState<"" | "1" | "2" | "3" | "4">("");
+  const facetsInit = loadFacets();
+  const [entityType, setEntityType] = useState<"" | "case" | "alert">(
+    facetsInit.entityType,
+  );
+  const [minSev, setMinSev] = useState<"" | "1" | "2" | "3" | "4">(
+    facetsInit.minSev,
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        FACETS_KEY,
+        JSON.stringify({ entityType, minSev }),
+      );
+    } catch {
+      /* best-effort */
+    }
+  }, [entityType, minSev]);
 
   useEffect(() => {
     try {
