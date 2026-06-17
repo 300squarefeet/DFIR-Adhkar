@@ -181,6 +181,73 @@ async def get_observable(
     return _to_dto(o)
 
 
+class CaseRef(BaseModel):
+    case_id: UUID
+    number: int
+    title: str
+    severity: int
+    stage: str
+
+
+@router.get("/{observable_id}/case-refs", response_model=list[CaseRef])
+async def observable_case_refs(
+    observable_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+) -> list[CaseRef]:
+    """Cases that contain an observable with the same (data_type, data) as
+    this one. Joins through Observable.case_id ignoring soft-deleted cases
+    and the source observable itself. Useful for cross-case pivot when an
+    IOC reappears."""
+    from adhkar.db.models import Case as _Case
+
+    safe_limit = max(1, min(200, int(limit)))
+    src = (
+        await db.execute(
+            select(Observable).where(
+                Observable.id == observable_id,
+                Observable.organization_id == org_id,
+                Observable.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if src is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "observable_not_found")
+    rows = (
+        (
+            await db.execute(
+                select(_Case)
+                .join(Observable, Observable.case_id == _Case.id)
+                .where(
+                    _Case.organization_id == org_id,
+                    _Case.deleted_at.is_(None),
+                    Observable.data_type == src.data_type,
+                    Observable.data == src.data,
+                    Observable.id != observable_id,
+                    Observable.deleted_at.is_(None),
+                )
+                .order_by(_Case.number.desc())
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .unique()
+        .all()
+    )
+    return [
+        CaseRef(
+            case_id=c.id,
+            number=c.number,
+            title=c.title,
+            severity=c.severity,
+            stage=c.stage,
+        )
+        for c in rows
+    ]
+
+
 @router.patch("/{observable_id}", response_model=ObservableDTO)
 async def patch_observable(
     observable_id: UUID,
