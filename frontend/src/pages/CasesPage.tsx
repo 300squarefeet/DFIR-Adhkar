@@ -170,16 +170,36 @@ export function CasesPage() {
 
   return (
     <section className="p-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Cases</h1>
-        {permissions.has("manageCase") ? (
-          <Link
-            to="/cases/new"
-            className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary"
+        <div className="ml-auto flex items-center gap-2">
+          <a
+            href={(() => {
+              const base =
+                (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+                "http://localhost:8000";
+              const p = new URLSearchParams();
+              if (view.stage) p.set("stage", view.stage);
+              if (view.severity) p.set("severity", view.severity);
+              if (view.flagged) p.set("flagged", view.flagged);
+              const qs = p.toString();
+              return `${base}/v1/cases/export-csv${qs ? `?${qs}` : ""}`;
+            })()}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-xs hover:bg-md-sys-color-surface-container"
           >
-            + New Case
-          </Link>
-        ) : null}
+            Export CSV
+          </a>
+          {permissions.has("manageCase") ? (
+            <Link
+              to="/cases/new"
+              className="rounded-full bg-md-sys-color-primary px-4 py-1 text-sm text-md-sys-color-on-primary"
+            >
+              + New Case
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">

@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -243,6 +244,74 @@ async def create_case(
         )
         return _case_to_dto(case)
     raise HTTPException(status.HTTP_409_CONFLICT, "case_number_assignment_failed")
+
+
+@router.get(
+    "/v1/cases/export-csv",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def export_cases_csv(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    stage: STAGE | None = None,
+    severity: int | None = None,
+    flagged: bool | None = None,
+) -> PlainTextResponse:
+    """CSV dump of cases in the current org. Same filter surface as the
+    list endpoint (stage/severity/flagged) so a saved view can be exported."""
+    import csv
+    import io
+
+    stmt = select(Case).where(Case.organization_id == org_id, Case.deleted_at.is_(None))
+    if stage:
+        stmt = stmt.where(Case.stage == stage)
+    if severity is not None:
+        stmt = stmt.where(Case.severity == severity)
+    if flagged is not None:
+        stmt = stmt.where(Case.flagged == flagged)
+    rows = (await db.execute(stmt.order_by(Case.number.desc()))).scalars().all()
+    buf = io.StringIO()
+    w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    w.writerow(
+        [
+            "number",
+            "title",
+            "severity",
+            "tlp",
+            "pap",
+            "status",
+            "stage",
+            "assignee_id",
+            "flagged",
+            "tags",
+            "created_at",
+            "end_date",
+        ]
+    )
+    for c in rows:
+        w.writerow(
+            [
+                c.number,
+                c.title,
+                c.severity,
+                c.tlp,
+                c.pap,
+                c.status,
+                c.stage,
+                str(c.assignee_id) if c.assignee_id else "",
+                "true" if c.flagged else "false",
+                ",".join(c.tags),
+                c.created_at.isoformat(),
+                c.end_date.isoformat() if c.end_date else "",
+            ]
+        )
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="adhkar-cases.csv"'},
+    )
 
 
 @router.get("/v1/cases/{case_id}", response_model=CaseDTO)
