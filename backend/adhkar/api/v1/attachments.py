@@ -256,18 +256,24 @@ async def list_case_attachments(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    av_scan_status: str | None = None,
+    content_type_prefix: str | None = None,
 ) -> list[AttachmentDTO]:
-    rows = (
-        (
-            await db.execute(
-                select(Attachment)
-                .where(Attachment.organization_id == org_id, Attachment.case_id == case_id)
-                .order_by(Attachment.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
+    """Per-case attachments newest first. Optional `av_scan_status=
+    <value>` scopes to one scan state (pending/clean/infected/error);
+    `content_type_prefix=image/` does a LIKE prefix match so the
+    case detail page can render "images only" without filtering
+    client-side."""
+    stmt = (
+        select(Attachment)
+        .where(Attachment.organization_id == org_id, Attachment.case_id == case_id)
+        .order_by(Attachment.created_at.desc())
     )
+    if av_scan_status is not None:
+        stmt = stmt.where(Attachment.av_scan_status == av_scan_status)
+    if content_type_prefix is not None:
+        stmt = stmt.where(Attachment.content_type.like(f"{content_type_prefix}%"))
+    rows = (await db.execute(stmt)).scalars().all()
     return [_att_dto(a) for a in rows]
 
 
