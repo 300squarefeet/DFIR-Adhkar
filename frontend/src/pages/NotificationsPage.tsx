@@ -14,6 +14,12 @@ interface TestEndpointResult {
   error: string | null;
 }
 
+interface DeliveriesSummary {
+  days: number;
+  total: number;
+  by_status: Array<{ status: string; count: number }>;
+}
+
 interface EndpointRow {
   id: string;
   name: string;
@@ -37,6 +43,7 @@ export function NotificationsPage() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<string>("");
+  const [health, setHealth] = useState<DeliveriesSummary | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
@@ -69,6 +76,24 @@ export function NotificationsPage() {
     // refresh is intentionally fresh per render here; small page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiCall, kindFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchHealth = async () => {
+      try {
+        const summary = await apiCall<DeliveriesSummary>(
+          "/v1/notification-deliveries/summary?days=7",
+        );
+        if (!cancelled) setHealth(summary);
+      } catch {
+        if (!cancelled) setHealth(null);
+      }
+    };
+    void fetchHealth();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall]);
 
   const createWebhook = async () => {
     if (!newName.trim() || !newUrl.trim()) return;
@@ -130,6 +155,31 @@ export function NotificationsPage() {
   return (
     <section className="space-y-6 p-6">
       <h1 className="text-2xl font-semibold">Notifications</h1>
+
+      {health !== null && health.total !== 0 ? (
+        <section className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-xs text-md-sys-color-on-surface-variant">
+            Dispatcher (7d):
+          </span>
+          {health.by_status.map((s) => {
+            if (s.count === 0 && s.status !== "failed") return null;
+            const cls =
+              s.status === "succeeded"
+                ? "bg-severity-1/20 text-md-sys-color-on-surface"
+                : s.status === "failed"
+                  ? "bg-severity-4/20 text-md-sys-color-on-surface"
+                  : "bg-md-sys-color-surface-container text-md-sys-color-on-surface-variant";
+            return (
+              <span
+                key={s.status}
+                className={`rounded-full px-2 py-0.5 ${cls}`}
+              >
+                {s.status} {s.count}
+              </span>
+            );
+          })}
+        </section>
+      ) : null}
 
       <article>
         <h2 className="mb-2 text-lg font-medium">Endpoints ({endpoints.length})</h2>
