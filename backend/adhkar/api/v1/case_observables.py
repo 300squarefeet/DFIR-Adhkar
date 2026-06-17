@@ -235,9 +235,12 @@ async def case_observable_summary(
     _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    since: datetime | None = None,
 ) -> ObservableSummaryResponse:
     """Per-data_type count of observables attached to this case, with
-    IOC subtotals per bucket. 404 when the case isn't in caller's org."""
+    IOC subtotals per bucket. 404 when the case isn't in caller's org.
+    Optional `since=<ISO>` scopes the summary to observables created
+    after the cursor — useful for an "evidence added this week" view."""
     case = (
         await db.execute(
             select(Case).where(
@@ -249,22 +252,23 @@ async def case_observable_summary(
     ).scalar_one_or_none()
     if case is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
-    rows = (
-        await db.execute(
-            select(
-                Observable.data_type,
-                func.count().label("total"),
-                func.sum(func.cast(Observable.is_ioc, type_=Integer)).label("ioc_n"),
-            )
-            .where(
-                Observable.case_id == case_id,
-                Observable.organization_id == org_id,
-                Observable.deleted_at.is_(None),
-            )
-            .group_by(Observable.data_type)
-            .order_by(func.count().desc(), Observable.data_type)
+    summary_stmt = (
+        select(
+            Observable.data_type,
+            func.count().label("total"),
+            func.sum(func.cast(Observable.is_ioc, type_=Integer)).label("ioc_n"),
         )
-    ).all()
+        .where(
+            Observable.case_id == case_id,
+            Observable.organization_id == org_id,
+            Observable.deleted_at.is_(None),
+        )
+        .group_by(Observable.data_type)
+        .order_by(func.count().desc(), Observable.data_type)
+    )
+    if since is not None:
+        summary_stmt = summary_stmt.where(Observable.created_at >= since)
+    rows = (await db.execute(summary_stmt)).all()
     buckets = [
         ObservableSummaryBucket(
             data_type=str(r[0]),
