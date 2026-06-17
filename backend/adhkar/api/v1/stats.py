@@ -345,3 +345,34 @@ async def case_stages(
             for s in ("open", "in_progress", "closed")
         ]
     )
+
+
+class AlertStatusBucket(BaseModel):
+    status: str
+    count: int
+
+
+class AlertStatusesResponse(BaseModel):
+    entries: list[AlertStatusBucket]
+
+
+@router.get("/alerts-by-status", response_model=AlertStatusesResponse)
+async def alerts_by_status(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAlert"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AlertStatusesResponse:
+    """Count alerts grouped by status, zero-filled over the four canonical
+    statuses (New/Updated/Ignored/Imported)."""
+    rows = (
+        await db.execute(
+            select(Alert.status, func.count().label("n"))
+            .where(Alert.organization_id == org_id)
+            .group_by(Alert.status)
+        )
+    ).all()
+    by_status: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    canonical = ("New", "Updated", "Ignored", "Imported")
+    return AlertStatusesResponse(
+        entries=[AlertStatusBucket(status=s, count=by_status.get(s, 0)) for s in canonical]
+    )
