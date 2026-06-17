@@ -3,7 +3,7 @@
  * Lets an admin export a user's data as JSON, or erase their PII.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 
@@ -21,6 +21,13 @@ interface EraseResponse {
   counts: Record<string, number>;
 }
 
+interface UserOption {
+  id: string;
+  email: string;
+  display_name: string;
+  status: string;
+}
+
 export function GdprPage() {
   const { apiCall, permissions } = useAuth();
   const [userId, setUserId] = useState("");
@@ -28,8 +35,24 @@ export function GdprPage() {
   const [eraseData, setEraseData] = useState<EraseResponse | null>(null);
   const [busy, setBusy] = useState<"export" | "erase" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<UserOption[]>([]);
+  const pickerRef = useRef<HTMLDetailsElement | null>(null);
 
   const canManage = permissions.has("manageUser");
+
+  useEffect(() => {
+    let cancelled = false;
+    apiCall<UserOption[]>("/v1/users/recent?limit=20")
+      .then((r) => {
+        if (!cancelled) setRecent(r);
+      })
+      .catch(() => {
+        if (!cancelled) setRecent([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall]);
 
   if (!canManage) {
     return (
@@ -88,6 +111,31 @@ export function GdprPage() {
         redacts PII but never hard-deletes — audit and case history are
         preserved for forensic continuity.
       </p>
+      {recent.length > 0 ? (
+        <details ref={pickerRef}>
+          <summary className="cursor-pointer text-sm text-md-sys-color-on-surface-variant">
+            Pick from recent users ({recent.length})
+          </summary>
+          <div className="mt-2 border border-md-sys-color-outline-variant rounded p-2 text-sm space-y-1">
+            {recent.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                className="block w-full text-left rounded hover:bg-md-sys-color-surface-container px-2 py-1"
+                onClick={() => {
+                  setUserId(u.id);
+                  if (pickerRef.current) pickerRef.current.open = false;
+                }}
+              >
+                <span>{u.display_name || u.email}</span>{" "}
+                <span className="text-xs text-md-sys-color-on-surface-variant">
+                  {u.email}
+                </span>
+              </button>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <div className="flex gap-2">
         <input
           className="flex-1 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-2 text-sm"
