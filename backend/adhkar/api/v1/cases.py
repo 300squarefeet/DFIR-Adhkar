@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -784,13 +784,16 @@ async def list_all_tasks(
     mandatory: bool | None = None,
     overdue: bool | None = None,
     mine: bool | None = None,
+    due_within_days: int | None = None,
     limit: int = 200,
 ) -> list[TaskDTO]:
     """Cross-case task list. Used by the analyst's 'my queue' view.
 
     `mine=true` is shorthand for assignee_id=<current user>. `overdue=true`
     keeps only rows whose due_date is in the past AND whose status is not
-    Completed/Cancelled."""
+    Completed/Cancelled. `due_within_days=N` (1..90) keeps only rows with
+    a due_date inside the next N days that aren't already
+    Completed/Cancelled — useful for the dashboard "due this week" view."""
     safe_limit = max(1, min(500, int(limit)))
     stmt = select(Task).where(Task.organization_id == org_id)
     if mine is True:
@@ -805,6 +808,16 @@ async def list_all_tasks(
         stmt = stmt.where(
             Task.due_date.is_not(None),
             Task.due_date < datetime.now(tz=UTC),
+            Task.status.notin_(("Completed", "Cancelled")),
+        )
+    if due_within_days is not None:
+        bounded = max(1, min(90, int(due_within_days)))
+        now = datetime.now(tz=UTC)
+        horizon = now + timedelta(days=bounded)
+        stmt = stmt.where(
+            Task.due_date.is_not(None),
+            Task.due_date >= now,
+            Task.due_date <= horizon,
             Task.status.notin_(("Completed", "Cancelled")),
         )
     stmt = stmt.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc()).limit(safe_limit)
