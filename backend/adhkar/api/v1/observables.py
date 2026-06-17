@@ -111,6 +111,33 @@ async def search_observables(
     return [_to_dto(o) for o in rows]
 
 
+@router.get("/recent", response_model=list[ObservableDTO])
+async def list_recent_observables(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+    is_ioc: bool | None = None,
+) -> list[ObservableDTO]:
+    """N most-recently-updated non-deleted observables (`updated_at`
+    DESC), default 10, cap 50. Optional `is_ioc=true` keeps only
+    flagged IOCs. Mirrors /v1/cases/recent + /v1/alerts/recent +
+    /v1/tasks/recent for dashboard symmetry."""
+    safe_limit = max(1, min(50, int(limit)))
+    stmt = (
+        select(Observable)
+        .where(Observable.organization_id == org_id, Observable.deleted_at.is_(None))
+        .order_by(Observable.updated_at.desc())
+        .limit(safe_limit)
+    )
+    if is_ioc is True:
+        stmt = stmt.where(Observable.is_ioc.is_(True))
+    elif is_ioc is False:
+        stmt = stmt.where(Observable.is_ioc.is_(False))
+    rows = (await db.execute(stmt)).scalars().all()
+    return [_to_dto(o) for o in rows]
+
+
 @router.get("", response_model=list[ObservableDTO])
 async def list_observables(
     _user: Annotated[CurrentUser, Depends(require_permission("viewObservable"))],
