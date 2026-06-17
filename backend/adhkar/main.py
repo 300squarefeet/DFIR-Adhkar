@@ -25,6 +25,7 @@ from adhkar.api.v1.gdpr import router as gdpr_router
 from adhkar.api.v1.kb import router as kb_router
 from adhkar.api.v1.live import router as live_router
 from adhkar.api.v1.mcp import router as mcp_router
+from adhkar.api.v1.mentions import router as mentions_router
 from adhkar.api.v1.meta import router as meta_router
 from adhkar.api.v1.mfa import router as mfa_router
 from adhkar.api.v1.notifications import router as notifications_router
@@ -135,6 +136,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(search_router)
     app.include_router(stats_router)
     app.include_router(live_router)
+    app.include_router(mentions_router)
 
     register_exception_handlers(app)
     configure_otel(app, settings)

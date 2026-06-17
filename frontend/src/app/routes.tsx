@@ -11,6 +11,7 @@ import { AdminProfilesPage } from "@/pages/AdminProfilesPage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { AnalyzerJobsPage } from "@/pages/AnalyzerJobsPage";
 import { AttackHeatmapPage } from "@/pages/AttackHeatmapPage";
+import { MentionsPage } from "@/pages/MentionsPage";
 import { AuditLogPage } from "@/pages/AuditLogPage";
 import { AlertDetailPage } from "@/pages/AlertDetailPage";
 import { AlertsPage } from "@/pages/AlertsPage";
@@ -210,6 +211,12 @@ const attackHeatmapRoute = createRoute({
   component: AttackHeatmapPage,
 });
 
+const mentionsRoute = createRoute({
+  getParentRoute: () => protectedLayout,
+  path: "/mentions",
+  component: MentionsPage,
+});
+
 const caseDetailRoute = createRoute({
   getParentRoute: () => protectedLayout,
   path: "/cases/$caseId",
@@ -248,6 +255,7 @@ export const router = createRouter({
       tasksRoute,
       taxonomiesRoute,
       attackHeatmapRoute,
+      mentionsRoute,
     ]),
   ]),
 });
