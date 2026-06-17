@@ -6,7 +6,7 @@ import csv
 import io
 import json as _json
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import desc, select
+from sqlalchemy import func as _sqlfunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import CurrentUser, get_db, require_current_org, require_permission
@@ -159,3 +160,42 @@ async def export_audit_csv(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="adhkar-audit.csv"'},
     )
+
+
+class AuditSummaryRow(BaseModel):
+    entity_type: str
+    action: str
+    count: int
+
+
+class AuditSummaryResponse(BaseModel):
+    window_days: int
+    rows: list[AuditSummaryRow]
+
+
+@router.get("/summary", response_model=AuditSummaryResponse)
+async def audit_summary(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = Query(default=14, ge=1, le=90),
+) -> AuditSummaryResponse:
+    """Audit row counts grouped by (entity_type, action) over the last N days.
+    Sorted by count DESC then entity_type then action so the most-noisy
+    surfaces sort first. Useful for spotting noisy automation or a sudden
+    spike of mutations on one entity family."""
+    since = datetime.now(tz=UTC) - timedelta(days=days)
+    rows = (
+        await db.execute(
+            select(
+                AuditLog.entity_type,
+                AuditLog.action,
+                _sqlfunc.count().label("n"),
+            )
+            .where(AuditLog.organization_id == org_id, AuditLog.created_at >= since)
+            .group_by(AuditLog.entity_type, AuditLog.action)
+        )
+    ).all()
+    out = [AuditSummaryRow(entity_type=str(r[0]), action=str(r[1]), count=int(r[2])) for r in rows]
+    out.sort(key=lambda r: (-r.count, r.entity_type, r.action))
+    return AuditSummaryResponse(window_days=days, rows=out)
