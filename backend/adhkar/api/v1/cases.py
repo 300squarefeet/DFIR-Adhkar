@@ -876,6 +876,7 @@ async def list_all_tasks(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     assignee_id: UUID | None = None,
+    case_id: UUID | None = None,
     status_filter: TASK_STATUS | None = None,
     mandatory: bool | None = None,
     overdue: bool | None = None,
@@ -892,9 +893,12 @@ async def list_all_tasks(
     a due_date inside the next N days that aren't already
     Completed/Cancelled. `updated_since=<ISO>` bounds Task.updated_at and
     switches the sort to updated_at DESC — completes the delta-sync trio
-    with RC172/RC174/RC175."""
+    with RC172/RC174/RC175. `case_id=<uuid>` scopes to one case so the
+    same /v1/tasks endpoint can drive a case-detail board panel."""
     safe_limit = max(1, min(500, int(limit)))
     stmt = select(Task).where(Task.organization_id == org_id)
+    if case_id is not None:
+        stmt = stmt.where(Task.case_id == case_id)
     if mine is True:
         stmt = stmt.where(Task.assignee_id == user.user_id)
     elif assignee_id:
