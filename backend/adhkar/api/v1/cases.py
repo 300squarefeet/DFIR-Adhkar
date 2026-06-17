@@ -148,6 +148,32 @@ async def list_cases(
     return [_case_to_dto(c) for c in rows]
 
 
+@router.get("/v1/cases/recent", response_model=list[CaseDTO])
+async def list_recent_cases(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+) -> list[CaseDTO]:
+    """N most-recently-updated cases (`updated_at` DESC) for the current
+    org, default 10, capped 50. Skips soft-deleted cases. Same DTO shape
+    as the main list endpoint so the frontend can reuse the renderer."""
+    safe_limit = max(1, min(50, int(limit)))
+    rows = (
+        (
+            await db.execute(
+                select(Case)
+                .where(Case.organization_id == org_id, Case.deleted_at.is_(None))
+                .order_by(Case.updated_at.desc())
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_case_to_dto(c) for c in rows]
+
+
 class BulkPatchPayload(BaseModel):
     ids: list[UUID] = Field(min_length=1, max_length=200)
     patch: CasePatch
