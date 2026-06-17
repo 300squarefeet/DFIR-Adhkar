@@ -65,6 +65,8 @@ export function AlertDetailPage({ alertId }: Props) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const timelineUserNames = useUserNames(timeline.map((t) => t.actor_user_id));
   const [similar, setSimilar] = useState<SimilarAlert[] | null>(null);
+  const [similarUnpromoted, setSimilarUnpromoted] = useState<boolean>(false);
+  const [similarStatus, setSimilarStatus] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +94,12 @@ export function AlertDetailPage({ alertId }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const results = await apiCall<SimilarAlert[]>(`/v1/alerts/${alertId}/similar`);
+        const params = new URLSearchParams();
+        if (similarUnpromoted) params.set("unpromoted", "true");
+        if (similarStatus) params.set("alert_status", similarStatus);
+        const qs = params.toString();
+        const url = `/v1/alerts/${alertId}/similar${qs ? `?${qs}` : ""}`;
+        const results = await apiCall<SimilarAlert[]>(url);
         if (!cancelled) setSimilar(results);
       } catch {
         if (!cancelled) setSimilar([]);
@@ -101,7 +108,7 @@ export function AlertDetailPage({ alertId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [apiCall, alertId]);
+  }, [apiCall, alertId, similarUnpromoted, similarStatus]);
 
   const setStatus = async (status: string) => {
     if (!alert) return;
@@ -230,6 +237,46 @@ export function AlertDetailPage({ alertId }: Props) {
 
       <article>
         <h2 className="text-lg font-medium">Related alerts ({similar?.length ?? "…"})</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={similarUnpromoted}
+            className={
+              "rounded-full px-2 py-0.5 text-xs " +
+              (similarUnpromoted
+                ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+            }
+            onClick={() => {
+              setSimilarUnpromoted((v) => !v);
+            }}
+          >
+            Unpromoted only
+          </button>
+          <span className="mx-1 h-3 w-px bg-md-sys-color-outline-variant" />
+          {(["", ...STATUSES] as const).map((s) => {
+            const label = s === "" ? "Any" : s;
+            const active = similarStatus === s;
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={active}
+                className={
+                  "rounded-full px-2 py-0.5 text-xs " +
+                  (active
+                    ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                    : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+                }
+                onClick={() => {
+                  setSimilarStatus(s);
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
         {similar === null ? (
           <p className="mt-2 text-sm text-md-sys-color-on-surface-variant">Loading…</p>
         ) : similar.length === 0 ? (
