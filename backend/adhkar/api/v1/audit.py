@@ -188,23 +188,30 @@ async def audit_summary(
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = Query(default=14, ge=1, le=90),
+    actor_user_id: UUID | None = None,
+    entity_type: str | None = None,
 ) -> AuditSummaryResponse:
     """Audit row counts grouped by (entity_type, action) over the last N days.
     Sorted by count DESC then entity_type then action so the most-noisy
     surfaces sort first. Useful for spotting noisy automation or a sudden
-    spike of mutations on one entity family."""
+    spike of mutations on one entity family. Optional `actor_user_id`
+    scopes to one actor's noise; optional `entity_type` scopes to one
+    entity family."""
     since = datetime.now(tz=UTC) - timedelta(days=days)
-    rows = (
-        await db.execute(
-            select(
-                AuditLog.entity_type,
-                AuditLog.action,
-                _sqlfunc.count().label("n"),
-            )
-            .where(AuditLog.organization_id == org_id, AuditLog.created_at >= since)
-            .group_by(AuditLog.entity_type, AuditLog.action)
+    stmt = (
+        select(
+            AuditLog.entity_type,
+            AuditLog.action,
+            _sqlfunc.count().label("n"),
         )
-    ).all()
+        .where(AuditLog.organization_id == org_id, AuditLog.created_at >= since)
+        .group_by(AuditLog.entity_type, AuditLog.action)
+    )
+    if actor_user_id is not None:
+        stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
+    if entity_type is not None:
+        stmt = stmt.where(AuditLog.entity_type == entity_type)
+    rows = (await db.execute(stmt)).all()
     out = [AuditSummaryRow(entity_type=str(r[0]), action=str(r[1]), count=int(r[2])) for r in rows]
     out.sort(key=lambda r: (-r.count, r.entity_type, r.action))
     return AuditSummaryResponse(window_days=days, rows=out)
