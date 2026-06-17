@@ -121,6 +121,42 @@ class SimilarityCountsResponse(BaseModel):
     counts: list[SimilarityCount]
 
 
+class ObservableTagsResponse(BaseModel):
+    case_id: UUID
+    tags: list[str]
+
+
+@router.get(
+    "/v1/cases/{case_id}/observables/tags",
+    response_model=ObservableTagsResponse,
+)
+async def case_observable_tags(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ObservableTagsResponse:
+    """Union of all tags across observables attached to this case,
+    sorted alphabetically. Cheap server-side aggregate so the case
+    detail page can render "tags from evidence" without paging the
+    full observable list."""
+    await _load_case(db, org_id, case_id)
+    rows = (
+        await db.execute(
+            select(Observable.tags).where(
+                Observable.organization_id == org_id,
+                Observable.case_id == case_id,
+                Observable.deleted_at.is_(None),
+            )
+        )
+    ).all()
+    seen: set[str] = set()
+    for (tags,) in rows:
+        if tags:
+            seen.update(str(t) for t in tags)
+    return ObservableTagsResponse(case_id=case_id, tags=sorted(seen))
+
+
 class ObservableSummaryBucket(BaseModel):
     data_type: str
     count: int
