@@ -81,7 +81,28 @@ export function AlertsPage() {
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [view, setView] = useState<SavedView>(() => loadView());
+  const urlOverride = (() => {
+    if (typeof window === "undefined") return {} as Partial<SavedView>;
+    const p = new URLSearchParams(window.location.search);
+    const out: Partial<SavedView> = {};
+    const alertStatus = p.get("alert_status");
+    if (alertStatus !== null) out.status = alertStatus;
+    const source = p.get("source");
+    if (source !== null) out.source = source;
+    const severity = p.get("severity");
+    if (severity === "1" || severity === "2" || severity === "3" || severity === "4")
+      out.severity = severity;
+    const tag = p.get("tag");
+    if (tag !== null) out.tag = tag;
+    const unpromoted = p.get("unpromoted");
+    if (unpromoted === "true" || unpromoted === "false") out.unpromoted = unpromoted;
+    const since = p.get("since");
+    if (since !== null) out.since = since;
+    const until = p.get("until");
+    if (until !== null) out.until = until;
+    return out;
+  })();
+  const [view, setView] = useState<SavedView>(() => ({ ...loadView(), ...urlOverride }));
 
   const refresh = async () => {
     try {
