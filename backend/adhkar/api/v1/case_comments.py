@@ -216,20 +216,16 @@ async def list_links(
     _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
     org_id: Annotated[UUID, Depends(require_current_org)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    relation: RELATION | None = None,
 ) -> list[CaseLinkDTO]:
     await _load_case(db, org_id, case_id)
-    rows = (
-        (
-            await db.execute(
-                select(CaseLink).where(
-                    CaseLink.organization_id == org_id,
-                    or_(CaseLink.source_case_id == case_id, CaseLink.target_case_id == case_id),
-                )
-            )
-        )
-        .scalars()
-        .all()
+    stmt = select(CaseLink).where(
+        CaseLink.organization_id == org_id,
+        or_(CaseLink.source_case_id == case_id, CaseLink.target_case_id == case_id),
     )
+    if relation is not None:
+        stmt = stmt.where(CaseLink.relation == relation)
+    rows = (await db.execute(stmt)).scalars().all()
     return [_link_dto(link) for link in rows]
 
 
