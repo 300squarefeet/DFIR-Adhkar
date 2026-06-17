@@ -44,6 +44,8 @@ async def list_audit(
     entity_type: str | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> list[AuditLogDTO]:
     stmt = (
         select(AuditLog)
@@ -57,6 +59,10 @@ async def list_audit(
         stmt = stmt.where(AuditLog.action == action)
     if actor_user_id:
         stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at >= since)
+    if until is not None:
+        stmt = stmt.where(AuditLog.created_at < until)
     rows = (await db.execute(stmt)).scalars().all()
     return _to_dtos(rows)
 
@@ -91,10 +97,12 @@ async def export_audit_csv(
     entity_type: str | None = None,
     action: str | None = None,
     actor_user_id: UUID | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
     limit: int = Query(5000, ge=1, le=50_000),
 ) -> PlainTextResponse:
     """CSV dump of audit_logs in the current org. Caps at 50k rows so a
-    chatty integration can't OOM the server; tighten via `limit` to
+    chatty integration can't OOM the server; pass `since`/`until` to
     snapshot a date window."""
     stmt = (
         select(AuditLog)
@@ -108,6 +116,10 @@ async def export_audit_csv(
         stmt = stmt.where(AuditLog.action == action)
     if actor_user_id:
         stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at >= since)
+    if until is not None:
+        stmt = stmt.where(AuditLog.created_at < until)
     rows = (await db.execute(stmt)).scalars().all()
     buf = io.StringIO()
     w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
