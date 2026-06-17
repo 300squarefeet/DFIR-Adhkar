@@ -408,6 +408,40 @@ async def audit_per_day(
     )
 
 
+@router.get("/notifications-per-day", response_model=TimeSeriesResponse)
+async def notifications_per_day(
+    _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = Query(default=14, ge=1, le=90),
+    status_filter: Literal["pending", "succeeded", "failed"] | None = None,
+) -> TimeSeriesResponse:
+    """Notification-delivery attempts per day for the last N days,
+    zero-filled. Optional `status_filter` scopes to one delivery state
+    so a "Failed dispatches per day" sparkline can hit this directly."""
+    from adhkar.db.models import NotificationDelivery as _Delivery
+
+    since = datetime.now(tz=UTC) - timedelta(days=days)
+    day_col = func.date(_Delivery.created_at)
+    stmt = (
+        select(day_col.label("day"), func.count().label("n"))
+        .where(_Delivery.organization_id == org_id, _Delivery.created_at >= since)
+        .group_by(day_col)
+    )
+    if status_filter is not None:
+        stmt = stmt.where(_Delivery.status == status_filter)
+    rows = (await db.execute(stmt)).all()
+    by_day: dict[str, int] = {}
+    for row in rows:
+        day = row[0]
+        key = day.isoformat() if hasattr(day, "isoformat") else str(day)
+        by_day[key] = int(row[1])
+    return TimeSeriesResponse(
+        series="notifications-per-day",
+        points=[TimeSeriesPoint(day=k, count=by_day.get(k, 0)) for k in _last_n_days_keys(days)],
+    )
+
+
 class TlpBucket(BaseModel):
     tlp: str
     count: int
