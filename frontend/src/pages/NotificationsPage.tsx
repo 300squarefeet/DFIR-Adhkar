@@ -31,6 +31,7 @@ interface RuleRow {
 
 export function NotificationsPage() {
   const { apiCall, permissions } = useAuth();
+  const toast = useToast();
   const [endpoints, setEndpoints] = useState<EndpointRow[]>([]);
   const [rules, setRules] = useState<RuleRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -39,6 +40,12 @@ export function NotificationsPage() {
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // Per-endpoint busy set for in-flight test requests.
+  const [testingIds, setTestingIds] = useState<Set<string>>(new Set());
+  // Stable ref so testEndpoint closure doesn't stale-capture the set.
+  const testingIdsRef = useRef<Set<string>>(testingIds);
+  testingIdsRef.current = testingIds;
 
   const canManage = permissions.has("manageConfig");
 
@@ -85,6 +92,30 @@ export function NotificationsPage() {
     }
   };
 
+  const testEndpoint = async (id: string) => {
+    if (testingIdsRef.current.has(id)) return;
+    setTestingIds((prev) => new Set([...prev, id]));
+    try {
+      const r = await apiCall<TestEndpointResult>(
+        `/v1/notification-endpoints/${id}/test`,
+        { method: "POST" },
+      );
+      if (r.ok) {
+        toast.success(`Endpoint OK · delivery ${r.delivery_id.slice(0, 8)}`);
+      } else {
+        toast.error(`Endpoint failed: ${r.error ?? "unknown"}`);
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setTestingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   if (error)
     return (
       <section className="p-6">
@@ -112,6 +143,18 @@ export function NotificationsPage() {
               >
                 <span className="font-mono text-xs uppercase">{e.kind}</span>
                 <span>{e.name}</span>
+                {canManage ? (
+                  <button
+                    type="button"
+                    className="rounded-full border border-md-sys-color-outline-variant px-2 py-0.5 text-xs hover:bg-md-sys-color-surface-container disabled:opacity-50"
+                    disabled={testingIds.has(e.id)}
+                    onClick={() => {
+                      void testEndpoint(e.id);
+                    }}
+                  >
+                    {testingIds.has(e.id) ? "Testing…" : "Test"}
+                  </button>
+                ) : null}
                 <a
                   href={`/admin/notification-deliveries?endpoint_id=${e.id}`}
                   className="ml-auto text-xs text-md-sys-color-primary hover:underline"
