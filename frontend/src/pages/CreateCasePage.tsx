@@ -38,6 +38,7 @@ export function CreateCasePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [recentTemplates, setRecentTemplates] = useState<TemplateRow[]>([]);
   const [templateId, setTemplateId] = useState("");
 
   const canCreate = permissions.has("manageCase");
@@ -46,6 +47,12 @@ export function CreateCasePage() {
     apiCall<TemplateRow[]>("/v1/case-templates")
       .then(setTemplates)
       .catch(() => setTemplates([]));
+  }, [apiCall]);
+
+  useEffect(() => {
+    apiCall<TemplateRow[]>("/v1/case-templates/recent?limit=5")
+      .then(setRecentTemplates)
+      .catch(() => undefined);
   }, [apiCall]);
 
   useEffect(() => {
@@ -105,6 +112,27 @@ export function CreateCasePage() {
   return (
     <section className="max-w-xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">New Case</h1>
+      {recentTemplates.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-md-sys-color-on-surface-variant">Recent:</span>
+          {recentTemplates.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTemplateId(t.id)}
+              className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (templateId === t.id
+                  ? "bg-md-sys-color-primary text-md-sys-color-on-primary"
+                  : "border border-md-sys-color-outline-variant hover:bg-md-sys-color-surface-container")
+              }
+              title={`S${t.severity} · TLP ${t.tlp} · ${t.tasks.length} task${t.tasks.length === 1 ? "" : "s"}`}
+            >
+              {t.display_name || t.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {templates.length > 0 ? (
         <label className="block">
           <span className="text-sm">Template (optional)</span>
