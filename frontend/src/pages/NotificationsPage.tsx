@@ -3,9 +3,16 @@
  * endpoint. Full editor lands later.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/ui/Toast";
+
+interface TestEndpointResult {
+  delivery_id: string;
+  ok: boolean;
+  error: string | null;
+}
 
 interface EndpointRow {
   id: string;

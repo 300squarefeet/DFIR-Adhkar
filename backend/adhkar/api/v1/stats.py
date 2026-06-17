@@ -311,3 +311,37 @@ async def observables_by_type(
     return ObservableTypesResponse(
         entries=[ObservableTypeBucket(data_type=str(r[0]), count=int(r[1])) for r in rows]
     )
+
+
+class StageBucket(BaseModel):
+    stage: str
+    count: int
+
+
+class CaseStagesResponse(BaseModel):
+    entries: list[StageBucket]
+
+
+@router.get("/case-stages", response_model=CaseStagesResponse)
+async def case_stages(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CaseStagesResponse:
+    """Count of non-deleted cases grouped by stage (open/in_progress/closed)
+    for the org. Zero-fills the three canonical stages so the UI doesn't
+    need to special-case empty buckets."""
+    rows = (
+        await db.execute(
+            select(Case.stage, func.count().label("n"))
+            .where(Case.organization_id == org_id, Case.deleted_at.is_(None))
+            .group_by(Case.stage)
+        )
+    ).all()
+    by_stage: dict[str, int] = {str(r[0]): int(r[1]) for r in rows}
+    return CaseStagesResponse(
+        entries=[
+            StageBucket(stage=s, count=by_stage.get(s, 0))
+            for s in ("open", "in_progress", "closed")
+        ]
+    )
