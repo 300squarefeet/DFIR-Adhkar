@@ -32,6 +32,7 @@ export function AlertStatusPanel() {
   const ctx = useContext(AuthContext);
   const apiCall = ctx?.apiCall;
   const [data, setData] = useState<AlertStatusResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!apiCall) return;
@@ -40,7 +41,9 @@ export function AlertStatusPanel() {
       .then((r) => {
         if (!cancelled) setData(r);
       })
-      .catch(() => undefined);
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      });
     return () => {
       cancelled = true;
     };
@@ -48,8 +51,7 @@ export function AlertStatusPanel() {
 
   if (!apiCall) return null;
 
-  const isEmpty =
-    data === null ? false : data.entries.every((e) => e.count === 0);
+  const hasData = data !== null && data.entries.some((e) => e.count > 0);
 
   return (
     <article className="mb-4 rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface p-3">
@@ -59,9 +61,11 @@ export function AlertStatusPanel() {
           by triage state
         </span>
       </header>
-      {data === null ? (
+      {error ? (
+        <p className="text-xs text-md-sys-color-on-surface-variant">{error}</p>
+      ) : data === null ? (
         <p className="text-xs text-md-sys-color-on-surface-variant">Loading…</p>
-      ) : isEmpty || data.entries.length === 0 ? (
+      ) : !hasData ? (
         <p className="text-xs text-md-sys-color-on-surface-variant">
           No alerts yet.
         </p>
@@ -72,6 +76,7 @@ export function AlertStatusPanel() {
             return (
               <div
                 key={entry.status}
+                aria-label={`${entry.status}: ${entry.count} alerts`}
                 className="rounded border border-md-sys-color-outline-variant bg-md-sys-color-surface-container p-3"
               >
                 <div className={`text-3xl font-semibold ${meta.toneClass}`}>
