@@ -3,7 +3,7 @@
  * endpoint. Full editor lands later.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/ui/Toast";
@@ -43,9 +43,6 @@ export function NotificationsPage() {
 
   // Per-endpoint busy set for in-flight test requests.
   const [testingIds, setTestingIds] = useState<Set<string>>(new Set());
-  // Stable ref so testEndpoint closure doesn't stale-capture the set.
-  const testingIdsRef = useRef<Set<string>>(testingIds);
-  testingIdsRef.current = testingIds;
 
   const canManage = permissions.has("manageConfig");
 
@@ -93,7 +90,6 @@ export function NotificationsPage() {
   };
 
   const testEndpoint = async (id: string) => {
-    if (testingIdsRef.current.has(id)) return;
     setTestingIds((prev) => new Set([...prev, id]));
     try {
       const r = await apiCall<TestEndpointResult>(
@@ -106,7 +102,8 @@ export function NotificationsPage() {
         toast.error(`Endpoint failed: ${r.error ?? "unknown"}`);
       }
     } catch (e) {
-      toast.error((e as Error).message);
+      await refresh();
+      toast.error(`Endpoint unavailable: ${(e as Error).message}`);
     } finally {
       setTestingIds((prev) => {
         const next = new Set(prev);
