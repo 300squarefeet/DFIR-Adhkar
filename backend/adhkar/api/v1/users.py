@@ -104,6 +104,49 @@ async def search_users(
     ]
 
 
+@router.get("/v1/users/recent", response_model=list[UserDTO])
+async def list_recent_users(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 10,
+) -> list[UserDTO]:
+    """N org members ordered by their most-recent audit-log timestamp,
+    DESC. Falls back to display_name for users that have never authored
+    an audit event. Default 10, cap 50."""
+    from sqlalchemy import desc, func
+
+    from adhkar.db.models import AuditLog as _AuditLog
+
+    safe_limit = max(1, min(50, int(limit)))
+    last_seen = (
+        select(_AuditLog.actor_user_id, func.max(_AuditLog.created_at).label("last_seen"))
+        .where(
+            _AuditLog.organization_id == org_id,
+            _AuditLog.actor_user_id.is_not(None),
+        )
+        .group_by(_AuditLog.actor_user_id)
+        .subquery()
+    )
+    rows = (
+        await db.execute(
+            select(User, last_seen.c.last_seen)
+            .join(UserOrgMembership, UserOrgMembership.user_id == User.id)
+            .outerjoin(last_seen, last_seen.c.actor_user_id == User.id)
+            .where(
+                UserOrgMembership.organization_id == org_id,
+                User.deleted_at.is_(None),
+            )
+            .order_by(desc(last_seen.c.last_seen).nulls_last(), User.display_name)
+            .limit(safe_limit)
+        )
+    ).all()
+    return [
+        UserDTO(id=u.id, email=u.email, display_name=u.display_name, status=u.status)
+        for u, _ in rows
+    ]
+
+
 @router.get("/v1/users", response_model=list[UserDTO])
 async def list_users(
     _user: Annotated[CurrentUser, Depends(require_permission("manageUser"))],
