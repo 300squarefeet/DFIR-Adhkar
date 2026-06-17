@@ -66,6 +66,7 @@ EXPECTED_PATHS: tuple[str, ...] = (
     "/v1/audit/summary",
     "/v1/cases/{case_id}/tasks",
     "/v1/cases/{case_id}/tasks/reorder",
+    "/v1/cases/{case_id}/contributors",
     "/v1/mentions/me",
     "/v1/mentions/me/unread",
     "/v1/mentions/me/seen",

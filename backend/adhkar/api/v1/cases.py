@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -172,6 +172,91 @@ async def list_recent_cases(
         .all()
     )
     return [_case_to_dto(c) for c in rows]
+
+
+class ContributorRow(BaseModel):
+    user_id: UUID
+    comment_count: int
+    task_log_count: int
+    audit_count: int
+
+
+@router.get("/v1/cases/{case_id}/contributors", response_model=list[ContributorRow])
+async def list_case_contributors(
+    case_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ContributorRow]:
+    """Distinct user_ids that have touched this case via Comments, TaskLogs,
+    or AuditLog entries scoped to the case. Excludes None/system actors.
+    Ordered by total activity (comments+logs+audit) desc."""
+    # Fail-fast 404 if the case doesn't exist or isn't in caller's org.
+    from adhkar.db.models import AuditLog as _AuditLog
+    from adhkar.db.models import Comment as _Comment
+    from adhkar.db.models import TaskLog as _TaskLog
+
+    case = (
+        await db.execute(
+            select(Case).where(
+                Case.id == case_id,
+                Case.organization_id == org_id,
+                Case.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "case_not_found")
+
+    # Run three small aggregations in parallel-ish via sequential awaits;
+    # each is a small grouped count.
+    comment_rows = (
+        await db.execute(
+            select(_Comment.author_id, func.count().label("n"))
+            .where(_Comment.case_id == case_id, _Comment.author_id.is_not(None))
+            .group_by(_Comment.author_id)
+        )
+    ).all()
+    tasklog_rows = (
+        await db.execute(
+            select(_TaskLog.author_id, func.count().label("n"))
+            .join(Task, Task.id == _TaskLog.task_id)
+            .where(Task.case_id == case_id, _TaskLog.author_id.is_not(None))
+            .group_by(_TaskLog.author_id)
+        )
+    ).all()
+    audit_rows = (
+        await db.execute(
+            select(_AuditLog.actor_user_id, func.count().label("n"))
+            .where(
+                _AuditLog.organization_id == org_id,
+                _AuditLog.entity_type == "case",
+                _AuditLog.entity_id == case_id,
+                _AuditLog.actor_user_id.is_not(None),
+            )
+            .group_by(_AuditLog.actor_user_id)
+        )
+    ).all()
+
+    per_user: dict[UUID, dict[str, int]] = {}
+    for uid, n in comment_rows:
+        per_user.setdefault(uid, {"comment": 0, "task_log": 0, "audit": 0})["comment"] = int(n)
+    for uid, n in tasklog_rows:
+        per_user.setdefault(uid, {"comment": 0, "task_log": 0, "audit": 0})["task_log"] = int(n)
+    for uid, n in audit_rows:
+        per_user.setdefault(uid, {"comment": 0, "task_log": 0, "audit": 0})["audit"] = int(n)
+
+    out = [
+        ContributorRow(
+            user_id=uid,
+            comment_count=v["comment"],
+            task_log_count=v["task_log"],
+            audit_count=v["audit"],
+        )
+        for uid, v in per_user.items()
+    ]
+    out.sort(key=lambda r: -(r.comment_count + r.task_log_count + r.audit_count))
+    return out
 
 
 class BulkPatchPayload(BaseModel):
