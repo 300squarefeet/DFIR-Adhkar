@@ -436,6 +436,44 @@ async def observables_by_tlp(
     return TlpResponse(entries=[TlpBucket(tlp=t, count=by_tlp.get(t, 0)) for t in canonical])
 
 
+class CaseTlpBucket(BaseModel):
+    tlp: str
+    open_count: int
+    closed_count: int
+
+
+class CasesByTlpResponse(BaseModel):
+    entries: list[CaseTlpBucket]
+
+
+@router.get("/cases-by-tlp", response_model=CasesByTlpResponse)
+async def cases_by_tlp(
+    _user: Annotated[CurrentUser, Depends(require_permission("viewCase"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CasesByTlpResponse:
+    """Per-TLP open/closed case counts. Returns all five canonical TLP
+    buckets even when empty so the UI can keep the legend stable."""
+    rows = (
+        await db.execute(
+            select(
+                Case.tlp,
+                func.sum(case((Case.stage != "closed", 1), else_=0)).label("open_n"),
+                func.sum(case((Case.stage == "closed", 1), else_=0)).label("closed_n"),
+            )
+            .where(Case.organization_id == org_id, Case.deleted_at.is_(None))
+            .group_by(Case.tlp)
+        )
+    ).all()
+    by_tlp: dict[str, tuple[int, int]] = {str(r[0]): (int(r[1] or 0), int(r[2] or 0)) for r in rows}
+    canonical = ("white", "green", "amber", "amber-strict", "red")
+    entries: list[CaseTlpBucket] = []
+    for t in canonical:
+        opn, cls = by_tlp.get(t, (0, 0))
+        entries.append(CaseTlpBucket(tlp=t, open_count=opn, closed_count=cls))
+    return CasesByTlpResponse(entries=entries)
+
+
 class AssigneeBucket(BaseModel):
     assignee_id: UUID | None
     open_count: int
