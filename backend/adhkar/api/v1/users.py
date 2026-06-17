@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -387,3 +388,56 @@ async def reset_password(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "user_inactive")
     user.password_hash = hash_password(body.new_password)
     await db.flush()
+
+
+class UserActivityRow(BaseModel):
+    id: UUID
+    created_at: datetime
+    action: str
+    entity_type: str
+    entity_id: UUID | None
+
+
+@router.get("/v1/users/{user_id}/recent-activity", response_model=list[UserActivityRow])
+async def user_recent_activity(
+    user_id: UUID,
+    _user: Annotated[CurrentUser, Depends(require_permission("viewAudit"))],
+    org_id: Annotated[UUID, Depends(require_current_org)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 25,
+) -> list[UserActivityRow]:
+    """Last N audit events authored by this user in the current org.
+    Shortcut for the admin user-detail view; saves crafting an
+    /v1/audit?actor_user_id=… URL by hand."""
+    from datetime import datetime as _dt  # noqa: F401
+
+    from sqlalchemy import desc as _desc
+
+    from adhkar.db.models import AuditLog as _AuditLog
+
+    safe_limit = max(1, min(200, int(limit)))
+    rows = (
+        (
+            await db.execute(
+                select(_AuditLog)
+                .where(
+                    _AuditLog.organization_id == org_id,
+                    _AuditLog.actor_user_id == user_id,
+                )
+                .order_by(_desc(_AuditLog.created_at))
+                .limit(safe_limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        UserActivityRow(
+            id=r.id,
+            created_at=r.created_at,
+            action=r.action,
+            entity_type=r.entity_type,
+            entity_id=r.entity_id,
+        )
+        for r in rows
+    ]
