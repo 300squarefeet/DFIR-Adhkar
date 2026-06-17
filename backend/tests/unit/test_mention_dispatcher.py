@@ -86,6 +86,24 @@ async def test_multiple_matches_one_event_each(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_self_mention_is_silent(monkeypatch):
+    audit = AsyncMock()
+    monkeypatch.setattr(m, "audit_and_emit", audit)
+    actor = uuid4()
+    me = SimpleNamespace(id=actor, display_name="me")
+    db = _mock_db_returning([me])
+    n = await m.emit_mentions(
+        db,
+        org_id=uuid4(),
+        actor_user_id=actor,
+        content="@me note to self",
+        extra_diff={"case_id": "C-self"},
+    )
+    assert n == 0
+    audit.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_extra_diff_passthrough(monkeypatch):
     audit = AsyncMock()
     monkeypatch.setattr(m, "audit_and_emit", audit)
