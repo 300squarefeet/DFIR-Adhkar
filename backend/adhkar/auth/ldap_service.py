@@ -3,7 +3,7 @@
 Flow:
   1. Load enabled providers ordered by priority ASC.
   2. For each provider:
-     - Check circuit breaker (Redis key ldap:open:{id}); skip if open.
+     - Check circuit breaker (Redis key ldap:open:{name}:{id}); skip if open.
      - Build LdapClient + LdapProviderConfig from the row.
      - Service-bind + search by rendered filter (email -> {input}).
      - On 0 hits OR user-bind False  -> raise LdapInvalidCredentials (no skip).
@@ -11,10 +11,12 @@ Flow:
      - On success: fetch memberOf, resolve_memberships, fail-closed check, return BindResult.
   3. If every provider raised connection-class errors, raise LdapAllProvidersFailed.
 
-Circuit breaker math: INCR ldap:fail:{id} (TTL 60s) on every connection-class
-failure. When the post-INCR count crosses 50, SET ldap:open:{id} TTL 300s. The
-next call sees `exists ldap:open:{id}` and skips that provider until the key
-expires."""
+Circuit breaker math: INCR `ldap:fail:{name}:{id}` (TTL 60s) on every
+connection-class failure. When the post-INCR count crosses 50, SET
+`ldap:open:{name}:{id}` TTL 300s. The next call sees
+`exists ldap:open:{name}:{id}` and skips that provider until the key expires.
+The `{name}` prefix exists so operators can grep Redis by human-readable
+provider name; `{id}` keeps keys unique."""
 
 from __future__ import annotations
 
@@ -37,6 +39,7 @@ from adhkar.db.models import (
     LdapGroupMapping,
     LdapProvider,
     Organization,
+    User,
     UserOrgMembership,
 )
 
@@ -86,12 +89,12 @@ class LdapAuthService:
         )
         return [LdapProviderConfig.from_row(r, self._secret_key) for r in rows]
 
-    async def _circuit_open(self, provider_id: UUID, provider_name: str = "") -> bool:
+    async def _circuit_open(self, provider_id: UUID, provider_name: str) -> bool:
         if self._redis is None:
             return False
         return bool(await self._redis.exists(f"ldap:open:{provider_name}:{provider_id}"))
 
-    async def _bump_failure(self, provider_id: UUID, provider_name: str = "") -> None:
+    async def _bump_failure(self, provider_id: UUID, provider_name: str) -> None:
         if self._redis is None:
             return
         count = await self._redis.incr(f"ldap:fail:{provider_name}:{provider_id}")
@@ -126,8 +129,6 @@ class LdapAuthService:
         return [(row[0], row[1]) for row in rows]
 
     async def _count_manual_memberships(self, db: AsyncSession, email: str) -> int:
-        from adhkar.db.models import User
-
         result = await db.execute(
             select(UserOrgMembership)
             .join(User, User.id == UserOrgMembership.user_id)
@@ -143,12 +144,12 @@ class LdapAuthService:
         password: str,
     ) -> BindResult:
         providers = await self._load_enabled_providers(db)
-        all_failed_connection = bool(providers)
-        any_attempted = False
+        attempted = 0
+        connection_failures = 0
         for cfg in providers:
             if await self._circuit_open(cfg.id, cfg.name):
                 continue
-            any_attempted = True
+            attempted += 1
             client = self._build_client(cfg)
             try:
                 entries = client.bind_and_search(
@@ -165,9 +166,8 @@ class LdapAuthService:
                 )
             except (LdapConnectionError, LdapServiceBindError):
                 await self._bump_failure(cfg.id, cfg.name)
+                connection_failures += 1
                 continue
-
-            all_failed_connection = False
             if not entries:
                 # User not found on this provider — continue to next provider.
                 # Anti-enumeration: final error is LdapInvalidCredentials regardless.
@@ -200,7 +200,6 @@ class LdapAuthService:
                 resolved_memberships=resolved,
             )
 
-        if any_attempted and all_failed_connection:
+        if attempted > 0 and connection_failures == attempted:
             raise LdapAllProvidersFailed("every provider failed to connect")
-        # No providers reachable (all circuits open or no providers) — treat as invalid creds.
         raise LdapInvalidCredentials("no provider available")
