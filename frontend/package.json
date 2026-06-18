@@ -26,8 +26,8 @@
     "@tanstack/react-router": "^1.74.0",
     "cmdk": "^1.0.0",
     "material-symbols": "^0.27.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -41,7 +41,7 @@
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.0",
-    "@types/react": "^18.3.0",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "@vitest/coverage-v8": "^2.1.0",
