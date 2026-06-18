@@ -29,7 +29,8 @@ async def audit_and_emit(
     ip: str | None = None,
     event_type: str | None = None,
     payload: dict[str, Any] | None = None,
-) -> tuple[AuditLog, OutboxEvent]:
+    emit_outbox: bool = True,
+) -> tuple[AuditLog, OutboxEvent | None]:
     """Insert AuditLog + OutboxEvent in the current transaction.
 
     The default `event_type` is `{entity_type}.{action}` (e.g. `user.created`).
@@ -51,11 +52,14 @@ async def audit_and_emit(
         "entity_id": str(entity_id) if entity_id else None,
         "diff": diff,
     }
-    outbox = OutboxEvent(
-        organization_id=organization_id,
-        event_type=event_type or f"{entity_type}.{action}",
-        payload=event_payload,
-    )
-    db.add(outbox)
+    if emit_outbox:
+        outbox: OutboxEvent | None = OutboxEvent(
+            organization_id=organization_id,
+            event_type=event_type or f"{entity_type}.{action}",
+            payload=event_payload,
+        )
+        db.add(outbox)
+    else:
+        outbox = None
     await db.flush()
     return audit, outbox

@@ -165,6 +165,7 @@ async def _audit_failed(
                 "reason": reason,
                 "source_ip": source_ip(request),
             },
+            emit_outbox=False,
         )
     except Exception:
         _log.exception(
