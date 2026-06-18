@@ -203,3 +203,84 @@ class LdapAuthService:
         if attempted > 0 and connection_failures == attempted:
             raise LdapAllProvidersFailed("every provider failed to connect")
         raise LdapInvalidCredentials("no provider available")
+
+    async def upsert_user_and_memberships(
+        self,
+        db: AsyncSession,
+        result: BindResult,
+        *,
+        request_ip: str | None,
+    ) -> User:
+        from adhkar.audit import audit_and_emit
+        from adhkar.db.models import User
+
+        existing = (
+            await db.execute(select(User).where(User.email == result.email))
+        ).scalar_one_or_none()
+
+        first_time = existing is None
+        if existing is None:
+            existing = User(
+                email=result.email,
+                display_name=result.display_name,
+                password_hash=None,
+                status="active",
+                default_org_id=(
+                    result.resolved_memberships[0][0] if result.resolved_memberships else None
+                ),
+            )
+            db.add(existing)
+            await db.flush()
+        else:
+            existing.display_name = result.display_name
+            if existing.default_org_id is None and result.resolved_memberships:
+                existing.default_org_id = result.resolved_memberships[0][0]
+
+        existing_ldap = (
+            (
+                await db.execute(
+                    select(UserOrgMembership).where(
+                        UserOrgMembership.user_id == existing.id,
+                        UserOrgMembership.source == "ldap",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        existing_pairs = {(m.organization_id, m.profile_id) for m in existing_ldap}
+        resolved_pairs = set(result.resolved_memberships)
+        to_add = resolved_pairs - existing_pairs
+        to_remove = existing_pairs - resolved_pairs
+
+        for m in existing_ldap:
+            if (m.organization_id, m.profile_id) in to_remove:
+                await db.delete(m)
+        for org_id, profile_id in to_add:
+            db.add(
+                UserOrgMembership(
+                    user_id=existing.id,
+                    organization_id=org_id,
+                    profile_id=profile_id,
+                    source="ldap",
+                )
+            )
+
+        action = "ldap_user_provisioned" if first_time else "ldap_membership_sync"
+        await audit_and_emit(
+            db,
+            actor_user_id=existing.id,
+            organization_id=existing.default_org_id,
+            action=action,
+            entity_type="user",
+            entity_id=existing.id,
+            diff={
+                "provider_id": str(result.provider_id),
+                "added": [[str(a), str(b)] for a, b in to_add],
+                "removed": [[str(a), str(b)] for a, b in to_remove],
+                "groups": result.matched_group_dns,
+            },
+            ip=request_ip,
+        )
+        await db.flush()
+        return existing

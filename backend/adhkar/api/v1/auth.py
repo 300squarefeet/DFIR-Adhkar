@@ -9,19 +9,33 @@ from uuid import UUID
 import redis.asyncio as redis_async
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adhkar.api.deps import CurrentUser, get_current_user, get_db, get_redis, get_settings
+from adhkar.auth.ldap_errors import (
+    LdapAllProvidersFailed,
+    LdapError,
+    LdapInvalidCredentials,
+    LdapNoAuthorizedGroup,
+    LdapUserNotFound,
+    status_code_for,
+)
+from adhkar.auth.ldap_service import BindResult, LdapAuthService
 from adhkar.auth.password import verify_password
 from adhkar.auth.tokens import ACCESS_TTL, REFRESH_TTL, issue_tokens, revoke_session, rotate_refresh
 from adhkar.core.settings import Settings
 from adhkar.core.source_ip import source_ip
-from adhkar.db.models import Profile, User, UserOrgMembership
+from adhkar.db.models import LdapProvider, Profile, User, UserOrgMembership
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 REFRESH_COOKIE = "adhkar_refresh"
+
+
+def _ldap_service_factory(settings: Settings, redis: Redis | None) -> LdapAuthService:  # type: ignore[type-arg]
+    return LdapAuthService(secret_key=settings.secret_key, redis=redis)
 
 
 class LoginRequest(BaseModel):
@@ -76,14 +90,59 @@ async def login(
     response: Response,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis | None, Depends(get_redis)],  # type: ignore[type-arg]
 ) -> LoginResponse:
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
-    if not user or not user.password_hash:
-        # Constant-ish: avoid email enumeration
-        verify_password("$argon2id$v=19$m=65536,t=2,p=2$decoy$decoy", body.password)
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
-    if not verify_password(user.password_hash, body.password):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+
+    local_ok = (
+        user is not None
+        and user.password_hash is not None
+        and verify_password(user.password_hash, body.password)
+    )
+
+    bind_result: BindResult | None = None
+    if not local_ok:
+        # Only fall back to LDAP if either:
+        #  (a) user does not exist, OR
+        #  (b) user exists but has no local password (SSO/LDAP-managed account).
+        # If user exists WITH a local password but it mismatched, we DO NOT
+        # try LDAP — that would let an attacker pivot through a local account
+        # to an LDAP server.
+        ldap_eligible = user is None or user.password_hash is None
+        if not ldap_eligible:
+            verify_password("$argon2id$v=19$m=65536,t=2,p=2$decoy$decoy", body.password)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+
+        providers = (
+            (
+                await db.execute(
+                    select(LdapProvider).where(
+                        LdapProvider.enabled.is_(True), LdapProvider.deleted_at.is_(None)
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if providers is None:
+            verify_password("$argon2id$v=19$m=65536,t=2,p=2$decoy$decoy", body.password)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+
+        svc = _ldap_service_factory(settings, redis)
+        try:
+            bind_result = await svc.try_bind(db, email=body.email, password=body.password)
+        except (LdapInvalidCredentials, LdapUserNotFound) as exc:
+            raise HTTPException(status_code_for(exc), "invalid_credentials") from exc
+        except LdapNoAuthorizedGroup as exc:
+            raise HTTPException(status_code_for(exc), "ldap_no_authorized_group") from exc
+        except LdapAllProvidersFailed as exc:
+            raise HTTPException(status_code_for(exc), "ldap_unavailable") from exc
+        except LdapError as exc:
+            raise HTTPException(status_code_for(exc), "invalid_credentials") from exc
+
+        user = await svc.upsert_user_and_memberships(db, bind_result, request_ip=source_ip(request))
+
+    assert user is not None
     if user.status == "pending_invite":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "invite_pending")
     if user.status == "locked":
