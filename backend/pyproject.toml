@@ -121,8 +121,8 @@ filterwarnings = [
   "ignore:The wait_for_logs function with string or callable predicates is deprecated:DeprecationWarning",
   # asyncio StreamWriter and asyncpg/redis connections can emit ResourceWarning when
   # the event loop is closed in ASGI tests before background tasks finish cleanup.
-  "ignore:loop is closed:ResourceWarning",
-  "ignore:unclosed:ResourceWarning",
+  "ignore:loop is closed:ResourceWarning:tests\\.integration",
+  "ignore:unclosed:ResourceWarning:tests\\.integration",
 ]
 
 # ----- coverage -----

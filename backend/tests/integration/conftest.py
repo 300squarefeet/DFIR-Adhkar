@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+import sys
 import time
 
 import pytest
@@ -210,7 +211,13 @@ def _exec_ldap(cid: str, cmd: str, stdin: str | None = None) -> None:
         full_cmd = ["docker", "exec", cid, "bash", "-c", cmd]
         result = subprocess.run(full_cmd, capture_output=True)
 
-    if result.returncode not in (0, 68):  # 68 = entry already exists (ldapadd)
+    if result.returncode == 68:  # LDAP_ALREADY_EXISTS — idempotent seed
+        print(
+            f"  [openldap seed] rc=68 LDAP_ALREADY_EXISTS for entries; "
+            f"tolerating (idempotent): {result.stderr.decode(errors='replace')[:200]}",
+            file=sys.stderr,
+        )
+    elif result.returncode != 0:
         raise RuntimeError(
             f"ldap command failed (rc={result.returncode}):\n"
             f"  cmd: {cmd}\n"

@@ -124,7 +124,9 @@ async def test_first_login_auto_provisions_user_and_membership(app_and_provider)
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_wrong_password_returns_401(app_and_provider) -> None:
-    app, _ = app_and_provider
+    from adhkar.db.models import User
+
+    app, ctx = app_and_provider
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://t") as c:
         r = await c.post(
@@ -133,12 +135,25 @@ async def test_wrong_password_returns_401(app_and_provider) -> None:
         )
     assert r.status_code == 401
 
+    engine = create_async_engine(ctx["services"]["database_url"])
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as s:
+            user_row = (
+                await s.execute(select(User).where(User.email == "alice@corp.com"))
+            ).scalar_one_or_none()
+            assert user_row is None, "wrong password must not provision a User row"
+    finally:
+        await engine.dispose()
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_unmapped_group_user_returns_403(app_and_provider) -> None:
     """mallory is in Marketing which has no LdapGroupMapping -> 403."""
-    app, _ = app_and_provider
+    from adhkar.db.models import User
+
+    app, ctx = app_and_provider
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://t") as c:
         r = await c.post(
@@ -146,6 +161,18 @@ async def test_unmapped_group_user_returns_403(app_and_provider) -> None:
             json={"email": "mallory@corp.com", "password": "mallory-pw"},
         )
     assert r.status_code == 403, r.text
+    assert r.json()["detail"] == "ldap_no_authorized_group"
+
+    engine = create_async_engine(ctx["services"]["database_url"])
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as s:
+            user_row = (
+                await s.execute(select(User).where(User.email == "mallory@corp.com"))
+            ).scalar_one_or_none()
+            assert user_row is None, "unmapped group must not provision a User row"
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.integration
