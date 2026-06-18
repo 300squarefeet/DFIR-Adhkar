@@ -62,3 +62,5 @@ def test_render_filter_hex_escapes_per_rfc4515() -> None:
     )
     assert cfg.render_filter("a*b(c)d") == r"(mail=a\2ab\28c\29d)"
     assert cfg.render_filter("plain@corp.com") == "(mail=plain@corp.com)"
+    assert cfg.render_filter("a\\b") == r"(mail=a\5cb)"
+    assert cfg.render_filter("a\x00b") == r"(mail=a\00b)"
