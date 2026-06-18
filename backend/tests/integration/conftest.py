@@ -1,15 +1,19 @@
 """Shared session-scoped pg+redis+minio docker stack for integration tests.
 
-Each test file consumes the `services` fixture and receives a dict of
-URLs. Tests apply Alembic migrations at test setup time and roll back
-per-test changes via savepoints (handled inside each test file).
+Each test file consumes the `services` fixture and receives a dict of URLs.
+A function-scoped autouse `_db_clean` fixture truncates all non-Alembic
+tables between tests, so the session-shared database appears empty to each
+test while only paying the container-boot cost once.
 
-In CI the fixture honors DATABASE_URL/REDIS_URL service-container env
-vars and skips the docker boot. Local runs require Docker; missing
-docker triggers pytest.skip, not test failure."""
+In CI the `services` fixture honors DATABASE_URL/REDIS_URL service-container
+env vars and skips the docker boot. Local runs require Docker; missing
+docker triggers pytest.skip, not test failure. (Env-var mode is ignored
+when docker is also available — that's intentional, kept for explicit
+local testing.)"""
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 import pytest
@@ -59,3 +63,45 @@ def services():
         pg.stop()
         rd.stop()
         s3.stop()
+
+
+@pytest.fixture(autouse=True)
+def _db_clean(request):
+    """Truncate every non-Alembic table between tests so the session-shared
+    database appears empty per test. Skipped for tests that don't request the
+    `services` fixture (cheap no-op for unit-style integration tests like the
+    openapi smoke)."""
+    # Only run when the test actually pulls services in (avoid forcing every
+    # tests/integration/ test through the docker fixture).
+    if "services" not in request.fixturenames:
+        yield
+        return
+
+    services = request.getfixturevalue("services")
+    yield  # run test first
+
+    # Post-test: TRUNCATE all user tables in one statement.
+    async def _truncate() -> None:
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        engine = create_async_engine(services["database_url"])
+        try:
+            async with engine.connect() as conn:
+                # Discover all tables in public schema except alembic_version.
+                rows = (
+                    await conn.execute(
+                        text(
+                            "SELECT tablename FROM pg_tables "
+                            "WHERE schemaname = 'public' AND tablename != 'alembic_version'"
+                        )
+                    )
+                ).fetchall()
+                if rows:
+                    names = ", ".join(f'"{r[0]}"' for r in rows)
+                    await conn.execute(text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
+                    await conn.commit()
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_truncate())

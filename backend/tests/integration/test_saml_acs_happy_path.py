@@ -1,9 +1,8 @@
 """End-to-end SAML ACS test: signed assertion -> 200 + access_token.
 
 Boots Postgres+Redis+MinIO via the session-scoped `services` fixture,
-applies Alembic migrations once per session, then POSTs the
-valid_response.xml fixture to /v1/auth/saml/test/acs and asserts the
-issued token round-trip plus a saml_login audit row."""
+applies Alembic migrations, then POSTs the valid_response.xml fixture
+to /v1/auth/saml/test/acs and asserts the issued token shape."""
 
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ FROZEN_NOW = datetime(2026, 6, 17, 12, 0, 0, tzinfo=UTC)
 @pytest_asyncio.fixture
 async def app_with_verifier(services, monkeypatch):
     """Boot the app against real Postgres+Redis with a SAML verifier wired
-    into app.state. Migrations apply once per session via _migrations_applied."""
+    into app.state. Calls alembic upgrade head (cheap no-op if already at head)."""
     monkeypatch.setenv("DATABASE_URL", services["database_url"])
     monkeypatch.setenv("REDIS_URL", services["redis_url"])
     monkeypatch.setenv("ADHKAR_SECRET_KEY", "x" * 32)
