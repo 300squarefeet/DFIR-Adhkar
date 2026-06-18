@@ -20,7 +20,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Shared fixture
+// Shared fixture — matches LdapProviderOut (all fields)
 // ---------------------------------------------------------------------------
 
 const PROVIDER_1 = {
@@ -33,6 +33,12 @@ const PROVIDER_1 = {
   priority: 10,
   tls_required: true,
   allow_insecure: false,
+  user_search_filter: "(mail={input})",
+  user_id_attr: "sAMAccountName",
+  user_email_attr: "mail",
+  user_display_name_attr: "displayName",
+  group_membership_attr: "memberOf",
+  timeout_seconds: 5,
 };
 
 // Org + profile lists (returned by /v1/organizations and /v1/profiles when
@@ -40,12 +46,15 @@ const PROVIDER_1 = {
 const ORGS = [{ id: "org1", name: "ACME Corp" }];
 const PROFILES = [{ id: "prof1", name: "Analyst" }];
 
-// Helper: seed the first mockApiCall response with the provider list, then
-// fall through to org+profile stubs for subsequent calls.
+// Helper: seed the first mockApiCall response with the provider list + empty
+// mappings count fan-out, then fall through for subsequent calls.
 function seedProviderList(providers = [PROVIDER_1]) {
-  mockApiCall
-    .mockResolvedValueOnce(providers) // GET /v1/admin/ldap-providers
-    .mockResolvedValue([]); // fallback for any subsequent call
+  // Initial GET /v1/admin/ldap-providers
+  mockApiCall.mockResolvedValueOnce(providers);
+  // Fan-out: one GET /{id}/mappings per provider for count
+  providers.forEach(() => mockApiCall.mockResolvedValueOnce([]));
+  // Fallback for any subsequent calls
+  mockApiCall.mockResolvedValue([]);
 }
 
 describe("AdminLdapPage", () => {
@@ -74,6 +83,7 @@ describe("AdminLdapPage", () => {
   it("Test button shows OK result inline", async () => {
     mockApiCall
       .mockResolvedValueOnce([PROVIDER_1]) // initial list
+      .mockResolvedValueOnce([])           // fan-out mappings count p1
       .mockResolvedValueOnce({             // test-connection POST
         ok: true,
         server_uri_used: "ldaps://dc01:636",
@@ -99,6 +109,7 @@ describe("AdminLdapPage", () => {
   it("Test button shows error result inline on failure", async () => {
     mockApiCall
       .mockResolvedValueOnce([PROVIDER_1])
+      .mockResolvedValueOnce([])           // fan-out mappings count
       .mockResolvedValueOnce({
         ok: false,
         server_uri_used: null,
@@ -124,11 +135,13 @@ describe("AdminLdapPage", () => {
   // -------------------------------------------------------------------------
 
   it("Create form submits a POST and closes the drawer on success", async () => {
-    seedProviderList([]);
+    // Initial empty list + no fan-out (no providers)
+    mockApiCall.mockResolvedValueOnce([]);
     // POST /v1/admin/ldap-providers → new provider
     mockApiCall.mockResolvedValueOnce(PROVIDER_1);
-    // Refresh after save
+    // Refresh after save: list + fan-out count
     mockApiCall.mockResolvedValueOnce([PROVIDER_1]);
+    mockApiCall.mockResolvedValueOnce([]); // mappings count for p1
 
     render(<AdminLdapPage />);
     // Wait for initial render (empty list)
@@ -179,6 +192,7 @@ describe("AdminLdapPage", () => {
 
     mockApiCall
       .mockResolvedValueOnce([PROVIDER_1]) // initial provider list
+      .mockResolvedValueOnce([])          // fan-out: GET mappings count p1
       .mockResolvedValueOnce([])          // GET mappings (expand)
       .mockResolvedValueOnce(ORGS)        // GET /v1/organizations
       .mockResolvedValueOnce(PROFILES)    // GET /v1/profiles
@@ -231,30 +245,96 @@ describe("AdminLdapPage", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 6. Soft-delete confirm flow
+  // 6. Soft-delete — inline M3 confirm panel flow
   // -------------------------------------------------------------------------
 
-  it("soft-delete calls DELETE after window.confirm returns true", async () => {
+  it("soft-delete calls DELETE after inline confirm panel is confirmed", async () => {
     seedProviderList();
-    // Refresh after delete
+    // Refresh after delete: empty list + no fan-out
     mockApiCall.mockResolvedValueOnce([]);
-
-    // Intercept window.confirm
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(<AdminLdapPage />);
     await screen.findByTestId("provider-row-corp-ad");
 
+    // Click Delete — should show the confirmation panel, not call DELETE yet
     await userEvent.click(screen.getByLabelText("Delete corp-ad"));
 
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(screen.getByTestId("delete-confirm-panel")).toBeInTheDocument();
+    expect(screen.getByText(/Soft-delete provider/i)).toBeInTheDocument();
+
+    // Confirm the deletion
+    await userEvent.click(screen.getByTestId("delete-confirm-button"));
+
     await waitFor(() =>
       expect(mockApiCall).toHaveBeenCalledWith(
         "/v1/admin/ldap-providers/p1",
         expect.objectContaining({ method: "DELETE" }),
       ),
     );
+  });
 
-    confirmSpy.mockRestore();
+  // -------------------------------------------------------------------------
+  // 7. Advanced drawer fields are rendered and pre-populated
+  // -------------------------------------------------------------------------
+
+  it("test_edit_drawer_renders_advanced_fields: opens drawer, shows advanced fields pre-populated", async () => {
+    seedProviderList();
+
+    render(<AdminLdapPage />);
+    await screen.findByTestId("provider-row-corp-ad");
+
+    // Open Edit drawer for existing provider
+    await userEvent.click(screen.getByText("Edit"));
+    expect(screen.getByTestId("provider-drawer")).toBeInTheDocument();
+
+    // Open the Advanced section
+    await userEvent.click(screen.getByTestId("advanced-section-toggle"));
+
+    // All 6 advanced inputs should be present and pre-populated
+    const filterInput = screen.getByLabelText(/User search filter/i);
+    expect(filterInput).toBeInTheDocument();
+    expect(filterInput).toHaveValue(PROVIDER_1.user_search_filter);
+
+    const idAttrInput = screen.getByLabelText(/User ID attribute/i);
+    expect(idAttrInput).toBeInTheDocument();
+    expect(idAttrInput).toHaveValue(PROVIDER_1.user_id_attr);
+
+    const emailAttrInput = screen.getByLabelText(/User email attribute/i);
+    expect(emailAttrInput).toBeInTheDocument();
+    expect(emailAttrInput).toHaveValue(PROVIDER_1.user_email_attr);
+
+    const displayNameAttrInput = screen.getByLabelText(/User display name attribute/i);
+    expect(displayNameAttrInput).toBeInTheDocument();
+    expect(displayNameAttrInput).toHaveValue(PROVIDER_1.user_display_name_attr);
+
+    const groupMembershipAttrInput = screen.getByLabelText(/Group membership attribute/i);
+    expect(groupMembershipAttrInput).toBeInTheDocument();
+    expect(groupMembershipAttrInput).toHaveValue(PROVIDER_1.group_membership_attr);
+
+    const timeoutInput = screen.getByLabelText(/Timeout \(seconds\)/i);
+    expect(timeoutInput).toBeInTheDocument();
+    expect(timeoutInput).toHaveValue(PROVIDER_1.timeout_seconds);
+  });
+
+  // -------------------------------------------------------------------------
+  // 8. Mappings count is displayed in the provider table
+  // -------------------------------------------------------------------------
+
+  it("test_mappings_count_displayed_in_table: shows count from fan-out fetch", async () => {
+    const mapping1 = { id: "m1", ldap_provider_id: "p1", group_dn: "CN=A,DC=corp,DC=com", organization_id: "org1", profile_id: "prof1" };
+    const mapping2 = { id: "m2", ldap_provider_id: "p1", group_dn: "CN=B,DC=corp,DC=com", organization_id: "org1", profile_id: "prof1" };
+    const mapping3 = { id: "m3", ldap_provider_id: "p1", group_dn: "CN=C,DC=corp,DC=com", organization_id: "org1", profile_id: "prof1" };
+
+    mockApiCall
+      .mockResolvedValueOnce([PROVIDER_1])                    // GET /v1/admin/ldap-providers
+      .mockResolvedValueOnce([mapping1, mapping2, mapping3]); // fan-out: GET p1/mappings
+
+    render(<AdminLdapPage />);
+    await screen.findByTestId("provider-row-corp-ad");
+
+    // The mapping count cell should show "3"
+    await waitFor(() =>
+      expect(screen.getByTestId("mapping-count-p1")).toHaveTextContent("3"),
+    );
   });
 });

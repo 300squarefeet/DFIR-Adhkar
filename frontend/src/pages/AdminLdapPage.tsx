@@ -5,6 +5,11 @@
  * (bind_password is write-only — presence means rotate), per-provider
  * mappings table with inline Add / Delete, and a Test-connection button
  * that shows ok/error inline per row.
+ *
+ * Future-work: The mapping-count fan-out is O(N) parallel fetches on every
+ * page load. For admin pages with low provider cardinality (<20) this is fine.
+ * A future optimisation could be a single batch endpoint
+ * GET /v1/admin/ldap-providers?include_mapping_counts=true.
  */
 
 import { Fragment, useEffect, useState } from "react";
@@ -12,7 +17,7 @@ import { Fragment, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
-// Interfaces (mirror the backend schemas)
+// Interfaces (mirror the backend schemas — LdapProviderOut canonical shape)
 // ---------------------------------------------------------------------------
 
 interface LdapProvider {
@@ -21,6 +26,12 @@ interface LdapProvider {
   server_uris: string[];
   bind_dn: string;
   base_dn: string;
+  user_search_filter: string;
+  user_id_attr: string;
+  user_email_attr: string;
+  user_display_name_attr: string;
+  group_membership_attr: string;
+  timeout_seconds: number;
   enabled: boolean;
   priority: number;
   tls_required: boolean;
@@ -60,8 +71,10 @@ export function AdminLdapPage() {
   const { apiCall } = useAuth();
 
   const [providers, setProviders] = useState<LdapProvider[]>([]);
+  const [mappingCounts, setMappingCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<LdapProvider | "new" | null>(null);
+  const [deleting, setDeleting] = useState<LdapProvider | null>(null);
   const [mappings, setMappings] = useState<Record<string, LdapGroupMapping[]>>({});
   const [testResult, setTestResult] = useState<Record<string, TestConnectionResult>>({});
   const [testBusy, setTestBusy] = useState<Record<string, boolean>>({});
@@ -71,14 +84,44 @@ export function AdminLdapPage() {
     try {
       const list = await apiCall<LdapProvider[]>("/v1/admin/ldap-providers");
       setProviders(list);
+      setError(null);
+      // Fan-out: fetch mapping counts in parallel (N+1, bounded for admin page)
+      const counts = await Promise.all(
+        list.map((p) =>
+          apiCall<LdapGroupMapping[]>(`/v1/admin/ldap-providers/${p.id}/mappings`)
+            .then((ms) => [p.id, ms.length] as const)
+            .catch(() => [p.id, 0] as const),
+        ),
+      );
+      setMappingCounts(Object.fromEntries(counts));
     } catch (e) {
       setError((e as Error).message);
     }
   };
 
   useEffect(() => {
-    void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    apiCall<LdapProvider[]>("/v1/admin/ldap-providers")
+      .then(async (list) => {
+        if (cancelled) return;
+        setProviders(list);
+        setError(null);
+        // Fan-out: fetch mapping counts in parallel
+        const counts = await Promise.all(
+          list.map((p) =>
+            apiCall<LdapGroupMapping[]>(`/v1/admin/ldap-providers/${p.id}/mappings`)
+              .then((ms) => [p.id, ms.length] as const)
+              .catch(() => [p.id, 0] as const),
+          ),
+        );
+        if (!cancelled) setMappingCounts(Object.fromEntries(counts));
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [apiCall]);
 
   const refreshMappings = async (providerId: string) => {
@@ -87,6 +130,7 @@ export function AdminLdapPage() {
         `/v1/admin/ldap-providers/${providerId}/mappings`,
       );
       setMappings((m) => ({ ...m, [providerId]: data }));
+      setMappingCounts((c) => ({ ...c, [providerId]: data.length }));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -115,13 +159,10 @@ export function AdminLdapPage() {
     }
   };
 
-  const softDelete = async (provider: LdapProvider) => {
-    if (
-      !window.confirm(
-        `Delete provider "${provider.name}"? This will disable LDAP authentication for this directory.`,
-      )
-    )
-      return;
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    const provider = deleting;
+    setDeleting(null);
     try {
       await apiCall(`/v1/admin/ldap-providers/${provider.id}`, { method: "DELETE" });
       await refresh();
@@ -136,22 +177,6 @@ export function AdminLdapPage() {
     if (next) void refreshMappings(next);
   };
 
-  if (error)
-    return (
-      <section className="p-6">
-        <p role="alert" className="rounded bg-severity-4/20 p-3 text-severity-4">
-          {error}
-        </p>
-        <button
-          type="button"
-          className="mt-2 text-sm text-md-sys-color-primary underline"
-          onClick={() => setError(null)}
-        >
-          Dismiss
-        </button>
-      </section>
-    );
-
   return (
     <section className="space-y-4 p-6">
       <div className="flex items-center justify-between">
@@ -165,7 +190,56 @@ export function AdminLdapPage() {
         </button>
       </div>
 
-      {providers.length === 0 ? (
+      {/* Inline error banner — stays above table so the user can keep working */}
+      {error && (
+        <div className="flex items-start gap-3 rounded bg-severity-4/20 p-3">
+          <p role="alert" className="flex-1 text-sm text-severity-4">
+            {error}
+          </p>
+          <button
+            type="button"
+            className="shrink-0 text-sm text-md-sys-color-primary underline"
+            onClick={() => {
+              void refresh();
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Inline M3-style delete confirmation panel */}
+      {deleting !== null && (
+        <div
+          data-testid="delete-confirm-panel"
+          className="flex items-center gap-3 rounded border border-severity-4/30 bg-severity-4/10 p-3"
+        >
+          <p className="flex-1 text-sm">
+            Soft-delete provider{" "}
+            <span className="font-semibold">{deleting.name}</span>? This will
+            disable LDAP authentication for this directory.
+          </p>
+          <button
+            type="button"
+            className="rounded-full border border-md-sys-color-outline-variant px-3 py-1 text-sm hover:bg-md-sys-color-surface-container"
+            onClick={() => setDeleting(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rounded-full bg-severity-4 px-3 py-1 text-sm font-medium text-white hover:brightness-110"
+            data-testid="delete-confirm-button"
+            onClick={() => {
+              void confirmDelete();
+            }}
+          >
+            Confirm delete
+          </button>
+        </div>
+      )}
+
+      {providers.length === 0 && !error ? (
         <p className="text-sm text-md-sys-color-on-surface-variant">
           No LDAP providers configured.
         </p>
@@ -239,15 +313,23 @@ export function AdminLdapPage() {
                       </div>
                     </td>
                     <td className="py-2 pr-3">
-                      <button
-                        type="button"
-                        className="text-xs text-md-sys-color-primary underline hover:opacity-80"
-                        onClick={() => toggleExpand(p.id)}
-                        aria-expanded={isExpanded}
-                        aria-label={`Mappings for ${p.name}`}
-                      >
-                        {isExpanded ? "Hide" : "Mappings"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <span
+                          data-testid={`mapping-count-${p.id}`}
+                          className="text-xs text-md-sys-color-on-surface-variant"
+                        >
+                          {mappingCounts[p.id] ?? "–"}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs text-md-sys-color-primary underline hover:opacity-80"
+                          onClick={() => toggleExpand(p.id)}
+                          aria-expanded={isExpanded}
+                          aria-label={`Mappings for ${p.name}`}
+                        >
+                          {isExpanded ? "Hide" : "Show"}
+                        </button>
+                      </div>
                     </td>
                     <td className="py-2">
                       <div className="flex items-center gap-2">
@@ -261,9 +343,7 @@ export function AdminLdapPage() {
                         <button
                           type="button"
                           className="rounded-full border border-severity-4/40 px-3 py-0.5 text-xs text-severity-4 hover:bg-severity-4/10"
-                          onClick={() => {
-                            void softDelete(p);
-                          }}
+                          onClick={() => setDeleting(p)}
                           aria-label={`Delete ${p.name}`}
                         >
                           Delete
@@ -315,6 +395,16 @@ interface ProviderDrawerProps {
   onSaved: () => Promise<void>;
 }
 
+// Defaults matching LdapProviderIn backend defaults
+const ADV_DEFAULTS = {
+  user_search_filter: "(mail={input})",
+  user_id_attr: "sAMAccountName",
+  user_email_attr: "mail",
+  user_display_name_attr: "displayName",
+  group_membership_attr: "memberOf",
+  timeout_seconds: 5,
+};
+
 function ProviderDrawer({ provider, onClose, onSaved }: ProviderDrawerProps) {
   const { apiCall } = useAuth();
 
@@ -327,6 +417,27 @@ function ProviderDrawer({ provider, onClose, onSaved }: ProviderDrawerProps) {
   const [priority, setPriority] = useState(provider?.priority ?? 10);
   const [tlsRequired, setTlsRequired] = useState(provider?.tls_required ?? true);
   const [allowInsecure, setAllowInsecure] = useState(provider?.allow_insecure ?? false);
+
+  // Advanced fields
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [userSearchFilter, setUserSearchFilter] = useState(
+    provider?.user_search_filter ?? ADV_DEFAULTS.user_search_filter,
+  );
+  const [userIdAttr, setUserIdAttr] = useState(
+    provider?.user_id_attr ?? ADV_DEFAULTS.user_id_attr,
+  );
+  const [userEmailAttr, setUserEmailAttr] = useState(
+    provider?.user_email_attr ?? ADV_DEFAULTS.user_email_attr,
+  );
+  const [userDisplayNameAttr, setUserDisplayNameAttr] = useState(
+    provider?.user_display_name_attr ?? ADV_DEFAULTS.user_display_name_attr,
+  );
+  const [groupMembershipAttr, setGroupMembershipAttr] = useState(
+    provider?.group_membership_attr ?? ADV_DEFAULTS.group_membership_attr,
+  );
+  const [timeoutSeconds, setTimeoutSeconds] = useState(
+    provider?.timeout_seconds ?? ADV_DEFAULTS.timeout_seconds,
+  );
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -355,6 +466,12 @@ function ProviderDrawer({ provider, onClose, onSaved }: ProviderDrawerProps) {
             priority,
             tls_required: tlsRequired,
             allow_insecure: allowInsecure,
+            user_search_filter: userSearchFilter,
+            user_id_attr: userIdAttr,
+            user_email_attr: userEmailAttr,
+            user_display_name_attr: userDisplayNameAttr,
+            group_membership_attr: groupMembershipAttr,
+            timeout_seconds: timeoutSeconds,
           }),
         });
       } else {
@@ -371,6 +488,25 @@ function ProviderDrawer({ provider, onClose, onSaved }: ProviderDrawerProps) {
         // Only include bind_password when the user actually typed something
         if (bindPassword.length > 0) {
           patch.bind_password = bindPassword;
+        }
+        // Advanced fields — only include when changed to avoid noisy diffs
+        if (userSearchFilter !== provider.user_search_filter) {
+          patch.user_search_filter = userSearchFilter;
+        }
+        if (userIdAttr !== provider.user_id_attr) {
+          patch.user_id_attr = userIdAttr;
+        }
+        if (userEmailAttr !== provider.user_email_attr) {
+          patch.user_email_attr = userEmailAttr;
+        }
+        if (userDisplayNameAttr !== provider.user_display_name_attr) {
+          patch.user_display_name_attr = userDisplayNameAttr;
+        }
+        if (groupMembershipAttr !== provider.group_membership_attr) {
+          patch.group_membership_attr = groupMembershipAttr;
+        }
+        if (timeoutSeconds !== provider.timeout_seconds) {
+          patch.timeout_seconds = timeoutSeconds;
         }
         await apiCall<LdapProvider>(`/v1/admin/ldap-providers/${provider.id}`, {
           method: "PATCH",
@@ -536,6 +672,106 @@ function ProviderDrawer({ provider, onClose, onSaved }: ProviderDrawerProps) {
               />
               Allow insecure (plain LDAP)
             </label>
+          </div>
+
+          {/* Advanced LDAP settings (collapsible) */}
+          <div className="rounded border border-md-sys-color-outline-variant">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-md-sys-color-on-surface-variant hover:bg-md-sys-color-surface-container"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((o) => !o)}
+              data-testid="advanced-section-toggle"
+            >
+              <span>Advanced LDAP settings</span>
+              <span aria-hidden className="material-symbols-rounded text-[18px]">
+                {advancedOpen ? "expand_less" : "expand_more"}
+              </span>
+            </button>
+
+            {advancedOpen && (
+              <div className="space-y-3 border-t border-md-sys-color-outline-variant p-3">
+                <div>
+                  <label htmlFor="ldap-user-search-filter" className={labelCls}>
+                    User search filter
+                  </label>
+                  <input
+                    id="ldap-user-search-filter"
+                    className={inputCls}
+                    value={userSearchFilter}
+                    onChange={(e) => setUserSearchFilter(e.target.value)}
+                    placeholder={ADV_DEFAULTS.user_search_filter}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="ldap-user-id-attr" className={labelCls}>
+                    User ID attribute
+                  </label>
+                  <input
+                    id="ldap-user-id-attr"
+                    className={inputCls}
+                    value={userIdAttr}
+                    onChange={(e) => setUserIdAttr(e.target.value)}
+                    placeholder={ADV_DEFAULTS.user_id_attr}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="ldap-user-email-attr" className={labelCls}>
+                    User email attribute
+                  </label>
+                  <input
+                    id="ldap-user-email-attr"
+                    className={inputCls}
+                    value={userEmailAttr}
+                    onChange={(e) => setUserEmailAttr(e.target.value)}
+                    placeholder={ADV_DEFAULTS.user_email_attr}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="ldap-user-display-name-attr" className={labelCls}>
+                    User display name attribute
+                  </label>
+                  <input
+                    id="ldap-user-display-name-attr"
+                    className={inputCls}
+                    value={userDisplayNameAttr}
+                    onChange={(e) => setUserDisplayNameAttr(e.target.value)}
+                    placeholder={ADV_DEFAULTS.user_display_name_attr}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="ldap-group-membership-attr" className={labelCls}>
+                    Group membership attribute
+                  </label>
+                  <input
+                    id="ldap-group-membership-attr"
+                    className={inputCls}
+                    value={groupMembershipAttr}
+                    onChange={(e) => setGroupMembershipAttr(e.target.value)}
+                    placeholder={ADV_DEFAULTS.group_membership_attr}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="ldap-timeout-seconds" className={labelCls}>
+                    Timeout (seconds)
+                  </label>
+                  <input
+                    id="ldap-timeout-seconds"
+                    type="number"
+                    min={1}
+                    max={120}
+                    className={inputCls}
+                    value={timeoutSeconds}
+                    onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
