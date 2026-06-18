@@ -90,7 +90,7 @@ async def login(
     response: Response,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    redis: Annotated[Redis | None, Depends(get_redis)],  # type: ignore[type-arg]
+    redis: Annotated[Redis, Depends(get_redis)],  # type: ignore[type-arg]
 ) -> LoginResponse:
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
 
@@ -140,6 +140,7 @@ async def login(
         except LdapError as exc:
             raise HTTPException(status_code_for(exc), "invalid_credentials") from exc
 
+        assert bind_result is not None  # narrowed: all exception paths above raised
         user = await svc.upsert_user_and_memberships(db, bind_result, request_ip=source_ip(request))
 
     assert user is not None

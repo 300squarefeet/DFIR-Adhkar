@@ -282,5 +282,4 @@ class LdapAuthService:
             },
             ip=request_ip,
         )
-        await db.flush()
         return existing
