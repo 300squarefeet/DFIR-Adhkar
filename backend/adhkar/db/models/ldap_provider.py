@@ -15,8 +15,9 @@ from adhkar.db.models._common import IdMixin, SoftDeleteMixin, TimestampMixin
 
 class LdapProvider(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "ldap_providers"
+    __table_args__ = (UniqueConstraint("name", name="uq_ldap_providers_name"),)
 
-    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
     server_uris: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     bind_dn: Mapped[str] = mapped_column(String(500), nullable=False)
     bind_password_enc: Mapped[str] = mapped_column(String(500), nullable=False)
