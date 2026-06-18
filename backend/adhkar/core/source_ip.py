@@ -54,7 +54,9 @@ def source_ip(request: Request) -> str | None:
                 return candidate
     xri = request.headers.get("x-real-ip")
     if xri:
-        return xri.strip()
+        stripped = xri.strip()
+        if stripped:
+            return stripped
     if request.client is not None:
         return request.client.host
     return None

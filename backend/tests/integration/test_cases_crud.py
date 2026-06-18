@@ -1,4 +1,4 @@
-"""Integration: create -> patch -> soft-delete a case; verify audit trail."""
+"""Integration: create -> patch -> soft-delete a case; audit trail verified separately."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Integration: create observable -> attach to case -> similarity counts -> detach."""
+"""Integration: create observable -> attach to case -> detach (round-trip)."""
 
 from __future__ import annotations
 
@@ -81,6 +81,7 @@ async def test_observable_attach_detach_round_trip(app_against_services, service
             json={"title": "Obs round-trip", "severity": 2, "tlp": "amber"},
             headers=headers,
         )
+        assert r.status_code == 201, r.text
         case_id = r.json()["id"]
 
         # Create observable (unattached)
