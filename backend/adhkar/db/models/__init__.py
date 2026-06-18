@@ -12,6 +12,7 @@ from adhkar.db.models.case_link import CaseLink
 from adhkar.db.models.case_page import CasePage
 from adhkar.db.models.comment import Comment
 from adhkar.db.models.kb import CaseTemplate, KnowledgeBasePage
+from adhkar.db.models.ldap_provider import LdapGroupMapping, LdapProvider
 from adhkar.db.models.membership import UserOrgMembership
 from adhkar.db.models.mfa_secret import MfaSecret
 from adhkar.db.models.notification import (
@@ -46,6 +47,8 @@ __all__ = [
     "CaseTtp",
     "Comment",
     "KnowledgeBasePage",
+    "LdapGroupMapping",
+    "LdapProvider",
     "MfaSecret",
     "NotificationDelivery",
     "NotificationEndpoint",
