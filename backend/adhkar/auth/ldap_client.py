@@ -6,12 +6,17 @@ password into exception strings."""
 
 from __future__ import annotations
 
+import ssl
 from dataclasses import dataclass
 
 from ldap3 import ALL, Connection, Server, Tls
 from ldap3.core.exceptions import LDAPBindError, LDAPException, LDAPSocketOpenError
 
-from adhkar.auth.ldap_errors import LdapConnectionError, LdapInvalidCredentials
+from adhkar.auth.ldap_errors import (
+    LdapConnectionError,
+    LdapInvalidCredentials,
+    LdapServiceBindError,
+)
 
 
 def _build_connection(
@@ -23,7 +28,12 @@ def _build_connection(
     timeout: int,
 ) -> Connection:
     use_ssl = uri.startswith("ldaps://")
-    tls = Tls() if (tls_required and not allow_insecure) else None
+    if tls_required and not allow_insecure:
+        tls = Tls(validate=ssl.CERT_REQUIRED)
+    elif allow_insecure:
+        tls = Tls(validate=ssl.CERT_NONE)
+    else:
+        tls = None
     server = Server(uri, use_ssl=use_ssl, tls=tls, get_info=ALL, connect_timeout=timeout)
     return Connection(
         server,
@@ -61,13 +71,23 @@ class LdapClient:
                 self.timeout_seconds,
             )
             try:
-                if not conn.bind():
-                    raise LdapConnectionError(f"service-bind failed at {uri}")
-                conn.search(
-                    search_base=base_dn,
-                    search_filter=search_filter,
-                    attributes=attributes,
-                )
+                try:
+                    if not conn.bind():
+                        # bind returned False without raising — connection-class failure
+                        last_exc = LdapConnectionError(f"service-bind failed at {uri}")
+                        continue
+                except (LDAPSocketOpenError, LDAPException) as exc:
+                    last_exc = LdapConnectionError(f"service-bind failed at {uri}: {exc}")
+                    continue
+                # Bind succeeded — search failures are NOT a server-level retry signal
+                try:
+                    conn.search(
+                        search_base=base_dn,
+                        search_filter=search_filter,
+                        attributes=attributes,
+                    )
+                except LDAPException as exc:
+                    raise LdapServiceBindError(f"search failed at {uri}: {exc}") from exc
                 return [
                     {
                         "dn": entry.entry_dn,
@@ -75,9 +95,6 @@ class LdapClient:
                     }
                     for entry in conn.entries
                 ]
-            except (LDAPSocketOpenError, LDAPException) as exc:
-                last_exc = exc
-                continue
             finally:
                 try:
                     conn.unbind()
@@ -106,8 +123,12 @@ class LdapClient:
                 if conn.result and conn.result.get("description") == "invalidCredentials":
                     return False
                 raise LdapConnectionError(f"user-bind unexpected failure at {uri}")
-            except LDAPBindError:
-                return False
+            except LDAPBindError as exc:
+                desc = (conn.result or {}).get("description") if conn.result else None
+                if desc == "invalidCredentials":
+                    return False
+                last_exc = exc
+                continue
             except (LDAPSocketOpenError, LDAPException) as exc:
                 last_exc = exc
                 continue

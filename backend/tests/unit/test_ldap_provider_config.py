@@ -35,3 +35,30 @@ def test_validate_rejects_malformed_uri() -> None:
 
 def test_validate_accepts_ldap_and_ldaps_schemes() -> None:
     validate_server_uris(["ldap://dc01:389", "ldaps://dc02:636"])
+
+
+def test_render_filter_hex_escapes_per_rfc4515() -> None:
+    # Build a minimal cfg directly (no row) for filter test
+    from uuid import uuid4
+
+    from adhkar.auth.ldap_provider import LdapProviderConfig
+
+    cfg = LdapProviderConfig(
+        id=uuid4(),
+        name="t",
+        server_uris=["ldaps://x:636"],
+        bind_dn="x",
+        bind_password="x",
+        base_dn="x",
+        user_search_filter="(mail={input})",
+        user_id_attr="x",
+        user_email_attr="x",
+        user_display_name_attr="x",
+        group_membership_attr="x",
+        tls_required=True,
+        allow_insecure=False,
+        priority=100,
+        timeout_seconds=5,
+    )
+    assert cfg.render_filter("a*b(c)d") == r"(mail=a\2ab\28c\29d)"
+    assert cfg.render_filter("plain@corp.com") == "(mail=plain@corp.com)"

@@ -5,7 +5,6 @@ shape. Has zero database knowledge — pure transformation."""
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 from uuid import UUID
@@ -14,6 +13,8 @@ from adhkar.auth.crypto import decrypt
 from adhkar.db.models import LdapProvider
 
 _URI_SCHEMES = {"ldap", "ldaps"}
+
+_ESCAPE_MAP = {"\\": r"\5c", "*": r"\2a", "(": r"\28", ")": r"\29", "\x00": r"\00"}
 
 
 def validate_server_uris(uris: list[str]) -> None:
@@ -67,6 +68,6 @@ class LdapProviderConfig:
         )
 
     def render_filter(self, input_value: str) -> str:
-        """Substitute {input} placeholder with the LDAP-escaped value."""
-        escaped = re.sub(r"([\\*\(\)\x00])", r"\\\1", input_value)
+        """Substitute {input} placeholder with the LDAP-escaped value (RFC 4515)."""
+        escaped = "".join(_ESCAPE_MAP.get(c, c) for c in input_value)
         return self.user_search_filter.replace("{input}", escaped)
