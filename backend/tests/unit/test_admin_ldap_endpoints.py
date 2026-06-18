@@ -31,10 +31,13 @@ from adhkar.api.v1.admin_ldap import (
     LdapGroupMappingIn,
     LdapProviderIn,
     LdapProviderOut,
+    LdapProviderPatch,
     create_mapping,
     create_provider,
     delete_provider,
     get_provider,
+    list_mappings,
+    patch_provider,
 )
 from adhkar.api.v1.admin_ldap import (
     TestConnectionResult as ConnectionResult,
@@ -461,7 +464,9 @@ async def test_create_mapping_duplicate_returns_409() -> None:
     orig = Exception("duplicate key value violates unique constraint")
     integrity_error = IntegrityError(statement=None, params=None, orig=orig)
 
-    db = _make_db(flush_side_effect=integrity_error)
+    parent_row = _make_provider_row()
+    parent_row.id = provider_id
+    db = _make_db(get_result=parent_row, flush_side_effect=integrity_error)
     db.add = MagicMock()
     db.rollback = AsyncMock()
 
@@ -548,6 +553,123 @@ async def test_get_provider_returns_404_when_not_found() -> None:
         await get_provider(
             provider_id=provider_id,
             _user=user,
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Test 7: patch_provider updates fields and audits with correct field names
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_patch_provider_updates_fields_and_audits() -> None:
+    """patch_provider mutates row attrs and emits audit with sorted updated_fields."""
+    provider_id = uuid4()
+    provider_row = _make_provider_row()
+    provider_row.id = provider_id
+
+    user = _make_user()
+    settings = _make_settings()
+    db = _make_db(get_result=provider_row)
+
+    body = LdapProviderPatch(priority=200, enabled=False)
+
+    with patch("adhkar.api.v1.admin_ldap.audit_and_emit", new_callable=AsyncMock) as mock_audit:
+        mock_audit.return_value = (MagicMock(), MagicMock())
+        result = await patch_provider(
+            provider_id=provider_id,
+            body=body,
+            user=user,
+            db=db,
+            settings=settings,
+        )
+
+    assert isinstance(result, LdapProviderOut)
+    mock_audit.assert_awaited_once()
+    call_kwargs = mock_audit.call_args[1]
+    assert call_kwargs["action"] == "ldap_provider_updated"
+    assert call_kwargs["diff"]["updated_fields"] == ["enabled", "priority"]
+
+
+@pytest.mark.asyncio
+async def test_patch_provider_password_rotation_audits_bind_password_not_enc() -> None:
+    """patch_provider audit records 'bind_password', not the post-encrypt 'bind_password_enc'."""
+    provider_id = uuid4()
+    provider_row = _make_provider_row()
+    provider_row.id = provider_id
+
+    user = _make_user()
+    settings = _make_settings()
+    db = _make_db(get_result=provider_row)
+
+    body = LdapProviderPatch(bind_password="new-secret")
+
+    with patch("adhkar.api.v1.admin_ldap.audit_and_emit", new_callable=AsyncMock) as mock_audit:
+        mock_audit.return_value = (MagicMock(), MagicMock())
+        result = await patch_provider(
+            provider_id=provider_id,
+            body=body,
+            user=user,
+            db=db,
+            settings=settings,
+        )
+
+    assert isinstance(result, LdapProviderOut)
+    mock_audit.assert_awaited_once()
+    call_kwargs = mock_audit.call_args[1]
+    updated = call_kwargs["diff"]["updated_fields"]
+    assert "bind_password" in updated
+    assert "bind_password_enc" not in updated
+
+
+# ---------------------------------------------------------------------------
+# Test 8: list_mappings returns 404 for missing/deleted parent
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_mappings_returns_404_for_missing_parent() -> None:
+    """list_mappings raises 404 when parent LdapProvider does not exist."""
+    provider_id = uuid4()
+    user = _make_user()
+    db = _make_db(get_result=None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await list_mappings(
+            provider_id=provider_id,
+            _user=user,
+            db=db,
+        )
+
+    assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Test 9: create_mapping returns 404 for missing/deleted parent
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_mapping_returns_404_for_missing_parent() -> None:
+    """create_mapping raises 404 when parent LdapProvider does not exist."""
+    provider_id = uuid4()
+    user = _make_user()
+    db = _make_db(get_result=None)
+
+    body = LdapGroupMappingIn(
+        group_dn="cn=SOC,dc=corp,dc=com",
+        organization_id=uuid4(),
+        profile_id=uuid4(),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await create_mapping(
+            provider_id=provider_id,
+            body=body,
+            user=user,
             db=db,
         )
 

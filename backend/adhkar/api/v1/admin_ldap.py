@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -234,6 +235,7 @@ async def patch_provider(
     if row is None or row.deleted_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
     payload = body.model_dump(exclude_unset=True)
+    audit_fields = sorted(payload.keys())
     if "bind_password" in payload:
         payload["bind_password_enc"] = encrypt(
             payload.pop("bind_password").encode(), settings.secret_key
@@ -248,7 +250,7 @@ async def patch_provider(
         action="ldap_provider_updated",
         entity_type="ldap_provider",
         entity_id=row.id,
-        diff={"updated_fields": sorted(payload.keys())},
+        diff={"updated_fields": audit_fields},
         emit_outbox=True,
     )
     return _to_out(row)
@@ -292,7 +294,25 @@ async def test_connection(
     if row is None or row.deleted_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
 
-    cfg = LdapProviderConfig.from_row(row, settings.secret_key)
+    try:
+        cfg = LdapProviderConfig.from_row(row, settings.secret_key)
+    except InvalidToken:
+        await audit_and_emit(
+            db,
+            actor_user_id=user.user_id,
+            organization_id=user.org_id,
+            action="ldap_test_connection",
+            entity_type="ldap_provider",
+            entity_id=row.id,
+            diff={"ok": False, "error": "bind_password_decrypt_failed", "duration_ms": 0},
+        )
+        return TestConnectionResult(
+            ok=False,
+            server_uri_used=None,
+            error="bind_password_decrypt_failed",
+            duration_ms=0,
+        )
+
     client = LdapClient(
         server_uris=cfg.server_uris,
         tls_required=cfg.tls_required,
@@ -344,6 +364,9 @@ async def list_mappings(
     _user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[LdapGroupMappingOut]:
+    parent = await db.get(LdapProvider, provider_id)
+    if parent is None or parent.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
     rows = (
         (
             await db.execute(
@@ -367,6 +390,9 @@ async def create_mapping(
     user: Annotated[CurrentUser, Depends(require_permission("manageConfig"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> LdapGroupMappingOut:
+    parent = await db.get(LdapProvider, provider_id)
+    if parent is None or parent.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
     row = LdapGroupMapping(
         ldap_provider_id=provider_id,
         group_dn=body.group_dn,
