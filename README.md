@@ -6,6 +6,15 @@
 [![CI](https://github.com/<org>/adhkar-ir/actions/workflows/ci.yml/badge.svg)](https://github.com/<org>/adhkar-ir/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
+## Prerequisites
+
+SAML signature verification requires the `xmlsec1` binary and `libxmlsec1` headers. Install them before running `uv sync`:
+
+- **macOS:** `brew install libxmlsec1`
+- **Debian / Ubuntu:** `sudo apt-get install -y xmlsec1 libxmlsec1-dev`
+
+`backend/Dockerfile` and `.github/workflows/ci.yml` install these automatically; only fresh local clones need to do it manually.
+
 ## Quick start (local dev)
 
 ```bash
