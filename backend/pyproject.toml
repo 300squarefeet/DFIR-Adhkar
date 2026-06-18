@@ -99,7 +99,7 @@ no_implicit_reexport = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["qrcode", "qrcode.*", "respx.*", "saml2", "saml2.*", "testcontainers.*", "zxcvbn"]
+module = ["qrcode", "qrcode.*", "respx.*", "saml2", "saml2.*", "testcontainers.*", "zxcvbn", "ldap3", "ldap3.*"]
 ignore_missing_imports = true
 
 # ----- pytest -----
@@ -112,6 +112,9 @@ markers = [
 ]
 filterwarnings = [
   "error",
+  # pyasn1 0.6.x uses deprecated tagMap/typeMap attributes; ldap3 2.9.x triggers at import
+  "ignore:tagMap is deprecated:DeprecationWarning",
+  "ignore:typeMap is deprecated:DeprecationWarning",
 ]
 
 # ----- coverage -----
