@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
+import time
 
 import pytest
 
@@ -105,3 +107,113 @@ def _db_clean(request):
             await engine.dispose()
 
     asyncio.run(_truncate())
+
+
+@pytest.fixture(scope="session")
+def openldap_container():
+    """Session-scoped osixia/openldap:1.5.0 container seeded with 3 users + 2 groups.
+
+    Notes:
+    - bitnami/openldap:2.6 is no longer available on Docker Hub; osixia/openldap:1.5.0
+      is used instead (OpenLDAP 2.4.57, ships memberOf overlay pre-installed).
+    - The memberOf overlay defaults to groupOfUniqueNames/uniqueMember. We reconfigure
+      it for groupOfNames/member BEFORE adding data so that memberOf is populated.
+    - The admin DN is used as bind DN because the svc account has no read ACL
+      in osixia's default configuration (olcAccess gives "by * none").
+    - LDAP data is seeded by copying the LDIF file into the container and running
+      ldapadd; memberOf attributes are populated automatically by the overlay when
+      groups are added.
+    """
+    if not DOCKER_AVAILABLE:
+        pytest.skip("docker not available")
+
+    from pathlib import Path
+
+    from testcontainers.core.generic import DockerContainer
+    from testcontainers.core.waiting_utils import wait_for_logs
+
+    ldif = Path(__file__).parent / "fixtures" / "seed.ldif"
+
+    container = (
+        DockerContainer("osixia/openldap:1.5.0")
+        .with_env("LDAP_ORGANISATION", "Corp")
+        .with_env("LDAP_DOMAIN", "corp.com")
+        .with_env("LDAP_ADMIN_PASSWORD", "adminpw")
+        .with_env("LDAP_TLS", "false")
+        .with_exposed_ports(389)
+    )
+    container.start()
+    try:
+        # Wait until slapd is up and answering.
+        wait_for_logs(container, "slapd starting", timeout=60)
+        # Give slapd a moment to finish initialising after the log line.
+        time.sleep(2)
+
+        cid = container.get_wrapped_container().id
+
+        # ------------------------------------------------------------------
+        # Reconfigure memberOf overlay to track groupOfNames / member
+        # (osixia default is groupOfUniqueNames / uniqueMember).
+        # This MUST happen before data is loaded so memberOf is populated.
+        # ------------------------------------------------------------------
+        _exec_ldap(
+            cid,
+            "ldapmodify -x -H ldap://localhost:389 -D 'cn=admin,cn=config' -w 'config'",
+            stdin=(
+                "dn: olcOverlay={0}memberof,olcDatabase={1}mdb,cn=config\n"
+                "changetype: modify\n"
+                "replace: olcMemberOfGroupOC\n"
+                "olcMemberOfGroupOC: groupOfNames\n"
+                "-\n"
+                "replace: olcMemberOfMemberAD\n"
+                "olcMemberOfMemberAD: member\n"
+            ),
+        )
+
+        # ------------------------------------------------------------------
+        # Copy the LDIF into the container and seed the directory.
+        # ------------------------------------------------------------------
+        subprocess.run(
+            ["docker", "cp", str(ldif), f"{cid}:/tmp/seed.ldif"],
+            check=True,
+            capture_output=True,
+        )
+        _exec_ldap(
+            cid,
+            "ldapadd -x -H ldap://localhost:389"
+            " -D 'cn=admin,dc=corp,dc=com' -w 'adminpw' -f /tmp/seed.ldif",
+        )
+
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(389)
+        yield {
+            "uri": f"ldap://{host}:{port}",
+            # osixia default ACLs deny non-admin reads; use admin as bind DN.
+            "bind_dn": "cn=admin,dc=corp,dc=com",
+            "bind_pw": "adminpw",
+        }
+    finally:
+        container.stop()
+
+
+def _exec_ldap(cid: str, cmd: str, stdin: str | None = None) -> None:
+    """Run cmd inside the container via 'docker exec'. Raises on non-zero exit."""
+    if stdin is not None:
+        # Pipe stdin via bash -c so heredoc-style input works.
+        full_cmd = ["docker", "exec", "-i", cid, "bash", "-c", cmd]
+        result = subprocess.run(
+            full_cmd,
+            input=stdin.encode(),
+            capture_output=True,
+        )
+    else:
+        full_cmd = ["docker", "exec", cid, "bash", "-c", cmd]
+        result = subprocess.run(full_cmd, capture_output=True)
+
+    if result.returncode not in (0, 68):  # 68 = entry already exists (ldapadd)
+        raise RuntimeError(
+            f"ldap command failed (rc={result.returncode}):\n"
+            f"  cmd: {cmd}\n"
+            f"  stdout: {result.stdout.decode(errors='replace')}\n"
+            f"  stderr: {result.stderr.decode(errors='replace')}"
+        )

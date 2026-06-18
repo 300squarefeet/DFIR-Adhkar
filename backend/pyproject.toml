@@ -115,6 +115,14 @@ filterwarnings = [
   # pyasn1 0.6.x uses deprecated tagMap/typeMap attributes; ldap3 2.9.x triggers at import
   "ignore:tagMap is deprecated:DeprecationWarning",
   "ignore:typeMap is deprecated:DeprecationWarning",
+  # testcontainers >=4.x emits DeprecationWarnings for legacy @wait_container_is_ready
+  # and wait_for_logs(str) usage; suppress both until the library is updated.
+  "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning",
+  "ignore:The wait_for_logs function with string or callable predicates is deprecated:DeprecationWarning",
+  # asyncio StreamWriter and asyncpg/redis connections can emit ResourceWarning when
+  # the event loop is closed in ASGI tests before background tasks finish cleanup.
+  "ignore:loop is closed:ResourceWarning",
+  "ignore:unclosed:ResourceWarning",
 ]
 
 # ----- coverage -----

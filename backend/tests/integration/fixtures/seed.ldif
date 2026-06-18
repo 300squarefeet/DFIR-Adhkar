@@ -1,0 +1,52 @@
+# Base OUs
+dn: ou=users,dc=corp,dc=com
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=corp,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+# Service account (bind account for LDAP auth service)
+dn: cn=svc,dc=corp,dc=com
+objectClass: person
+cn: svc
+sn: svc
+userPassword: svc-pw
+
+# Users
+dn: cn=alice,ou=users,dc=corp,dc=com
+objectClass: inetOrgPerson
+cn: alice
+sn: Adams
+mail: alice@corp.com
+displayName: Alice Adams
+userPassword: alice-pw
+
+dn: cn=bob,ou=users,dc=corp,dc=com
+objectClass: inetOrgPerson
+cn: bob
+sn: Brown
+mail: bob@corp.com
+displayName: Bob Brown
+userPassword: bob-pw
+
+dn: cn=mallory,ou=users,dc=corp,dc=com
+objectClass: inetOrgPerson
+cn: mallory
+sn: Marlowe
+mail: mallory@corp.com
+displayName: Mallory Marlowe
+userPassword: mallory-pw
+
+# Groups (added AFTER memberOf overlay is configured for groupOfNames/member)
+dn: cn=SOC Analysts,ou=groups,dc=corp,dc=com
+objectClass: groupOfNames
+cn: SOC Analysts
+member: cn=alice,ou=users,dc=corp,dc=com
+member: cn=bob,ou=users,dc=corp,dc=com
+
+dn: cn=Marketing,ou=groups,dc=corp,dc=com
+objectClass: groupOfNames
+cn: Marketing
+member: cn=mallory,ou=users,dc=corp,dc=com
