@@ -170,6 +170,13 @@ interface PromotedAlert {
   created_at: string;
 }
 
+interface MyContrib {
+  user_id: string;
+  comment_count: number;
+  task_log_count: number;
+  audit_count: number;
+}
+
 const LINK_RELATIONS = [
   "related",
   "duplicate",
@@ -245,6 +252,7 @@ export function CaseDetailPage({ caseId }: Props) {
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
   const [avFilter, setAvFilter] = useState<string>("");
   const [promotedFrom, setPromotedFrom] = useState<PromotedAlert[]>([]);
+  const [myContrib, setMyContrib] = useState<MyContrib | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -438,6 +446,23 @@ export function CaseDetailPage({ caseId }: Props) {
         if (!cancelled) setPromotedFrom(rows);
       } catch {
         if (!cancelled) setPromotedFrom([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCall, caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiCall<MyContrib>(
+          `/v1/cases/${caseId}/contributors/me`,
+        );
+        if (!cancelled) setMyContrib(data);
+      } catch {
+        if (!cancelled) setMyContrib(null);
       }
     })();
     return () => {
@@ -957,6 +982,20 @@ export function CaseDetailPage({ caseId }: Props) {
             </a>
           ) : null}
         </div>
+        {myContrib !== null &&
+        myContrib.comment_count +
+          myContrib.task_log_count +
+          myContrib.audit_count >
+          0 ? (
+          <aside className="mt-1 inline-flex items-center gap-2 rounded-full bg-md-sys-color-surface-container px-3 py-0.5 text-xs">
+            <span className="font-medium">Your activity:</span>{" "}
+            <span>
+              {myContrib.comment_count} comments ·{" "}
+              {myContrib.task_log_count} task updates ·{" "}
+              {myContrib.audit_count} audits
+            </span>
+          </aside>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {editingHeader ? (
             <>
