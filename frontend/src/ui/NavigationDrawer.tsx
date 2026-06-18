@@ -35,6 +35,12 @@ const ITEMS: ReadonlyArray<Item> = [
   { to: "/portal", label: "Portal", icon: "groups" },
 ];
 
+const ADMIN_LDAP_ITEM = {
+  to: "/admin/ldap",
+  label: "Admin · LDAP",
+  icon: "domain",
+} as const;
+
 function useUnreadMentions(): number {
   const ctx = useContext(AuthContext);
   const [n, setN] = useState(0);
@@ -62,9 +68,16 @@ function useUnreadMentions(): number {
 
 export function NavigationDrawer() {
   const unread = useUnreadMentions();
+  const ctx = useContext(AuthContext);
+  const canManageConfig = ctx?.permissions.has("manageConfig") ?? false;
+
+  const allItems: ReadonlyArray<Item> = canManageConfig
+    ? [...ITEMS, ADMIN_LDAP_ITEM]
+    : ITEMS;
+
   return (
     <nav className="flex h-full w-56 flex-col gap-1 border-r border-outline-variant bg-surface-container-low p-2">
-      {ITEMS.map((it) => {
+      {allItems.map((it) => {
         if (it.to) {
           const badge =
             it.to === "/mentions" && unread > 0 ? unread : null;
