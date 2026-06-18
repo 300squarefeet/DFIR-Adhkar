@@ -31,6 +31,7 @@ from adhkar.auth.saml_errors import (
 )
 from adhkar.auth.tokens import issue_tokens
 from adhkar.core.settings import Settings, get_settings
+from adhkar.core.source_ip import source_ip
 from adhkar.db.models import User
 
 router = APIRouter(prefix="/v1/auth/saml", tags=["auth-saml"])
@@ -162,7 +163,7 @@ async def _audit_failed(
                 "provider": provider,
                 "code": code,
                 "reason": reason,
-                "source_ip": (request.client.host if request.client else None),
+                "source_ip": source_ip(request),
             },
         )
     except Exception:

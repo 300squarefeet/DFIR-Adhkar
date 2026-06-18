@@ -15,6 +15,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from adhkar.core.source_ip import source_ip
+
 _log = logging.getLogger(__name__)
 
 # Per-route-family limits: requests-per-window. window=60 seconds.
@@ -64,7 +66,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         bucket, limit = _route_bucket(request.url.path)
-        client = request.client.host if request.client else "unknown"
+        client = source_ip(request) or "unknown"
         key = f"rl:{bucket}:{client}"
         r = await self._client()
         if r is None:

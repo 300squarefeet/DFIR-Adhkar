@@ -16,6 +16,7 @@ from adhkar.api.deps import CurrentUser, get_current_user, get_db, get_redis, ge
 from adhkar.auth.password import verify_password
 from adhkar.auth.tokens import ACCESS_TTL, REFRESH_TTL, issue_tokens, revoke_session, rotate_refresh
 from adhkar.core.settings import Settings
+from adhkar.core.source_ip import source_ip
 from adhkar.db.models import Profile, User, UserOrgMembership
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -112,7 +113,7 @@ async def login(
         perms=sorted(profile.permissions),
         secret=settings.secret_key,
         user_agent=request.headers.get("user-agent"),
-        ip=request.client.host if request.client else None,
+        ip=source_ip(request),
     )
 
     _set_refresh_cookie(response, issued.refresh_token, settings)
@@ -143,7 +144,7 @@ async def refresh(
             perms=[],
             secret=settings.secret_key,
             user_agent=request.headers.get("user-agent"),
-            ip=request.client.host if request.client else None,
+            ip=source_ip(request),
         )
     except ValueError as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from e
@@ -199,7 +200,7 @@ async def switch_org(
         perms=sorted(profile.permissions),
         secret=settings.secret_key,
         user_agent=request.headers.get("user-agent"),
-        ip=request.client.host if request.client else None,
+        ip=source_ip(request),
     )
     _set_refresh_cookie(response, issued.refresh_token, settings)
     return LoginResponse(
