@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
